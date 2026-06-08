@@ -1,315 +1,367 @@
 package orchestrator
 
 import (
-    "fmt"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "time"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
 
-    "comquad/internal/cooker"
-    "comquad/internal/deploy"
-    "comquad/internal/preprocess"
-    "comquad/internal/transpile"
+	"comquad/internal/cooker"
+	"comquad/internal/deploy"
+	"comquad/internal/preprocess"
+	"comquad/internal/transpile"
 )
 
 // Orchestrator wires all internal packages together and drives
 // the lifecycle of a comquad project.
 type Orchestrator struct {
-    projectName string
-    cwd         string
+	projectName string
+	cwd         string
 }
 
 // NewOrchestrator creates a new Orchestrator for the current working directory.
 func NewOrchestrator(projectName string) (*Orchestrator, error) {
-    cwd, err := os.Getwd()
-    if err != nil {
-        return nil, fmt.Errorf("failed to get working directory: %w", err)
-    }
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
 
-    // Fall back to directory name if no name provided
-    if projectName == "" {
-        projectName = filepath.Base(cwd)
-    }
+	// Fall back to directory name if no name provided
+	if projectName == "" {
+		projectName = filepath.Base(cwd)
+	}
 
-    return &Orchestrator{
-        projectName: projectName,
-        cwd:         cwd,
-    }, nil
+	return &Orchestrator{
+		projectName: projectName,
+		cwd:         cwd,
+	}, nil
 }
 
 // Up preprocesses, transpiles, cooks and deploys the project
 // defined in the compose.yaml in the current working directory.
 func (o *Orchestrator) Up() error {
-    composeFile := filepath.Join(o.cwd, "compose.yaml")
-    if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-        return fmt.Errorf("no compose.yaml found in current directory")
-    }
+	composeFile := findComposeFile(o.cwd)
+	if composeFile == "" {
+		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
+	}
 
-    targetDir, err := o.resolveTargetDir()
-    if err != nil {
-        return err
-    }
+	targetDir, err := o.resolveTargetDir()
+	if err != nil {
+		return err
+	}
 
-    tempDir, err := os.MkdirTemp("", "comquad-*")
-    if err != nil {
-        return fmt.Errorf("failed to create temp directory: %w", err)
-    }
-    defer os.RemoveAll(tempDir)
+	tempDir, err := os.MkdirTemp("", "comquad-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
 
-    processedYaml, err := o.preprocess(composeFile)
-    if err != nil {
-        return err
-    }
+	processedYaml, err := o.preprocess(composeFile)
+	if err != nil {
+		return err
+	}
 
-    if err := o.transpile(processedYaml, tempDir); err != nil {
-        return err
-    }
+	if err := o.transpile(processedYaml, tempDir); err != nil {
+		return err
+	}
 
-    isRootless := os.Getuid() != 0
-    if err := o.cook(tempDir, targetDir, isRootless); err != nil {
-        return err
-    }
+	isRootless := isRootless()
+	if err := o.cook(tempDir, targetDir, isRootless); err != nil {
+		return err
+	}
 
-    projectFiles, err := o.collectProjectFiles(targetDir)
-    if err != nil {
-        return err
-    }
+	projectFiles, err := o.collectProjectFiles(targetDir)
+	if err != nil {
+		return err
+	}
 
-    // cleanup only removes files if registration fails
-    // NOT on startUnits failure — files must stay for systemd
-    cleanup := func() {
-        for _, f := range projectFiles {
-            os.Remove(f)
-        }
-        if dbusMgr, err := deploy.NewSystemdManager(); err == nil {
-            defer dbusMgr.Close()
-            dbusMgr.ReloadDaemon()
-        }
-    }
+	// cleanup only removes files if registration fails
+	// NOT on startUnits failure — files must stay for systemd
+	cleanup := func() {
+		for _, f := range projectFiles {
+			os.Remove(f)
+		}
+		if dbusMgr, err := deploy.NewSystemdManager(); err == nil {
+			defer dbusMgr.Close()
+			dbusMgr.ReloadDaemon(projectFiles...)
+		}
+	}
 
-    if err := o.registerState(projectFiles); err != nil {
-        cleanup()
-        return err
-    }
+	if err := o.registerState(projectFiles); err != nil {
+		cleanup()
+		return err
+	}
 
-    // ✅ No cleanup on startUnits failure — let systemd keep the files
-    if err := o.startUnits(projectFiles); err != nil {
-        return fmt.Errorf("units written but failed to start: %w", err)
-    }
+	// No cleanup on startUnits failure — let systemd keep the files
+	if err := o.startUnits(projectFiles); err != nil {
+		return fmt.Errorf("units written but failed to start: %w", err)
+	}
 
-    fmt.Println("Successfully deployed project:", o.projectName)
-    return nil
+	fmt.Println("Successfully deployed project:", o.projectName)
+	return nil
 }
-
 
 // Down stops all units, removes quadlet files and unregisters the project.
 func (o *Orchestrator) Down() error {
-    stateMgr, err := deploy.NewStateManager()
-    if err != nil {
-        return fmt.Errorf("failed to initialize state manager: %w", err)
-    }
+	stateMgr, err := deploy.NewStateManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize state manager: %w", err)
+	}
 
-    state, exists := stateMgr.Projects[o.projectName]
-    if !exists {
-        return fmt.Errorf("project %s is not deployed", o.projectName)
-    }
+	state, exists := stateMgr.Projects[o.projectName]
+	if !exists {
+		return fmt.Errorf("project %s is not deployed", o.projectName)
+	}
 
-    // Step 1: Stop all units via systemd
-    if err := o.stopUnits(state.Files); err != nil {
-        // Non-fatal: log and continue so we still clean up files
-        fmt.Printf("Warning: some units failed to stop: %v\n", err)
-    }
+	// Step 1: Stop all units via systemd
+	if err := o.stopUnits(state.Files); err != nil {
+		fmt.Printf("Warning: some units failed to stop: %v\n", err)
+	}
 
-    // Step 2: Remove quadlet files from target dir
-    for _, f := range state.Files {
-        if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
-            fmt.Printf("Warning: failed to remove file %s: %v\n", f, err)
-        }
-    }
+	// Verify units are actually stopped
+	if err := o.verifyUnitsStopped(state.Files); err != nil {
+		fmt.Printf("Warning: %v\n", err)
+	}
 
-    // Step 3: Reload daemon so systemd forgets the removed units
-    dbusMgr, err := deploy.NewSystemdManager()
-    if err != nil {
-        return fmt.Errorf("failed to connect to systemd: %w", err)
-    }
-    defer dbusMgr.Close()
+	// Step 2: Remove quadlet files from target dir
+	for _, f := range state.Files {
+		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
+			fmt.Printf("Warning: failed to remove file %s: %v\n", f, err)
+		}
+	}
 
-    if err := dbusMgr.ReloadDaemon(); err != nil {
-        return fmt.Errorf("failed to reload systemd daemon: %w", err)
-    }
+	// Step 3: Reload daemon so systemd forgets the removed units
+	dbusMgr, err := deploy.NewSystemdManager()
+	if err != nil {
+		return fmt.Errorf("failed to connect to systemd: %w", err)
+	}
+	defer dbusMgr.Close()
 
-    // Step 4: Unregister project from state
-    if err := stateMgr.UnregisterProject(o.projectName); err != nil {
-        return fmt.Errorf("failed to unregister project: %w", err)
-    }
+	if err := dbusMgr.ReloadDaemon(); err != nil {
+		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+	}
 
-    fmt.Println("Successfully removed project:", o.projectName)
-    return nil
+	// Step 4: Unregister project from state
+	if err := stateMgr.UnregisterProject(o.projectName); err != nil {
+		return fmt.Errorf("failed to unregister project: %w", err)
+	}
+
+	fmt.Println("Successfully removed project:", o.projectName)
+	return nil
 }
 
 // --- private helpers ---
 
 func (o *Orchestrator) resolveTargetDir() (string, error) {
-    resolver := deploy.NewTargetDirResolver()
-    targetDir, err := resolver.GetSystemdPath()
-    if err != nil {
-        return "", fmt.Errorf("failed to resolve systemd path: %w", err)
-    }
-    return targetDir, nil
+	resolver := deploy.NewTargetDirResolver()
+	targetDir, err := resolver.GetSystemdPath()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve systemd path: %w", err)
+	}
+	return targetDir, nil
 }
 
 func (o *Orchestrator) preprocess(composeFile string) ([]byte, error) {
-    composeData, err := os.ReadFile(composeFile)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read compose file: %w", err)
-    }
+	composeData, err := os.ReadFile(composeFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read compose file: %w", err)
+	}
 
-    engine := preprocess.NewEngine(o.projectName, o.cwd)
-    processed, err := engine.Process(composeData)
-    if err != nil {
-        return nil, fmt.Errorf("preprocessing failed: %w", err)
-    }
+	engine := preprocess.NewEngine(o.projectName, o.cwd)
+	processed, err := engine.Process(composeData)
+	if err != nil {
+		return nil, fmt.Errorf("preprocessing failed: %w", err)
+	}
 
-    return processed, nil
+	return processed, nil
 }
 
 func (o *Orchestrator) transpile(processedYaml []byte, tempDir string) error {
-    podlet := transpile.NewPodletRunner(tempDir)
-    if err := podlet.Transpile(processedYaml); err != nil {
-        return fmt.Errorf("transpilation failed: %w", err)
-    }
-    return nil
+	podlet := transpile.NewPodletRunner(tempDir)
+	if err := podlet.Transpile(processedYaml); err != nil {
+		return fmt.Errorf("transpilation failed: %w", err)
+	}
+	return nil
 }
 
 func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) error {
-    cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless)
-    if err := cookerEngine.Cook(); err != nil {
-        return fmt.Errorf("cooking failed: %w", err)
-    }
-    return nil
+	cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless)
+	if err := cookerEngine.Cook(); err != nil {
+		return fmt.Errorf("cooking failed: %w", err)
+	}
+	return nil
 }
 
 func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
-    entries, err := os.ReadDir(targetDir)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read target directory: %w", err)
-    }
+	entries, err := os.ReadDir(targetDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read target directory: %w", err)
+	}
 
-    var projectFiles []string
-    prefix := "comquad-" + o.projectName
-    for _, f := range entries {
-        if strings.Contains(f.Name(), prefix) {
-            projectFiles = append(projectFiles, filepath.Join(targetDir, f.Name()))
-        }
-    }
+	var projectFiles []string
+	prefix := "comquad-" + o.projectName
+	for _, f := range entries {
+		if strings.HasPrefix(f.Name(), prefix) {
+			projectFiles = append(projectFiles, filepath.Join(targetDir, f.Name()))
+		}
+	}
 
-    return projectFiles, nil
+	return projectFiles, nil
 }
 
 func (o *Orchestrator) registerState(projectFiles []string) error {
-    stateMgr, err := deploy.NewStateManager()
-    if err != nil {
-        return fmt.Errorf("failed to initialize state manager: %w", err)
-    }
+	stateMgr, err := deploy.NewStateManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize state manager: %w", err)
+	}
 
-    return stateMgr.RegisterProject(deploy.ProjectState{
-        ProjectName: o.projectName,
-        SourcePath:  o.cwd,
-        Files:       projectFiles,
-    })
+	return stateMgr.RegisterProject(deploy.ProjectState{
+		ProjectName: o.projectName,
+		SourcePath:  o.cwd,
+		Files:       projectFiles,
+	})
 }
 
 func (o *Orchestrator) startUnits(projectFiles []string) error {
-    dbusMgr, err := deploy.NewSystemdManager()
-    if err != nil {
-        return fmt.Errorf("failed to connect to systemd: %w", err)
-    }
-    defer dbusMgr.Close()
+	dbusMgr, err := deploy.NewSystemdManager()
+	if err != nil {
+		return fmt.Errorf("failed to connect to systemd: %w", err)
+	}
+	defer dbusMgr.Close()
 
-    // Pre-pull all images referenced in container files
-    if err := o.prePullImages(projectFiles); err != nil {
-        return fmt.Errorf("failed to pre-pull images: %w", err)
-    }
+	// Pre-pull all images referenced in container files
+	if err := o.prePullImages(projectFiles); err != nil {
+		return fmt.Errorf("failed to pre-pull images: %w", err)
+	}
 
-    if err := dbusMgr.ReloadDaemon(); err != nil {
-        return fmt.Errorf("failed to reload systemd daemon: %w", err)
-    }
+	if err := dbusMgr.ReloadDaemon(projectFiles...); err != nil {
+		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+	}
 
-    for _, f := range projectFiles {
-        if strings.HasSuffix(f, ".container") {
-            unitName := containerFileToUnitName(f)
-            fmt.Printf("Starting unit: %s\n", unitName)
+	for _, f := range projectFiles {
+		if strings.HasSuffix(f, ".container") {
+			unitName := containerFileToUnitName(f)
+			fmt.Printf("Starting unit: %s\n", unitName)
 
-            if err := dbusMgr.WaitForUnit(unitName, 10*time.Second); err != nil {
-                return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
-            }
+			if err := dbusMgr.WaitForUnit(unitName, 10*time.Second); err != nil {
+				return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
+			}
 
-            if err := dbusMgr.StartUnit(unitName); err != nil {
-                return fmt.Errorf("failed to start unit %s: %w", unitName, err)
-            }
-        }
-    }
+			if err := dbusMgr.StartUnit(unitName); err != nil {
+				return fmt.Errorf("failed to start unit %s: %w", unitName, err)
+			}
+		}
+	}
 
-    return nil
+	return nil
 }
 
 // prePullImages reads all .container files and pulls their images via podman
 // so systemd doesn't have to deal with interactive registry prompts.
 func (o *Orchestrator) prePullImages(projectFiles []string) error {
-    for _, f := range projectFiles {
-        if !strings.HasSuffix(f, ".container") {
-            continue
-        }
+	for _, f := range projectFiles {
+		if !strings.HasSuffix(f, ".container") {
+			continue
+		}
 
-        content, err := os.ReadFile(f)
-        if err != nil {
-            return fmt.Errorf("failed to read %s: %w", f, err)
-        }
+		content, err := os.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w", f, err)
+		}
 
-        // Parse Image= line from the container file
-        for _, line := range strings.Split(string(content), "\n") {
-            line = strings.TrimSpace(line)
-            if strings.HasPrefix(line, "Image=") {
-                image := strings.TrimPrefix(line, "Image=")
-                image = strings.TrimSpace(image)
-                fmt.Printf("Pulling image: %s\n", image)
+		// Parse Image= line from the container file
+		for _, line := range strings.Split(string(content), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "Image=") {
+				image := strings.TrimPrefix(line, "Image=")
+				image = strings.TrimSpace(image)
+				fmt.Printf("Pulling image: %s\n", image)
 
-                cmd := exec.Command("podman", "pull", image)
-                cmd.Stdout = os.Stdout
-                cmd.Stderr = os.Stderr
-                if err := cmd.Run(); err != nil {
-                    return fmt.Errorf("failed to pull image %s: %w", image, err)
-                }
-                break
-            }
-        }
-    }
-    return nil
+				cmd := exec.Command("podman", "pull", image)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					return fmt.Errorf("failed to pull image %s: %w", image, err)
+				}
+				break
+			}
+		}
+	}
+	return nil
 }
 
 func (o *Orchestrator) stopUnits(projectFiles []string) error {
-    dbusMgr, err := deploy.NewSystemdManager()
-    if err != nil {
-        return fmt.Errorf("failed to connect to systemd: %w", err)
-    }
-    defer dbusMgr.Close()
+	dbusMgr, err := deploy.NewSystemdManager()
+	if err != nil {
+		return fmt.Errorf("failed to connect to systemd: %w", err)
+	}
+	defer dbusMgr.Close()
 
-    for _, f := range projectFiles {
-        if strings.HasSuffix(f, ".container") {
-            unitName := containerFileToUnitName(f)
-            fmt.Printf("Stopping unit: %s\n", unitName)
-            if err := dbusMgr.StopUnit(unitName); err != nil {
-                return fmt.Errorf("failed to stop unit %s: %w", unitName, err)
-            }
-        }
-    }
+	for _, f := range projectFiles {
+		if strings.HasSuffix(f, ".container") {
+			unitName := containerFileToUnitName(f)
+			fmt.Printf("Stopping unit: %s\n", unitName)
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				return fmt.Errorf("failed to stop unit %s: %w", unitName, err)
+			}
+		}
+	}
 
-    return nil
+	return nil
+}
+
+func (o *Orchestrator) verifyUnitsStopped(projectFiles []string) error {
+	dbusMgr, err := deploy.NewSystemdManager()
+	if err != nil {
+		return fmt.Errorf("failed to connect to systemd: %w", err)
+	}
+	defer dbusMgr.Close()
+
+	var activeUnits []string
+	for _, f := range projectFiles {
+		if !strings.HasSuffix(f, ".container") {
+			continue
+		}
+		unitName := containerFileToUnitName(f)
+		units, err := dbusMgr.ListUnitsByNames([]string{unitName})
+		if err != nil {
+			continue
+		}
+		if len(units) > 0 && units[0].ActiveState == "active" {
+			activeUnits = append(activeUnits, unitName)
+		}
+	}
+
+	if len(activeUnits) > 0 {
+		return fmt.Errorf("units still active after stop: %s", strings.Join(activeUnits, ", "))
+	}
+
+	return nil
 }
 
 func containerFileToUnitName(filePath string) string {
-    base := filepath.Base(filePath)
-    return strings.TrimSuffix(base, ".container") + ".service"
+	base := filepath.Base(filePath)
+	return strings.TrimSuffix(base, ".container") + ".service"
+}
+
+func findComposeFile(dir string) string {
+	candidates := []string{
+		"compose.yaml",
+		"compose.yml",
+		"docker-compose.yaml",
+		"docker-compose.yml",
+	}
+	for _, name := range candidates {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
+func isRootless() bool {
+	return os.Getuid() != 0
 }
