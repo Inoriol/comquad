@@ -22,7 +22,8 @@ func NewEngine(projectName string, workingDir string) *Engine {
 	}
 }
 
-// Process takes a raw YAML input and applies normalization rules
+// Process takes a raw YAML input and applies normalization rules.
+// It also extracts build configuration from services.
 func (e *Engine) Process(input []byte) ([]byte, error) {
 	var cf ComposeFile
 
@@ -50,8 +51,8 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 
 		service.Labels["com.comquad.project"] = e.ProjectName
 
-		// Normalize image names to full Docker Hub path when no registry is specified
-		if service.Image != "" {
+		// Normalize image names only for services without build config
+		if service.Image != "" && service.Build == nil {
 			service.Image = normalizeImage(service.Image)
 		}
 
@@ -96,6 +97,53 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 	}
 
 	return output, nil
+}
+
+// GetBuildInfo returns build configuration for services that have it
+func (e *Engine) GetBuildInfo(input []byte) (map[string]*BuildInfo, error) {
+	var cf ComposeFile
+
+	if err := yaml.Unmarshal(input, &cf); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal compose file: %w", err)
+	}
+
+	buildInfo := make(map[string]*BuildInfo)
+
+	for serviceName, service := range cf.Services {
+		if service.Build == nil {
+			continue
+		}
+
+		context := service.Build.Context
+		if context == "" {
+			context = "."
+		}
+
+		// Resolve context to absolute path
+		if !filepath.IsAbs(context) {
+			context = filepath.Join(e.WorkingDirectory, context)
+		}
+
+		dockerfile := service.Build.Dockerfile
+		if dockerfile == "" {
+			dockerfile = "Dockerfile"
+		}
+
+		args := []string{}
+		for k, v := range service.Build.Args {
+			args = append(args, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		buildInfo[serviceName] = &BuildInfo{
+			Context:    context,
+			Dockerfile: dockerfile,
+			Args:       args,
+			Target:     service.Build.Target,
+			Service:    serviceName,
+		}
+	}
+
+	return buildInfo, nil
 }
 
 // normalizeImage ensures the image has a full registry path.

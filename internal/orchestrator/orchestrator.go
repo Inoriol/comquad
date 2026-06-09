@@ -3,11 +3,11 @@ package orchestrator
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"comquad/internal/build"
 	"comquad/internal/cooker"
 	"comquad/internal/deploy"
 	"comquad/internal/preprocess"
@@ -41,7 +41,7 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 
 // Up preprocesses, transpiles, cooks and deploys the project
 // defined in the compose.yaml in the current working directory.
-func (o *Orchestrator) Up() error {
+func (o *Orchestrator) Up(forceBuild bool, pullStrategy string) error {
 	composeFile := findComposeFile(o.cwd)
 	if composeFile == "" {
 		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
@@ -57,6 +57,18 @@ func (o *Orchestrator) Up() error {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
+
+	// Read compose file once to get build info
+	composeData, err := os.ReadFile(composeFile)
+	if err != nil {
+		return fmt.Errorf("failed to read compose file: %w", err)
+	}
+
+	// Get build info before preprocessing
+	buildInfo, err := o.getBuildInfo(composeData)
+	if err != nil {
+		return err
+	}
 
 	processedYaml, err := o.preprocess(composeFile)
 	if err != nil {
@@ -91,6 +103,11 @@ func (o *Orchestrator) Up() error {
 
 	if err := o.registerState(projectFiles); err != nil {
 		cleanup()
+		return err
+	}
+
+	// Handle images (build or pull) before starting units
+	if err := o.handleImages(projectFiles, buildInfo, forceBuild, pullStrategy); err != nil {
 		return err
 	}
 
@@ -178,6 +195,11 @@ func (o *Orchestrator) preprocess(composeFile string) ([]byte, error) {
 	return processed, nil
 }
 
+func (o *Orchestrator) getBuildInfo(composeData []byte) (map[string]*preprocess.BuildInfo, error) {
+	engine := preprocess.NewEngine(o.projectName, o.cwd)
+	return engine.GetBuildInfo(composeData)
+}
+
 func (o *Orchestrator) transpile(processedYaml []byte, tempDir string) error {
 	podlet := transpile.NewPodletRunner(tempDir)
 	if err := podlet.Transpile(processedYaml); err != nil {
@@ -231,11 +253,6 @@ func (o *Orchestrator) startUnits(projectFiles []string) error {
 	}
 	defer dbusMgr.Close()
 
-	// Pre-pull all images referenced in container files
-	if err := o.prePullImages(projectFiles); err != nil {
-		return fmt.Errorf("failed to pre-pull images: %w", err)
-	}
-
 	if err := dbusMgr.ReloadDaemon(projectFiles...); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
@@ -258,9 +275,42 @@ func (o *Orchestrator) startUnits(projectFiles []string) error {
 	return nil
 }
 
-// prePullImages reads all .container files and pulls their images via podman
-// so systemd doesn't have to deal with interactive registry prompts.
-func (o *Orchestrator) prePullImages(projectFiles []string) error {
+// handleImages builds or pulls images based on the compose file and strategy
+func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]*preprocess.BuildInfo, forceBuild bool, pullStrategy string) error {
+	// First handle build services
+	for serviceName, info := range buildInfo {
+		imageTag := build.GenerateBuildTag(o.projectName, serviceName)
+
+		// Check if we need to build
+		shouldBuild := forceBuild
+		if !shouldBuild {
+			engine := &build.Engine{}
+			shouldBuild = !engine.ImageExists(imageTag)
+		}
+
+		if shouldBuild {
+			engine := &build.Engine{}
+			if err := engine.BuildService(
+				serviceName,
+				info.Context,
+				info.Dockerfile,
+				info.Args,
+				info.Target,
+				imageTag,
+			); err != nil {
+				return fmt.Errorf("failed to build image for service %s: %w", serviceName, err)
+			}
+		} else {
+			fmt.Printf("Image already exists locally, skipping build: %s\n", imageTag)
+		}
+	}
+
+	// Then handle image-only services
+	imagePullStrategy, err := build.ParsePullStrategy(pullStrategy)
+	if err != nil {
+		return err
+	}
+
 	for _, f := range projectFiles {
 		if !strings.HasSuffix(f, ".container") {
 			continue
@@ -277,18 +327,24 @@ func (o *Orchestrator) prePullImages(projectFiles []string) error {
 			if strings.HasPrefix(line, "Image=") {
 				image := strings.TrimPrefix(line, "Image=")
 				image = strings.TrimSpace(image)
-				fmt.Printf("Pulling image: %s\n", image)
 
-				cmd := exec.Command("podman", "pull", image)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					return fmt.Errorf("failed to pull image %s: %w", image, err)
+				// Skip build-generated images (they're already handled above)
+				if strings.Contains(image, ":") {
+					continue
+				}
+
+				engine := &build.Engine{
+					PullStrategy: imagePullStrategy,
+				}
+
+				if err := engine.HandleImage("unknown", image); err != nil {
+					return fmt.Errorf("failed to handle image %s: %w", image, err)
 				}
 				break
 			}
 		}
 	}
+
 	return nil
 }
 

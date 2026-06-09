@@ -343,3 +343,265 @@ func TestNormalizeImage_EmptyString(t *testing.T) {
 func contains(haystack, needle string) bool {
 	return len(haystack) > 0 && len(needle) > 0 && (len(haystack) >= len(needle)) && (haystack == needle || len(haystack) > len(needle) && (haystack[:len(needle)] == needle || contains(haystack[1:], needle)))
 }
+
+func TestProcess_SkipsImageNormalizationForBuildServices(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: .
+  db:
+    image: postgres
+`)
+
+	engine := NewEngine("myapp", "/some/dir")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	resultStr := string(result)
+
+	// web service should NOT have docker.io/library/ prefix
+	if contains(resultStr, "docker.io/library/web") {
+		t.Errorf("build service 'web' should not have docker.io/library/ prefix")
+	}
+
+	// db service should have docker.io/library/ prefix
+	if !contains(resultStr, "docker.io/library/postgres") {
+		t.Errorf("image service 'db' should have docker.io/library/ prefix")
+	}
+}
+
+func TestGetBuildInfo_StringContext(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: ./myapp
+  api:
+    build: .
+`)
+
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo([]byte(input))
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web' service")
+	}
+
+	if webInfo.Context != "/workdir/myapp" {
+		t.Errorf("expected web context '/workdir/myapp', got %q", webInfo.Context)
+	}
+
+	if webInfo.Dockerfile != "Dockerfile" {
+		t.Errorf("expected web dockerfile 'Dockerfile', got %q", webInfo.Dockerfile)
+	}
+
+	apiInfo, ok := buildInfo["api"]
+	if !ok {
+		t.Fatal("expected build info for 'api' service")
+	}
+
+	if apiInfo.Context != "/workdir" {
+		t.Errorf("expected api context '/workdir', got %q", apiInfo.Context)
+	}
+}
+
+func TestGetBuildInfo_MapContext(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+      target: production
+      args:
+        VERSION: "1.0"
+        ARCH: "amd64"
+`)
+
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo([]byte(input))
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web' service")
+	}
+
+	if webInfo.Context != "/workdir/apps/web" {
+		t.Errorf("expected web context '/workdir/apps/web', got %q", webInfo.Context)
+	}
+
+	if webInfo.Dockerfile != "Dockerfile.prod" {
+		t.Errorf("expected web dockerfile 'Dockerfile.prod', got %q", webInfo.Dockerfile)
+	}
+
+	if webInfo.Target != "production" {
+		t.Errorf("expected web target 'production', got %q", webInfo.Target)
+	}
+
+	// Check build args
+	found := false
+	for _, arg := range webInfo.Args {
+		if arg == "VERSION=1.0" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected build arg 'VERSION=1.0', got %v", webInfo.Args)
+	}
+}
+
+func TestGetBuildInfo_NoBuildServices(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    image: nginx
+  db:
+    image: postgres
+`)
+
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo([]byte(input))
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+
+	if len(buildInfo) != 0 {
+		t.Errorf("expected no build info, got %d entries", len(buildInfo))
+	}
+}
+
+func TestProcess_BuildWithStringContext(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: ./myapp
+  db:
+    image: postgres
+`)
+
+	engine := NewEngine("myapp", "/workdir")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	resultStr := string(result)
+
+	// web service should have build context preserved (converted to map form)
+	if !contains(resultStr, "context: ./myapp") {
+		t.Errorf("expected build context './myapp' to be preserved, got:\n%s", resultStr)
+	}
+
+	// web service should NOT have docker.io/library/ prefix
+	if contains(resultStr, "docker.io/library/web") {
+		t.Errorf("build service 'web' should not have docker.io/library/ prefix")
+	}
+
+	// db service should have docker.io/library/ prefix
+	if !contains(resultStr, "docker.io/library/postgres") {
+		t.Errorf("image service 'db' should have docker.io/library/ prefix")
+	}
+}
+
+func TestProcess_BuildWithMapContext(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+      target: production
+`)
+
+	engine := NewEngine("myapp", "/workdir")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	resultStr := string(result)
+
+	// Check that build config is preserved
+	if !contains(resultStr, "context: ./apps/web") {
+		t.Errorf("expected context to be preserved")
+	}
+	if !contains(resultStr, "dockerfile: Dockerfile.prod") {
+		t.Errorf("expected dockerfile to be preserved")
+	}
+	if !contains(resultStr, "target: production") {
+		t.Errorf("expected target to be preserved")
+	}
+}
+
+func TestGetBuildInfo_BuildWithStringContext(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: ./myapp
+`)
+
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo([]byte(input))
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web' service")
+	}
+
+	if webInfo.Context != "/workdir/myapp" {
+		t.Errorf("expected context '/workdir/myapp', got %q", webInfo.Context)
+	}
+
+	if webInfo.Dockerfile != "Dockerfile" {
+		t.Errorf("expected dockerfile 'Dockerfile', got %q", webInfo.Dockerfile)
+	}
+}
+
+func TestGetBuildInfo_BuildWithMapContext(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+      target: prod
+      args:
+        VERSION: "1.0"
+`)
+
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo([]byte(input))
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web' service")
+	}
+
+	if webInfo.Context != "/workdir/apps/web" {
+		t.Errorf("expected context '/workdir/apps/web', got %q", webInfo.Context)
+	}
+
+	if webInfo.Dockerfile != "Dockerfile.prod" {
+		t.Errorf("expected dockerfile 'Dockerfile.prod', got %q", webInfo.Dockerfile)
+	}
+
+	if webInfo.Target != "prod" {
+		t.Errorf("expected target 'prod', got %q", webInfo.Target)
+	}
+}
+

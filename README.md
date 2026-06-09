@@ -25,7 +25,9 @@ management to systemd.
    `.network`, and `.volume` quadlet files
 3. **Cook** — prefixes files with `cq-<project>`, rewrites cross-unit
    references, and applies rootless port offsets where needed
-4. **Deploy** — copies files to the systemd config directory, registers project
+4. **Build** — builds images from `build:` contexts (if defined), checks local
+   images, and pulls from registry (respects `--pull` flag)
+5. **Deploy** — copies files to the systemd config directory, registers project
    state, and starts each unit via D-Bus
 
 ## Requirements
@@ -62,6 +64,20 @@ Override the project name:
 
 ```bash
 comquad up -n my-service
+```
+
+Force rebuild all images:
+
+```bash
+comquad up --build
+```
+
+Control image pull behavior:
+
+```bash
+comquad up --pull always      # Always pull from registry
+comquad up --pull missing      # Pull only if not found locally (default)
+comquad up --pull never        # Fail if image not found locally
 ```
 
 ### Remove a project
@@ -103,6 +119,7 @@ comquad ps -n myapp               # units for named project
 
 ```
 cmd/comquad/        CLI entry point (cobra commands)
+internal/build/     Image building and pulling (podman build/pull)
 internal/cooker/    Post-processes quadlet files (renaming, reference rewriting)
 internal/deploy/    Systemd interaction (D-Bus), state management, target dir resolution
 internal/orchestrator/ Wires all packages together, drives up/down lifecycle
@@ -148,6 +165,37 @@ supported:
 - Container names are auto-generated as `<project>-<service>` if not specified
 - A `com.comquad.project` label is injected into every service
 - Images without a registry prefix default to Docker Hub (`docker.io/library/`)
+- Services with `build:` skip image normalization (no `docker.io/library/` prefix added)
+- Build services are tagged as `<project>-<service>:latest`
+
+### Build support
+
+Services with a `build:` field are built locally using `podman build`. The image
+is tagged as `<project>-<service>:latest` and used in the generated quadlet
+files. Build configuration supports:
+
+```yaml
+services:
+  web:
+    build:
+      context: ./apps/web        # Build context directory (default: .)
+      dockerfile: Dockerfile.prod # Custom Dockerfile name (default: Dockerfile)
+      target: production          # Build target stage
+      args:                       # Build arguments
+        VERSION: "1.0"
+        ARCH: "amd64"
+```
+
+Or a shorthand string form:
+
+```yaml
+services:
+  web:
+    build: ./apps/web
+```
+
+Build images are not pulled from a registry. Use `--build` to force rebuild even
+if the image exists locally.
 
 ### Opting out of AutoUpdate
 

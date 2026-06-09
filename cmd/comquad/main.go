@@ -26,7 +26,13 @@ var upCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Up()
+
+		pullStr := pullStrategy
+		if pullStr == "" {
+			pullStr = "missing"
+		}
+
+		return o.Up(forceBuild, pullStr)
 	},
 }
 
@@ -55,6 +61,8 @@ var listCmd = &cobra.Command{
 }
 
 var follow bool
+var forceBuild bool
+var pullStrategy string
 
 var logsCmd = &cobra.Command{
 	Use:   "logs [service ...]",
@@ -106,6 +114,8 @@ var checkCmd = &cobra.Command{
 
 func init() {
 	upCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	upCmd.Flags().BoolVarP(&forceBuild, "build", "b", false, "Force rebuild images even if they exist locally")
+	upCmd.Flags().StringVarP(&pullStrategy, "pull", "p", "missing", "Image pull strategy: 'always', 'missing' (default), or 'never'")
 	downCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	listCmd.Flags().StringVarP(&projectName, "name", "n", "", "Filter by project name")
 	logsCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
