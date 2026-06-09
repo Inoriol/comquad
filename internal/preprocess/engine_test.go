@@ -123,8 +123,8 @@ services:
 	}
 
 	resultStr := string(result)
-	if !contains(resultStr, "comquad-default") {
-		t.Errorf("expected default network 'comquad-default' not found in:\n%s", resultStr)
+	if !contains(resultStr, "cq-default") {
+		t.Errorf("expected default network 'cq-default' not found in:\n%s", resultStr)
 	}
 }
 
@@ -142,9 +142,9 @@ services:
 	}
 
 	resultStr := string(result)
-	// Service with no explicit networks should be attached to comquad-default
-	if !contains(resultStr, "comquad-default") {
-		t.Errorf("expected service to be attached to comquad-default, got:\n%s", resultStr)
+	// Service with no explicit networks should be attached to cq-default
+	if !contains(resultStr, "cq-default") {
+		t.Errorf("expected service to be attached to cq-default, got:\n%s", resultStr)
 	}
 }
 
@@ -167,7 +167,7 @@ networks:
 	}
 
 	resultStr := string(result)
-	if contains(resultStr, "comquad-default") {
+	if contains(resultStr, "cq-default") {
 		t.Errorf("expected no default network when networks are already defined, got:\n%s", resultStr)
 	}
 }

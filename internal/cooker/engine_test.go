@@ -25,7 +25,7 @@ func TestCook_RenamesFiles(t *testing.T) {
 	}
 
 	for _, f := range files {
-		expected := "comquad-myproject-" + f
+		expected := "cq-myproject-" + f
 		dst := filepath.Join(targetDir, expected)
 		if _, err := os.Stat(dst); os.IsNotExist(err) {
 			t.Errorf("expected file %q not found in target dir", expected)
@@ -37,7 +37,7 @@ func TestCook_AlreadyHasPrefix(t *testing.T) {
 	tempDir := t.TempDir()
 	targetDir := t.TempDir()
 
-	if err := os.WriteFile(filepath.Join(tempDir, "comquad-myproject-web.container"), []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "cq-myproject-web.container"), []byte("test"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,7 +46,7 @@ func TestCook_AlreadyHasPrefix(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-web.container")
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		t.Error("expected file with unchanged name to exist")
 	}
@@ -56,7 +56,7 @@ func TestCook_ReplacesGenericComquadPrefix(t *testing.T) {
 	tempDir := t.TempDir()
 	targetDir := t.TempDir()
 
-	if err := os.WriteFile(filepath.Join(tempDir, "comquad-web.container"), []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "cq-web.container"), []byte("test"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -65,9 +65,9 @@ func TestCook_ReplacesGenericComquadPrefix(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-web.container")
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		t.Error("expected comquad- prefix to be replaced with comquad-myproject- prefix")
+		t.Error("expected cq- prefix to be replaced with cq-myproject- prefix")
 	}
 }
 
@@ -76,15 +76,15 @@ func TestCook_RewritesNetworkReferences(t *testing.T) {
 	targetDir := t.TempDir()
 
 	// Create a network file that will be renamed
-	networkName := "comquad-myproject-appnet.network"
-	networkContent := "[Network]\nName=comquad-myproject-appnet"
+	networkName := "cq-myproject-appnet.network"
+	networkContent := "[Network]\nName=cq-myproject-appnet"
 	if err := os.WriteFile(filepath.Join(tempDir, networkName), []byte(networkContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a container file that references the network
-	containerContent := "[Container]\nImage=nginx\nNetwork=comquad-myproject-appnet"
-	if err := os.WriteFile(filepath.Join(tempDir, "comquad-myproject-web.container"), []byte(containerContent), 0644); err != nil {
+	containerContent := "[Container]\nImage=nginx\nNetwork=cq-myproject-appnet"
+	if err := os.WriteFile(filepath.Join(tempDir, "cq-myproject-web.container"), []byte(containerContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -93,17 +93,17 @@ func TestCook_RewritesNetworkReferences(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-web.container")
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
 	content, err := os.ReadFile(dst)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
 	}
 
 	// The Network= line should have been rewritten from old to new name
-	// Old ref: comquad-myproject-appnet (without .network extension)
-	// New ref: comquad-myproject-appnet (without .network extension)
+	// Old ref: cq-myproject-appnet (without .network extension)
+	// New ref: cq-myproject-appnet (without .network extension)
 	// Since the rename map would have same old/new for this case, no change expected
-	if !strings.Contains(string(content), "Network=comquad-myproject-appnet") {
+	if !strings.Contains(string(content), "Network=cq-myproject-appnet") {
 		t.Errorf("expected Network= reference to be preserved, got:\n%s", string(content))
 	}
 }
@@ -113,15 +113,15 @@ func TestCook_RewritesVolumeReferences(t *testing.T) {
 	targetDir := t.TempDir()
 
 	// Create a volume file
-	volName := "comquad-myproject-appvol.volume"
-	volContent := "[Volume]\nName=comquad-myproject-appvol"
+	volName := "cq-myproject-appvol.volume"
+	volContent := "[Volume]\nName=cq-myproject-appvol"
 	if err := os.WriteFile(filepath.Join(tempDir, volName), []byte(volContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a container file that references the volume
-	containerContent := "[Container]\nImage=nginx\nVolume=comquad-myproject-appvol:/data"
-	if err := os.WriteFile(filepath.Join(tempDir, "comquad-myproject-web.container"), []byte(containerContent), 0644); err != nil {
+	containerContent := "[Container]\nImage=nginx\nVolume=cq-myproject-appvol:/data"
+	if err := os.WriteFile(filepath.Join(tempDir, "cq-myproject-web.container"), []byte(containerContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,13 +130,13 @@ func TestCook_RewritesVolumeReferences(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-web.container")
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
 	content, err := os.ReadFile(dst)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
 	}
 
-	if !strings.Contains(string(content), "Volume=comquad-myproject-appvol") {
+	if !strings.Contains(string(content), "Volume=cq-myproject-appvol") {
 		t.Errorf("expected Volume= reference to be preserved, got:\n%s", string(content))
 	}
 }
@@ -155,7 +155,7 @@ func TestCook_AddsInstallSectionToContainer(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-web.container")
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
 	content, err := os.ReadFile(dst)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
@@ -183,7 +183,7 @@ func TestCook_AddsInstallSectionToNetwork(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-appnet.network")
+	dst := filepath.Join(targetDir, "cq-myproject-appnet.network")
 	content, err := os.ReadFile(dst)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
@@ -208,7 +208,7 @@ func TestCook_SkipsAutoUpdateWhenNoAutoupdateLabel(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-web.container")
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
 	content, err := os.ReadFile(dst)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
@@ -233,7 +233,7 @@ func TestCook_AddsAutoUpdateWhenNoLabel(t *testing.T) {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
-	dst := filepath.Join(targetDir, "comquad-myproject-web.container")
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
 	content, err := os.ReadFile(dst)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
@@ -281,7 +281,7 @@ func TestCook_IgnoresDirectories(t *testing.T) {
 func TestBuildNewFileName_NoPrefix(t *testing.T) {
 	c := &Cooker{ProjectName: "myproject"}
 	result := c.buildNewFileName("web.container")
-	expected := "comquad-myproject-web.container"
+	expected := "cq-myproject-web.container"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}
@@ -289,8 +289,8 @@ func TestBuildNewFileName_NoPrefix(t *testing.T) {
 
 func TestBuildNewFileName_AlreadyHasPrefix(t *testing.T) {
 	c := &Cooker{ProjectName: "myproject"}
-	result := c.buildNewFileName("comquad-myproject-web.container")
-	expected := "comquad-myproject-web.container"
+	result := c.buildNewFileName("cq-myproject-web.container")
+	expected := "cq-myproject-web.container"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}
@@ -298,8 +298,8 @@ func TestBuildNewFileName_AlreadyHasPrefix(t *testing.T) {
 
 func TestBuildNewFileName_HasGenericComquadPrefix(t *testing.T) {
 	c := &Cooker{ProjectName: "myproject"}
-	result := c.buildNewFileName("comquad-web.container")
-	expected := "comquad-myproject-web.container"
+	result := c.buildNewFileName("cq-web.container")
+	expected := "cq-myproject-web.container"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}

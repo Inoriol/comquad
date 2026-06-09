@@ -1,6 +1,14 @@
 # comquad
 
-Docker-compose-like CLI for Podman Quadlets, backed by systemd.
+ComQuad (Compose + Quadlet and small pun to kumquat) is Docker-compose-like CLI for Podman Quadlets, backed by systemd.
+
+## 🚧 Project Status: Infra-Built Utility
+
+I am an infrastructure engineer, not a full-time software developer. I built **Comquad** to solve a specific problem for my own workflow.
+
+- **Contributions:** I am currently not accepting complex feature pull requests because I do not have the bandwidth or Go expertise to maintain them.
+- **Bugs:** Feel free to open issues if a specific Docker Compose file breaks, but fixes will happen on a "best effort" timeline.
+- **Philosophy:** This tool is intentionally small, simple, and transparent. It is not trying to become Kubernetes.
 
 ## Overview
 
@@ -15,7 +23,7 @@ management to systemd.
    networks, project labels)
 2. **Transpile** — runs `podlet` to convert the compose YAML into `.container`,
    `.network`, and `.volume` quadlet files
-3. **Cook** — prefixes files with `comquad-<project>`, rewrites cross-unit
+3. **Cook** — prefixes files with `cq-<project>`, rewrites cross-unit
    references, and applies rootless port offsets where needed
 4. **Deploy** — copies files to the systemd config directory, registers project
    state, and starts each unit via D-Bus
@@ -72,6 +80,23 @@ comquad list
 
 ```bash
 comquad check
+```
+
+### Stream logs
+
+```bash
+comquad logs                      # all services (one-shot)
+comquad logs -f                   # all services (follow)
+comquad logs web                  # single service
+comquad logs -n myapp             # named project
+comquad logs -n myapp web db      # specific services
+```
+
+### Show unit status
+
+```bash
+comquad ps                        # units for current project
+comquad ps -n myapp               # units for named project
 ```
 
 ## Project structure
@@ -139,8 +164,8 @@ services:
 
 ## TODO
 
-- `log` command — stream container logs via `podman logs`
-- `edit` command — open the compose file in an editor and re-deploy
+- `ps` command — to get a clean status table
+- `edit` command — open the quadlet file in an editor and re-deploy
 - Integration tests — end-to-end tests covering the full up/down lifecycle
 - Smarter state management — reconcile `projects.json` with actual systemd units on disk
 

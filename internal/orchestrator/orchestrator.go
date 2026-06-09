@@ -201,7 +201,7 @@ func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
 	}
 
 	var projectFiles []string
-	prefix := "comquad-" + o.projectName
+	prefix := "cq-" + o.projectName
 	for _, f := range entries {
 		if strings.HasPrefix(f.Name(), prefix) {
 			projectFiles = append(projectFiles, filepath.Join(targetDir, f.Name()))
@@ -341,9 +341,13 @@ func (o *Orchestrator) verifyUnitsStopped(projectFiles []string) error {
 	return nil
 }
 
-func containerFileToUnitName(filePath string) string {
+func ContainerFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	return strings.TrimSuffix(base, ".container") + ".service"
+}
+
+func containerFileToUnitName(filePath string) string {
+	return ContainerFileToUnitName(filePath)
 }
 
 func findComposeFile(dir string) string {

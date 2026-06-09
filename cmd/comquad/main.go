@@ -54,6 +54,33 @@ var listCmd = &cobra.Command{
 	},
 }
 
+var follow bool
+
+var logsCmd = &cobra.Command{
+	Use:   "logs [service ...]",
+	Short: "Print logs for a deployed project",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+		follow, _ := cmd.Flags().GetBool("follow")
+		return o.Logs(args, follow)
+	},
+}
+
+var psCmd = &cobra.Command{
+	Use:   "ps",
+	Short: "Show the current state of project units",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+		return o.Ps()
+	},
+}
+
 var checkCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Check that required tools are available",
@@ -81,12 +108,17 @@ func init() {
 	upCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	downCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	listCmd.Flags().StringVarP(&projectName, "name", "n", "", "Filter by project name")
+	logsCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")
+	psCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 }
 
 func main() {
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(downCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(psCmd)
 	rootCmd.AddCommand(checkCmd)
 
 	if err := rootCmd.Execute(); err != nil {

@@ -82,16 +82,16 @@ func (c *Cooker) Cook() error {
 
 // buildNewFileName determines the new name for a file after cooking.
 func (c *Cooker) buildNewFileName(oldName string) string {
-	prefix := fmt.Sprintf("comquad-%s-", c.ProjectName)
+	prefix := fmt.Sprintf("cq-%s-", c.ProjectName)
 
 	// Already has our full prefix — don't double prefix
 	if strings.HasPrefix(oldName, prefix) {
 		return oldName
 	}
 
-	// Podlet added a generic "comquad-" prefix — replace with our full prefix
-	if strings.HasPrefix(oldName, "comquad-") {
-		return prefix + strings.TrimPrefix(oldName, "comquad-")
+	// Podlet added a generic "cq-" prefix — replace with our full prefix
+	if strings.HasPrefix(oldName, "cq-") {
+		return prefix + strings.TrimPrefix(oldName, "cq-")
 	}
 
 	// No prefix — add ours

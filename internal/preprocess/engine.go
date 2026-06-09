@@ -77,7 +77,7 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 
 	// 2. Automatic Networking: Ensure a default bridge network exists
 	if len(cf.Networks) == 0 {
-		cf.Networks["comquad-default"] = &Network{
+		cf.Networks["cq-default"] = &Network{
 			Driver: "bridge",
 		}
 	}
@@ -85,7 +85,7 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 	// Ensure all services are attached to at least one network
 	for _, service := range cf.Services {
 		if len(service.Networks) == 0 {
-			service.Networks = append(service.Networks, "comquad-default")
+			service.Networks = append(service.Networks, "cq-default")
 		}
 	}
 

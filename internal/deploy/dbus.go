@@ -145,3 +145,8 @@ func (s *SystemdManager) StopUnit(unitName string) error {
 func (s *SystemdManager) ListUnitsByNames(unitNames []string) ([]dbus.UnitStatus, error) {
 	return s.conn.ListUnitsByNamesContext(context.Background(), unitNames)
 }
+
+// ListAllUnits returns all units known to systemd.
+func (s *SystemdManager) ListAllUnits() ([]dbus.UnitStatus, error) {
+	return s.conn.ListUnitsContext(context.Background())
+}
