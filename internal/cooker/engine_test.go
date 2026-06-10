@@ -19,7 +19,7 @@ func TestCook_RenamesFiles(t *testing.T) {
 		}
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestCook_AlreadyHasPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestCook_ReplacesGenericComquadPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCook_RewritesNetworkReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestCook_RewritesVolumeReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestCook_AddsInstallSectionToContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestCook_AddsInstallSectionToNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestCook_SkipsAutoUpdateWhenNoAutoupdateLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestCook_AddsAutoUpdateWhenNoLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestCook_CreatesTargetDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestCook_IgnoresDirectories(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -360,7 +360,7 @@ func TestStripQuadletExtension(t *testing.T) {
 }
 
 func TestNewCooker(t *testing.T) {
-	c := NewCooker("/tmp", "/target", "myproject", true)
+	c := NewCooker("/tmp", "/target", "myproject", true, 0)
 	if c.TempDir != "/tmp" {
 		t.Errorf("expected TempDir '/tmp', got %q", c.TempDir)
 	}
@@ -372,5 +372,196 @@ func TestNewCooker(t *testing.T) {
 	}
 	if !c.IsRootless {
 		t.Error("expected IsRootless to be true")
+	}
+}
+
+func TestParseHostPort_Basic(t *testing.T) {
+	tests := []struct {
+		input   string
+		want    int
+		wantErr bool
+	}{
+		{"80", 80, false},
+		{"8080", 8080, false},
+		{"443/tcp", 443, false},
+		{"8080/udp", 8080, false},
+		{"80:80", 80, false},
+		{"8080:80", 8080, false},
+		{"127.0.0.1:80:80", 80, false},
+		{"192.168.1.1:443:443/tcp", 443, false},
+		{"invalid", 0, true},
+		{"abc", 0, true},
+		{":", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := parseHostPort(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("parseHostPort(%q) expected error, got nil", tt.input)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("parseHostPort(%q) unexpected error: %v", tt.input, err)
+				}
+				if got != tt.want {
+					t.Errorf("parseHostPort(%q) = %d, want %d", tt.input, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestRebuildPublishPort_Basic(t *testing.T) {
+	c := &Cooker{}
+
+	tests := []struct {
+		portStr   string
+		newPort   int
+		expected  string
+	}{
+		{"80", 8080, "8080"},
+		{"80:80", 8080, "8080:80"},
+		{"80:443", 8080, "8080:443"},
+		{"127.0.0.1:80:80", 8080, "127.0.0.1:8080:80"},
+		{"80/tcp", 8080, "8080/tcp"},
+		{"80:80/tcp", 8080, "8080:80/tcp"},
+		{"80:80/udp", 8080, "8080:80/udp"},
+		{"127.0.0.1:80:80/udp", 8080, "127.0.0.1:8080:80/udp"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.portStr, func(t *testing.T) {
+			result := c.rebuildPublishPort(tt.portStr, tt.newPort)
+			if result != tt.expected {
+				t.Errorf("rebuildPublishPort(%q, %d) = %q, want %q", tt.portStr, tt.newPort, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCook_PortOffsetting_PrivilegedPorts(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	containerContent := "[Container]\nImage=nginx\nPublishPort=80\nPublishPort=443/tcp"
+	if err := os.WriteFile(filepath.Join(tempDir, "web.container"), []byte(containerContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", true, 2000)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	// Port 80 should be offset to 2080
+	if !strings.Contains(string(content), "PublishPort=2080") {
+		t.Errorf("expected PublishPort=2080, got:\n%s", string(content))
+	}
+	// Port 443 should be offset to 2443 (443 + 2000), but 2043 is claimed by another port so it increments
+	if !strings.Contains(string(content), "PublishPort=2443/tcp") {
+		t.Errorf("expected PublishPort=2443/tcp, got:\n%s", string(content))
+	}
+}
+
+func TestCook_PortOffsetting_UnprivilegedPorts(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	containerContent := "[Container]\nImage=nginx\nPublishPort=8080"
+	if err := os.WriteFile(filepath.Join(tempDir, "web.container"), []byte(containerContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", true, 2000)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	// Port 8080 should remain unchanged (>= 1024)
+	if !strings.Contains(string(content), "PublishPort=8080") {
+		t.Errorf("expected PublishPort=8080 unchanged, got:\n%s", string(content))
+	}
+}
+
+func TestCook_PortOffsetting_NoOffsetForNonRootless(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	containerContent := "[Container]\nImage=nginx\nPublishPort=80"
+	if err := os.WriteFile(filepath.Join(tempDir, "web.container"), []byte(containerContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", false, 2000)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	// Port 80 should remain unchanged when not rootless
+	if !strings.Contains(string(content), "PublishPort=80") {
+		t.Errorf("expected PublishPort=80 unchanged in non-rootless mode, got:\n%s", string(content))
+	}
+}
+
+
+
+func TestCook_PortOffsetting_InternalConflict(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// Two services with privileged ports that would conflict after offsetting
+	// web: PublishPort=80 -> 2080
+	// api: PublishPort=81 -> 2081 (no conflict)
+	webContent := "[Container]\nImage=nginx\nPublishPort=80"
+	apiContent := "[Container]\nImage=node\nPublishPort=81"
+	if err := os.WriteFile(filepath.Join(tempDir, "web.container"), []byte(webContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "api.container"), []byte(apiContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", true, 2000)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	webDst := filepath.Join(targetDir, "cq-myproject-web.container")
+	webOut, err := os.ReadFile(webDst)
+	if err != nil {
+		t.Fatalf("failed to read web output: %v", err)
+	}
+
+	apiDst := filepath.Join(targetDir, "cq-myproject-api.container")
+	apiOut, err := os.ReadFile(apiDst)
+	if err != nil {
+		t.Fatalf("failed to read api output: %v", err)
+	}
+
+	if !strings.Contains(string(webOut), "PublishPort=2080") {
+		t.Errorf("web: expected PublishPort=2080, got:\n%s", string(webOut))
+	}
+	if !strings.Contains(string(apiOut), "PublishPort=2081") {
+		t.Errorf("api: expected PublishPort=2081, got:\n%s", string(apiOut))
 	}
 }

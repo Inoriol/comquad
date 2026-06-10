@@ -60,6 +60,7 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 * An identifying label (`com.comquad.project`) is attached to all generated units.
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
 * Services marked with local `build:` blocks bypass image registry name validation.
+* In rootless mode, privileged ports (< 1024) are automatically offset by `COMQUAD_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
 
 ### Local Build Rules
 
@@ -92,17 +93,3 @@ services:
 
 ```
 
----
-
-## 🗺️ Roadmap & Next Steps
-
-The utility is functional, but the following low-level system integrations are targeted for development:
-
-* **`ps` command improvement** — Clean data-frame formatting to aggregate unit statuses cleanly. Agreggate containers, networks and volumes differently
-* **`edit` workflow** — A command pipeline to open active quadlets inside an `$EDITOR` buffer and instantly reload systemd.
-* **`exec` command** — A command to run a command inside a currently running container.
-* **Port offsetting for rootless** — Offset ports by defined env variable (default 2000) and make sure there are no overlapping afterwards.
-* **Better verbosity** — State to user exactly what changes are made during preparation.
-* **Dry run mode support** — To show what changes would have been made without actual deployment.
-* **Lifecycle Integration Testing** — End-to-end sandbox execution suites to protect the translation pipeline logic.
-* **Self-Healing State Management** — An active reconciliation engine to sync `projects.json` states with active systemd disk states.

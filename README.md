@@ -49,6 +49,7 @@ comquad up
 * **Override project name:** `comquad up -n my-service`
 * **Force rebuild all images:** `comquad up --build`
 * **Control image pulls:** `comquad up --pull [always|missing|never]` *(default: missing)*
+* **Rootless port offset:** Set `COMQUAD_PORT_OFFSET` env variable (default 2000) to shift privileged ports (< 1024) for rootless mode
 
 ### Manage & Monitor
 
@@ -69,7 +70,7 @@ comquad logs -n myapp web db  # specific project/services
 
 ## 🏗️ System Architecture & Internal Mechanics
 
-For a deep dive into how `comquad` processes your compose files, manages state, and maps directories, please see dedicated [ARCHITECTURE.md] guide.
+For a deep dive into how `comquad` processes your compose files, manages state, and maps directories, please see dedicated [Architecture Guide](./ARCHITECTURE.md) guide.
 
 ## 📄 License
 

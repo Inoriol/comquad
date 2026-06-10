@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -209,7 +210,16 @@ func (o *Orchestrator) transpile(processedYaml []byte, tempDir string) error {
 }
 
 func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) error {
-	cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless)
+	portOffset := 0
+	if isRootless {
+		portOffset = 2000
+		if envOffset := os.Getenv("ROOTLESS_PORT_OFFSET"); envOffset != "" {
+			if parsed, err := strconv.Atoi(envOffset); err == nil && parsed > 0 {
+				portOffset = parsed
+			}
+		}
+	}
+	cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless, portOffset)
 	if err := cookerEngine.Cook(); err != nil {
 		return fmt.Errorf("cooking failed: %w", err)
 	}
