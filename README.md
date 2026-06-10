@@ -56,6 +56,7 @@ comquad up
 * **Remove a project:** `comquad down`
 * **List deployed projects:** `comquad list`
 * **Show unit status:** `comquad ps`
+* **View project units or a specific unit file:** `comquad view [project] [service]`
 * **Check prerequisites:** `comquad check`
 
 ### Stream logs
@@ -66,6 +67,15 @@ comquad logs -f               # all services (follow)
 comquad logs web              # single service
 comquad logs -n myapp web db  # specific project/services
 
+```
+
+### View
+
+```bash
+comquad view                  # view all units for a project
+comquad view myapp            # view all units for a specific project
+comquad view myapp web        # cat the cq-myapp-web.container file
+comquad view -n myapp web     # override project name
 ```
 
 ## 🏗️ System Architecture & Internal Mechanics

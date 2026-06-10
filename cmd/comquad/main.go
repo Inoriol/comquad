@@ -112,6 +112,24 @@ var checkCmd = &cobra.Command{
 	},
 }
 
+var viewCmd = &cobra.Command{
+	Use:   "view [project] [service]",
+	Short: "View systemd units for a project or display a specific unit file",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+
+		var projectArg string
+		if len(args) > 0 {
+			projectArg = args[0]
+		}
+
+		return o.View(projectArg)
+	},
+}
+
 func init() {
 	upCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	upCmd.Flags().BoolVarP(&forceBuild, "build", "b", false, "Force rebuild images even if they exist locally")
@@ -121,6 +139,7 @@ func init() {
 	logsCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")
 	psCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	viewCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 }
 
 func main() {
@@ -130,6 +149,7 @@ func main() {
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(psCmd)
 	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(viewCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

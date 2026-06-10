@@ -27,6 +27,16 @@ internal/transpile/    # Wrapper executing the podlet binary
 
 ```
 
+## 👁️ View Command
+
+The `view` command provides two modes of inspection:
+
+**Project view** (no service argument): queries systemd D-Bus for all units belonging to a project, computes aggregate health status (`healthy` / `degraded` / `down`), and displays a table of `UNIT`, `ACTIVE`, and `SUB` states.
+
+**Unit file view** (with service argument): resolves the quadlet file using four matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, or `cq-myapp-web.container`), reads the file, and prints its contents.
+
+Unit resolution iterates over `state.Files` from `projects.json`, checking each pattern in order until a match is found.
+
 ## 💾 State & File System Management
 
 ### State File Location
