@@ -37,6 +37,18 @@ The `view` command provides two modes of inspection:
 
 Unit resolution iterates over `state.Files` from `projects.json`, checking each pattern in order until a match is found.
 
+## ✏️ Edit Command
+
+The `edit` command provides two modes of file editing:
+
+**Project edit** (no service argument): resolves all `.container`, `.network`, and `.volume` quadlet files for a project and opens them in `$EDITOR` (falls back to `vi`). After the editor exits, comquad compares file contents and auto-reloads systemd, restarting any changed container units.
+
+**Unit file edit** (with service argument): resolves a single quadlet file using the same matching patterns as `view`, opens it in the editor, and reloads systemd if changes were detected.
+
+The `--no-reload` flag opens files without triggering a systemd daemon reload or unit restart.
+
+Unit resolution shares the same matching logic as `view`, using `MatchContainer` and `MatchNetworkOrVolume` helpers that iterate over `state.Files` from `projects.json`.
+
 ## 💾 State & File System Management
 
 ### State File Location

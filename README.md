@@ -57,6 +57,7 @@ comquad up
 * **List deployed projects:** `comquad list`
 * **Show unit status:** `comquad ps`
 * **View project units or a specific unit file:** `comquad view [project] [service]`
+* **Edit project units or a specific unit file:** `comquad edit [project] [service] [--no-reload]`
 * **Check prerequisites:** `comquad check`
 
 ### Stream logs
@@ -76,6 +77,16 @@ comquad view                  # view all units for a project
 comquad view myapp            # view all units for a specific project
 comquad view myapp web        # cat the cq-myapp-web.container file
 comquad view -n myapp web     # override project name
+```
+
+### Edit
+
+```bash
+comquad edit                  # edit all units for a project
+comquad edit myapp            # edit all units for a specific project
+comquad edit myapp web        # edit the cq-myapp-web.container file
+comquad edit -n myapp web     # override project name
+comquad edit --no-reload      # open files without auto-reloading systemd
 ```
 
 ## 🏗️ System Architecture & Internal Mechanics

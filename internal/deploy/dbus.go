@@ -141,6 +141,32 @@ func (s *SystemdManager) StopUnit(unitName string) error {
 	return nil
 }
 
+// RestartUnit restarts a specific systemd unit and waits for the job to complete.
+// Unlike StartUnit, this always tears down and recreates the unit even if already active.
+func (s *SystemdManager) RestartUnit(unitName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ch := make(chan string, 1)
+	_, err := s.conn.RestartUnitContext(ctx, unitName, "replace", ch)
+	if err != nil {
+		return fmt.Errorf("failed to enqueue restart job for unit %s: %w", unitName, err)
+	}
+
+	// Wait for the job result or context timeout.
+	// Possible results: "done", "failed", "cancelled", "timeout", "dependency", "skipped"
+	select {
+	case result := <-ch:
+		if result != "done" {
+			return fmt.Errorf("unit %s failed to restart, job result: %s", unitName, result)
+		}
+	case <-ctx.Done():
+		return fmt.Errorf("timed out waiting for unit %s to restart", unitName)
+	}
+
+	return nil
+}
+
 // ListUnitsByNames returns the current state of the specified units.
 func (s *SystemdManager) ListUnitsByNames(unitNames []string) ([]dbus.UnitStatus, error) {
 	return s.conn.ListUnitsByNamesContext(context.Background(), unitNames)

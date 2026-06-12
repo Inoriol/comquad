@@ -63,6 +63,7 @@ var listCmd = &cobra.Command{
 var follow bool
 var forceBuild bool
 var pullStrategy string
+var noReload bool
 
 var logsCmd = &cobra.Command{
 	Use:   "logs [service ...]",
@@ -130,6 +131,24 @@ var viewCmd = &cobra.Command{
 	},
 }
 
+var editCmd = &cobra.Command{
+	Use:   "edit [project] [service]",
+	Short: "Edit systemd units for a project or a specific unit file",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+
+		var projectArg string
+		if len(args) > 0 {
+			projectArg = args[0]
+		}
+
+		return o.Edit(projectArg, noReload)
+	},
+}
+
 func init() {
 	upCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	upCmd.Flags().BoolVarP(&forceBuild, "build", "b", false, "Force rebuild images even if they exist locally")
@@ -140,6 +159,8 @@ func init() {
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")
 	psCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	viewCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	editCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	editCmd.Flags().BoolVar(&noReload, "no-reload", false, "Open files in editor without reloading systemd")
 }
 
 func main() {
@@ -150,6 +171,7 @@ func main() {
 	rootCmd.AddCommand(psCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(viewCmd)
+	rootCmd.AddCommand(editCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

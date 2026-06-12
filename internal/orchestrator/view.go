@@ -104,59 +104,11 @@ func (o *Orchestrator) viewUnit(state deploy.ProjectState, arg string) error {
 }
 
 func (o *Orchestrator) matchContainer(state deploy.ProjectState, arg string) string {
-	servicePrefix := "cq-" + o.projectName + "-"
-
-	for _, f := range state.Files {
-		if !strings.HasSuffix(f, ".container") {
-			continue
-		}
-		base := filepath.Base(f)
-		nameWithoutExt := strings.TrimSuffix(base, ".container")
-
-		if base == arg {
-			return f
-		}
-		if nameWithoutExt == arg {
-			return f
-		}
-		if strings.TrimSuffix(arg, ".service") == nameWithoutExt {
-			return f
-		}
-		if strings.TrimPrefix(nameWithoutExt, servicePrefix) == arg {
-			return f
-		}
-	}
-	return ""
+	return MatchContainer(o.projectName, state, arg)
 }
 
 func (o *Orchestrator) matchNetworkOrVolume(state deploy.ProjectState, arg string) string {
-	for _, f := range state.Files {
-		if !strings.HasSuffix(f, ".network") && !strings.HasSuffix(f, ".volume") {
-			continue
-		}
-		base := filepath.Base(f)
-		nameWithoutExt := strings.TrimSuffix(base, ".network")
-		nameWithoutExt = strings.TrimSuffix(nameWithoutExt, ".volume")
-
-		// Compute the service name (systemd unit name without .service)
-		serviceName := nameWithoutExt
-		if strings.HasSuffix(base, ".network") {
-			serviceName = nameWithoutExt + "-network"
-		} else if strings.HasSuffix(base, ".volume") {
-			serviceName = nameWithoutExt + "-volume"
-		}
-
-		if base == arg {
-			return f
-		}
-		if serviceName == arg {
-			return f
-		}
-		if strings.TrimSuffix(arg, ".service") == serviceName {
-			return f
-		}
-	}
-	return ""
+	return MatchNetworkOrVolume(o.projectName, state, arg)
 }
 
 func (o *Orchestrator) printFile(path string) error {
