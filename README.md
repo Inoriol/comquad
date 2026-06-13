@@ -50,6 +50,7 @@ comquad up
 * **Force rebuild all images:** `comquad up --build`
 * **Control image pulls:** `comquad up --pull [always|missing|never]` *(default: missing)*
 * **Rootless port offset:** Set `COMQUAD_PORT_OFFSET` env variable (default 2000) to shift privileged ports (< 1024) for rootless mode
+* **Follow logs after deploy:** `comquad up -f` streams journal logs from the deployment timestamp until interrupted
 
 ### Manage & Monitor
 

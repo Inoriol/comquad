@@ -5,7 +5,6 @@ The utility is functional, but the following low-level system integrations are t
 * **`logs` command improvement** — Get cleaner logs - more options and include logs for volumes and networks
 * **`ps` command improvement** — Clean data-frame formatting to aggregate unit statuses cleanly. Agreggate containers, networks and volumes differently.
 * **`down` command improvement** — Don't delete .volume resources unless it's specified with tag. Okay, apprently it doesn't even try to delete volumes and networks! Fix it!
-* **`up` command improvement** — Add labels to Networks and Volumes. Add -f tag to emulate vanilla "docker compose up" behavior, where logs of all project units are being followed in read time from the moment project starts
 * **`exec` command** — A command to run a command inside a currently running container.
 * **Better verbosity** — State to user exactly what changes are made during preparation.
 * **Dry run mode support** — To show what changes would have been made without actual deployment.

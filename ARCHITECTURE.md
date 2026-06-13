@@ -8,7 +8,7 @@ When you run `comquad up`, the engine moves your configuration through a five-st
 
 1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels).
 2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, and `.volume` quadlet files.
-3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, and applies rootless port offsets where needed.
+3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed.
 4. **Build** — Handles local images via `podman build` if `build:` contexts are defined, validates existing local images, or pulls missing ones from the registry.
 5. **Deploy** — Relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus.
 
@@ -104,6 +104,7 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 * Every service container without an assigned network is auto-attached to that default project network.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
 * An identifying label (`com.comquad.project`) is attached to all generated units.
+* A `com.comquad.managed` label is attached to all files to indicate comquad management.
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
 * Services marked with local `build:` blocks bypass image registry name validation.
 * In rootless mode, privileged ports (< 1024) are automatically offset by `COMQUAD_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
@@ -138,4 +139,10 @@ services:
       comquad-no-autoupdate: "true"
 
 ```
+
+## 📋 Follow Logs on Deploy
+
+When `comquad up -f` is used, after successfully deploying all units the CLI captures the current timestamp and streams all journal logs for every project unit (containers, networks, and volumes) from that point onward. This emulates the default `docker compose up` behavior (without `-d`), keeping the terminal attached to live output until interrupted with Ctrl+C.
+
+The deployment timestamp is captured after image handling completes but before `daemon-reload` and unit starts, ensuring no startup logs are missed.
 

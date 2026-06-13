@@ -74,6 +74,9 @@ func (c *Cooker) Cook() error {
 			updatedContent = c.addSystemdOptimizations(updatedContent)
 		}
 
+		// Add labels to all file types
+		updatedContent = c.addProjectLabels(updatedContent, newName)
+
 		if err := os.WriteFile(dstPath, []byte(updatedContent), 0644); err != nil {
 			return fmt.Errorf("failed to write file %s: %w", newName, err)
 		}
@@ -341,6 +344,65 @@ func parseHostPort(portStr string) (int, error) {
 	}
 
 	return hostPort, nil
+}
+
+// addProjectLabels injects comquad identity labels into quadlet files.
+// All files get Label=com.comquad.managed=true.
+// .network and .volume files also get Label=com.comquad.project=<projectName>.
+func (c *Cooker) addProjectLabels(content string, fileName string) string {
+	var sectionHeader string
+
+	switch {
+	case strings.HasSuffix(fileName, ".container"):
+		sectionHeader = "[Container]"
+	case strings.HasSuffix(fileName, ".network"):
+		sectionHeader = "[Network]"
+	case strings.HasSuffix(fileName, ".volume"):
+		sectionHeader = "[Volume]"
+	default:
+		return content
+	}
+
+	lines := strings.Split(content, "\n")
+
+	// Find the section header
+	sectionIdx := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == sectionHeader {
+			sectionIdx = i
+			break
+		}
+	}
+
+	if sectionIdx < 0 {
+		return content
+	}
+
+	// Find the last Label= line in this section
+	lastLabelIdx := -1
+	for i := sectionIdx; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "[") && i > sectionIdx {
+			break
+		}
+		if strings.HasPrefix(trimmed, "Label=") {
+			lastLabelIdx = i
+		}
+	}
+
+	// Insert new labels after the last Label= line (or after section header)
+	insertAt := lastLabelIdx
+	if insertAt < 0 {
+		insertAt = sectionIdx
+	}
+
+	var labels []string
+	labels = append(labels, "Label=com.comquad.project="+c.ProjectName)
+	labels = append(labels, "Label=com.comquad.managed=true")
+
+	lines = append(lines[:insertAt+1], append(labels, lines[insertAt+1:]...)...)
+
+	return strings.Join(lines, "\n")
 }
 
 

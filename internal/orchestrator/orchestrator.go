@@ -42,7 +42,8 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 
 // Up preprocesses, transpiles, cooks and deploys the project
 // defined in the compose.yaml in the current working directory.
-func (o *Orchestrator) Up(forceBuild bool, pullStrategy string) error {
+// If follow is true, streams logs from the deployment timestamp onward.
+func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) error {
 	composeFile := findComposeFile(o.cwd)
 	if composeFile == "" {
 		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
@@ -112,12 +113,21 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string) error {
 		return err
 	}
 
+	// Capture deploy timestamp before starting units
+	deployTime := time.Now().Format("2006-01-02 15:04:05")
+
 	// No cleanup on startUnits failure — let systemd keep the files
 	if err := o.startUnits(projectFiles); err != nil {
 		return fmt.Errorf("units written but failed to start: %w", err)
 	}
 
 	fmt.Println("Successfully deployed project:", o.projectName)
+
+	if follow {
+		fmt.Println("Following logs for project:", o.projectName)
+		return o.FollowLogs(deployTime)
+	}
+
 	return nil
 }
 

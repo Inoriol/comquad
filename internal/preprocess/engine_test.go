@@ -61,9 +61,10 @@ services:
 	}
 
 	resultStr := string(result)
-	expected := "com.comquad.project: testproject"
+	// Labels are now injected in the cooker step, not the preprocessor
+	expected := "container_name: testproject-web"
 	if !contains(resultStr, expected) {
-		t.Errorf("expected label %q not found in:\n%s", expected, resultStr)
+		t.Errorf("expected container_name %q not found in:\n%s", expected, resultStr)
 	}
 }
 
@@ -218,8 +219,9 @@ services:
 	}
 
 	resultStr := string(result)
-	if !contains(resultStr, "com.comquad.project: myapp") {
-		t.Errorf("expected label injection, got:\n%s", resultStr)
+	// Labels are now injected in the cooker step, not the preprocessor
+	if !contains(resultStr, "container_name: myapp-web") {
+		t.Errorf("expected container_name injection, got:\n%s", resultStr)
 	}
 }
 

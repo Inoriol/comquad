@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"comquad/internal/deploy"
@@ -124,6 +125,57 @@ func (o *Orchestrator) runJournalctl(unitNames []string, invocationID string, fo
 	}
 	if invocationID != "" {
 		args = append(args, "--invocation="+invocationID)
+	}
+
+	cmd := exec.Command("journalctl", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+// FollowLogs streams all journalctl logs for every unit in the project
+// from the given timestamp onward.
+func (o *Orchestrator) FollowLogs(since string) error {
+	stateMgr, err := deploy.NewStateManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize state manager: %w", err)
+	}
+
+	state, exists := stateMgr.Projects[o.projectName]
+	if !exists {
+		return fmt.Errorf("project %s is not deployed", o.projectName)
+	}
+
+	var unitNames []string
+	for _, f := range state.Files {
+		base := filepath.Base(f)
+		var unitName string
+		switch {
+		case strings.HasSuffix(f, ".container"):
+			unitName = strings.TrimSuffix(base, ".container") + ".service"
+		case strings.HasSuffix(f, ".network"):
+			unitName = strings.TrimSuffix(base, ".network") + ".network"
+		case strings.HasSuffix(f, ".volume"):
+			unitName = strings.TrimSuffix(base, ".volume") + ".volume"
+		}
+		if unitName != "" {
+			unitNames = append(unitNames, unitName)
+		}
+	}
+
+	if len(unitNames) == 0 {
+		return fmt.Errorf("no units found for project %s", o.projectName)
+	}
+
+	args := []string{"--no-pager", "--since=" + since, "-f"}
+	if os.Getuid() == 0 {
+		args = append(args, "--system")
+	} else {
+		args = append(args, "--user")
+	}
+	for _, unit := range unitNames {
+		args = append(args, "-u", unit)
 	}
 
 	cmd := exec.Command("journalctl", args...)

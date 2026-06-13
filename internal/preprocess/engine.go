@@ -45,12 +45,6 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 			service.ContainerName = fmt.Sprintf("%s-%s", e.ProjectName, serviceName)
 		}
 
-		if service.Labels == nil {
-			service.Labels = make(map[string]string)
-		}
-
-		service.Labels["com.comquad.project"] = e.ProjectName
-
 		// Normalize image names only for services without build config
 		if service.Image != "" && service.Build == nil {
 			service.Image = normalizeImage(service.Image)
