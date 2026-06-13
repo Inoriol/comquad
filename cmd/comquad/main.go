@@ -149,6 +149,42 @@ var editCmd = &cobra.Command{
 	},
 }
 
+var startCmd = &cobra.Command{
+	Use:   "start [service ...]",
+	Short: "Start all units for the project or specific services",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+		return o.Start(args)
+	},
+}
+
+var stopCmd = &cobra.Command{
+	Use:   "stop [service ...]",
+	Short: "Stop all units for the project or specific services",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+		return o.Stop(args)
+	},
+}
+
+var restartCmd = &cobra.Command{
+	Use:   "restart [service ...]",
+	Short: "Restart all units for the project or specific services",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+		return o.Restart(args)
+	},
+}
+
 func init() {
 	upCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	upCmd.Flags().BoolVarP(&forceBuild, "build", "b", false, "Force rebuild images even if they exist locally")
@@ -161,6 +197,9 @@ func init() {
 	viewCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	editCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	editCmd.Flags().BoolVar(&noReload, "no-reload", false, "Open files in editor without reloading systemd")
+	startCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	stopCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	restartCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 }
 
 func main() {
@@ -172,6 +211,9 @@ func main() {
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(viewCmd)
 	rootCmd.AddCommand(editCmd)
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(stopCmd)
+	rootCmd.AddCommand(restartCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -59,6 +59,20 @@ The `logs` command queries systemd D-Bus to determine each unit's state and filt
 
 Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, or short name (after stripping `cq-<project>-` prefix). `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
 
+## 🔄 Lifecycle Commands (Start, Stop, Restart)
+
+The `start`, `stop`, and `restart` commands manage the runtime state of deployed projects without touching quadlet files or triggering daemon-reload. They operate directly via D-Bus.
+
+**Service resolution:** All three commands accept optional `[service ...]` positional arguments. When provided, they use `MatchContainers` to resolve service names to unit names. When omitted, all `.container` files from the project's state are started/stopped/restarted.
+
+**Start** — Iterates over resolved unit names and calls `StartUnit` via D-Bus. Reports per-unit status messages.
+
+**Stop** — Iterates over resolved unit names and calls `StopUnit` via D-Bus, then verifies all units are no longer active (same verification as `down`).
+
+**Restart** — Iterates over resolved unit names and calls `RestartUnit` via D-Bus, which tears down and recreates the unit cleanly.
+
+All three commands require the project to exist in `projects.json` state. They share a `resolveUnits()` helper that looks up the project state, matches service names, and deduplicates results.
+
 ## 💾 State & File System Management
 
 ### State File Location
