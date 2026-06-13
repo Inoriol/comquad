@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -175,4 +176,24 @@ func (s *SystemdManager) ListUnitsByNames(unitNames []string) ([]dbus.UnitStatus
 // ListAllUnits returns all units known to systemd.
 func (s *SystemdManager) ListAllUnits() ([]dbus.UnitStatus, error) {
 	return s.conn.ListUnitsContext(context.Background())
+}
+
+// GetInvocationID returns the invocation ID of a specific unit as raw hex.
+// Returns empty string if the unit is not found or has no invocation ID.
+func (s *SystemdManager) GetInvocationID(unitName string) (string, error) {
+	props, err := s.conn.GetUnitPropertiesContext(context.Background(), unitName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get properties for unit %s: %w", unitName, err)
+	}
+	inv, ok := props["InvocationID"]
+	if !ok {
+		return "", nil
+	}
+	switch v := inv.(type) {
+	case []byte:
+		return hex.EncodeToString(v), nil
+	case string:
+		return v, nil
+	}
+	return "", nil
 }

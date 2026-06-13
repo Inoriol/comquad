@@ -2,7 +2,7 @@
 
 The utility is functional, but the following low-level system integrations are targeted for development:
 
-* **`logs` command improvement** — Get cleaner logs - only for current Invocation ID for running containers and full logs for unit for containers on in other statuses
+* ~~**`logs` command improvement** — Get cleaner logs - only for current Invocation ID for running containers and full logs for unit for containers on in other statuses~~ ✅
 * **`ps` command improvement** — Clean data-frame formatting to aggregate unit statuses cleanly. Agreggate containers, networks and volumes differently.
 * **`down` command improvement** — Don't delete .volume resources unless it's specified with tag
 * **`up` command improvement** — Add -f tag to emulate vanilla "docker compose up" behavior, where logs of all project units are being followed in read time from the moment project starts

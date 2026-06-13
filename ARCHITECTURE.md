@@ -49,6 +49,16 @@ The `--no-reload` flag opens files without triggering a systemd daemon reload or
 
 Unit resolution shares the same matching logic as `view`, using `MatchContainer` and `MatchNetworkOrVolume` helpers that iterate over `state.Files` from `projects.json`.
 
+## 📋 Logs Command
+
+The `logs` command queries systemd D-Bus to determine each unit's state and filters output accordingly:
+
+**Running units** (`ActiveState == "active"`): retrieves the `InvocationID` property via D-Bus `GetUnitProperties` and passes it to `journalctl --invocation=<hex>`, showing only logs from the current invocation.
+
+**Stopped / failed units**: no filter is applied, showing full historical logs.
+
+Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, or short name (after stripping `cq-<project>-` prefix). `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
+
 ## 💾 State & File System Management
 
 ### State File Location

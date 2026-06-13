@@ -70,6 +70,8 @@ comquad logs -n myapp web db  # specific project/services
 
 ```
 
+For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown.
+
 ### View
 
 ```bash
