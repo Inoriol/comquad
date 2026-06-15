@@ -73,6 +73,24 @@ The `start`, `stop`, and `restart` commands manage the runtime state of deployed
 
 All three commands require the project to exist in `projects.json` state. They share a `resolveUnits()` helper that looks up the project state, matches service names, and deduplicates results.
 
+## 🗑️ Down Command
+
+The `down` command performs a complete teardown of a deployed project in six steps:
+
+1. **Stop units** — Stops all container units via systemd D-Bus `StopUnit`, then verifies all units are no longer active.
+2. **Remove networks** — Lists all Podman networks matching the `cq-<project>-` or `*-<project>` prefix and removes them via `podman network rm`.
+3. **Remove volumes (opt-in)** — When the `-v, --volumes` flag is provided, lists all Podman volumes matching the same prefix pattern and removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
+4. **Remove quadlet files** — Deletes all `.container`, `.network`, and `.volume` files from the systemd target directory.
+5. **Reload daemon** — Triggers `daemon-reload` via D-Bus so systemd forgets the removed units.
+6. **Unregister project** — Removes the project entry from `projects.json` state file.
+
+**Usage:**
+
+```bash
+comquad down          # stops containers, removes networks, removes quadlet files
+comquad down -v       # also removes Podman volumes
+```
+
 ## 🐳 Exec Command
 
 The `exec` command runs a command inside a running container via `podman exec`. It requires a single service argument and allocates a TTY by default (like `docker compose exec`).

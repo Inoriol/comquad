@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"comquad/internal/deploy"
 	"comquad/internal/orchestrator"
 )
 
@@ -44,9 +45,11 @@ var downCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Down()
+		return o.Down(downRemoveVolumes)
 	},
 }
+
+var downRemoveVolumes bool
 
 var listCmd = &cobra.Command{
 	Use:   "list",
@@ -93,23 +96,59 @@ var psCmd = &cobra.Command{
 
 var checkCmd = &cobra.Command{
 	Use:   "check",
-	Short: "Check that required tools are available",
+	Short: "Check that required tools and services are available",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tools := []string{"podman", "podlet"}
 		var missing []string
+		var warnings []string
+
 		for _, tool := range tools {
 			if _, err := exec.LookPath(tool); err != nil {
 				missing = append(missing, tool)
 			}
 		}
+
 		if len(missing) > 0 {
 			return fmt.Errorf("missing required tools: %s", strings.Join(missing, ", "))
 		}
+
 		fmt.Println("All required tools are available:")
 		for _, tool := range tools {
 			path, _ := exec.LookPath(tool)
 			fmt.Printf("  %s: %s\n", tool, path)
 		}
+
+		if _, err := exec.LookPath("systemctl"); err != nil {
+			warnings = append(warnings, "systemctl not found — systemd integration may not work")
+		}
+
+		sm, err := deploy.NewSystemdManager()
+		if err != nil {
+			warnings = append(warnings, "D-Bus connection failed: "+err.Error())
+		} else {
+			sm.Close()
+			fmt.Println("  D-Bus: connected")
+		}
+
+		resolver := deploy.NewTargetDirResolver()
+		targetDir, err := resolver.GetSystemdPath()
+		if err == nil {
+			if err := os.MkdirAll(targetDir, 0755); err != nil {
+				warnings = append(warnings, "target directory not writable: "+targetDir)
+			} else {
+				fmt.Printf("  Target dir: %s (writable)\n", targetDir)
+			}
+		}
+
+		if len(warnings) > 0 {
+			fmt.Println("\nWarnings:")
+			for _, w := range warnings {
+				fmt.Printf("  - %s\n", w)
+			}
+		} else {
+			fmt.Println("\nAll system checks passed.")
+		}
+
 		return nil
 	},
 }
@@ -220,6 +259,7 @@ func init() {
 	upCmd.Flags().StringVarP(&pullStrategy, "pull", "p", "missing", "Image pull strategy: 'always', 'missing' (default), or 'never'")
 	upCmd.Flags().BoolVarP(&upFollow, "follow", "f", false, "Follow logs after deployment")
 	downCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	downCmd.Flags().BoolVarP(&downRemoveVolumes, "volumes", "v", false, "Remove named volumes declared in the compose file")
 	listCmd.Flags().StringVarP(&projectName, "name", "n", "", "Filter by project name")
 	logsCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")

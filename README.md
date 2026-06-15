@@ -49,7 +49,7 @@ comquad up
 * **Override project name:** `comquad up -n my-service`
 * **Force rebuild all images:** `comquad up --build`
 * **Control image pulls:** `comquad up --pull [always|missing|never]` *(default: missing)*
-* **Rootless port offset:** Set `COMQUAD_PORT_OFFSET` env variable (default 2000) to shift privileged ports (< 1024) for rootless mode
+* **Rootless port offset:** Set `ROOTLESS_PORT_OFFSET` env variable (default 2000) to shift privileged ports (< 1024) for rootless mode
 * **Follow logs after deploy:** `comquad up -f` streams journal logs from the deployment timestamp until interrupted
 
 ### Manage & Monitor
@@ -58,6 +58,7 @@ comquad up
 * **Stop a project:** `comquad stop [service ...]`
 * **Restart a project:** `comquad restart [service ...]`
 * **Remove a project:** `comquad down`
+* **Remove with volumes:** `comquad down -v` (also removes Podman volumes)
 * **List deployed projects:** `comquad list`
 * **Show unit status:** `comquad ps`
 * **View unit file:** `comquad view [project] [service]`

@@ -81,7 +81,7 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) err
 		return err
 	}
 
-	isRootless := isRootless()
+	isRootless := deploy.IsRootless()
 	if err := o.cook(tempDir, targetDir, isRootless); err != nil {
 		return err
 	}
@@ -131,8 +131,9 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) err
 	return nil
 }
 
-// Down stops all units, removes quadlet files and unregisters the project.
-func (o *Orchestrator) Down() error {
+// Down stops all units, removes quadlet files, removes networks, and unregisters the project.
+// If removeVolumes is true, also removes Podman volumes.
+func (o *Orchestrator) Down(removeVolumes bool) error {
 	stateMgr, err := deploy.NewStateManager()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
@@ -153,14 +154,26 @@ func (o *Orchestrator) Down() error {
 		fmt.Printf("Warning: %v\n", err)
 	}
 
-	// Step 2: Remove quadlet files from target dir
+	// Step 2: Remove networks
+	if err := deploy.RemoveNetworks(o.projectName); err != nil {
+		fmt.Printf("Warning: failed to remove networks: %v\n", err)
+	}
+
+	// Step 3: Remove volumes if requested
+	if removeVolumes {
+		if err := deploy.RemoveVolumes(o.projectName); err != nil {
+			fmt.Printf("Warning: failed to remove volumes: %v\n", err)
+		}
+	}
+
+	// Step 4: Remove quadlet files from target dir
 	for _, f := range state.Files {
 		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
 			fmt.Printf("Warning: failed to remove file %s: %v\n", f, err)
 		}
 	}
 
-	// Step 3: Reload daemon so systemd forgets the removed units
+	// Step 5: Reload daemon so systemd forgets the removed units
 	dbusMgr, err := deploy.NewSystemdManager()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
@@ -171,7 +184,7 @@ func (o *Orchestrator) Down() error {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
 
-	// Step 4: Unregister project from state
+	// Step 6: Unregister project from state
 	if err := stateMgr.UnregisterProject(o.projectName); err != nil {
 		return fmt.Errorf("failed to unregister project: %w", err)
 	}
@@ -442,6 +455,4 @@ func findComposeFile(dir string) string {
 	return ""
 }
 
-func isRootless() bool {
-	return os.Getuid() != 0
-}
+

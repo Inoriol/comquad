@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,7 +25,7 @@ func NewSystemdManager() (*SystemdManager, error) {
 
 	// Use Background context — connection is long-lived,
 	// timeout contexts are only for individual operations
-	if isRootless := os.Getuid() != 0; isRootless {
+	if IsRootless() {
 		conn, err = dbus.NewUserConnectionContext(context.Background())
 	} else {
 		conn, err = dbus.NewSystemConnectionContext(context.Background())
@@ -196,4 +196,74 @@ func (s *SystemdManager) GetInvocationID(unitName string) (string, error) {
 		return v, nil
 	}
 	return "", nil
+}
+
+// RemoveNetworks removes all Podman networks matching the cq-<projectName> prefix.
+func RemoveNetworks(projectName string) error {
+	cmd := exec.Command("podman", "network", "ls", "--format", "{{.Name}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to list networks: %w", err)
+	}
+
+	prefix := "cq-" + projectName + "-"
+	var networks []string
+	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if strings.HasPrefix(name, prefix) || strings.HasSuffix(name, "-"+projectName) {
+			networks = append(networks, name)
+		}
+	}
+
+	if len(networks) == 0 {
+		return nil
+	}
+
+	for _, name := range networks {
+		fmt.Printf("Removing network: %s\n", name)
+		rmCmd := exec.Command("podman", "network", "rm", name)
+		if err := rmCmd.Run(); err != nil {
+			fmt.Printf("Warning: failed to remove network %s: %v\n", name, err)
+		}
+	}
+
+	return nil
+}
+
+// RemoveVolumes removes all Podman volumes matching the cq-<projectName> prefix.
+func RemoveVolumes(projectName string) error {
+	cmd := exec.Command("podman", "volume", "ls", "--format", "{{.Name}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to list volumes: %w", err)
+	}
+
+	prefix := "cq-" + projectName + "-"
+	var volumes []string
+	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if strings.HasPrefix(name, prefix) || strings.HasSuffix(name, "-"+projectName) {
+			volumes = append(volumes, name)
+		}
+	}
+
+	if len(volumes) == 0 {
+		return nil
+	}
+
+	for _, name := range volumes {
+		fmt.Printf("Removing volume: %s\n", name)
+		rmCmd := exec.Command("podman", "volume", "rm", name)
+		if err := rmCmd.Run(); err != nil {
+			fmt.Printf("Warning: failed to remove volume %s: %v\n", name, err)
+		}
+	}
+
+	return nil
 }
