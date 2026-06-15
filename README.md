@@ -107,6 +107,15 @@ comquad restart web           # restart a specific service
 comquad -n myapp start        # override project name
 ```
 
+### Exec
+
+```bash
+comquad exec web ls /app              # run command in web service
+comquad exec web sh                   # interactive shell (TTY allocated by default)
+comquad exec -u root web bash         # run as root inside the container
+comquad exec web -- cat /etc/hostname # pass through to podman
+```
+
 ## 🏗️ System Architecture & Internal Mechanics
 
 For a deep dive into how `comquad` processes your compose files, manages state, and maps directories, please see dedicated [Architecture Guide](./ARCHITECTURE.md) guide.

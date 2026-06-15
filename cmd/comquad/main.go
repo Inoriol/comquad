@@ -186,6 +186,34 @@ var restartCmd = &cobra.Command{
 	},
 }
 
+var execUser string
+var execTTY bool
+
+var execCmd = &cobra.Command{
+	Use:   "exec [service] <command...>",
+	Short: "Run a command inside a running container",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+
+		var service string
+		var command []string
+
+		if len(args) > 0 {
+			service = args[0]
+			command = args[1:]
+		}
+
+		if len(command) == 0 {
+			return fmt.Errorf("exec requires a command to run: comquad exec [service] <command>")
+		}
+
+		return o.Exec(service, execUser, execTTY, command)
+	},
+}
+
 func init() {
 	upCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	upCmd.Flags().BoolVarP(&forceBuild, "build", "b", false, "Force rebuild images even if they exist locally")
@@ -202,6 +230,9 @@ func init() {
 	startCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	stopCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	restartCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	execCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	execCmd.Flags().StringVarP(&execUser, "user", "u", "", "User to run as inside the container")
+	execCmd.Flags().BoolVarP(&execTTY, "tty", "t", true, "Allocate a TTY (default: true)")
 }
 
 func main() {
@@ -216,6 +247,7 @@ func main() {
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(restartCmd)
+	rootCmd.AddCommand(execCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

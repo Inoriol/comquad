@@ -30,6 +30,9 @@ func MatchContainer(projectName string, state deploy.ProjectState, arg string) s
 		if strings.TrimPrefix(nameWithoutExt, servicePrefix) == arg {
 			return f
 		}
+		if strings.TrimPrefix(nameWithoutExt, "cq-") == arg {
+			return f
+		}
 	}
 	return ""
 }
@@ -59,6 +62,10 @@ func MatchContainers(projectName string, state deploy.ProjectState, arg string) 
 			continue
 		}
 		if strings.TrimPrefix(nameWithoutExt, servicePrefix) == arg {
+			matches = append(matches, f)
+			continue
+		}
+		if strings.TrimPrefix(nameWithoutExt, "cq-") == arg {
 			matches = append(matches, f)
 			continue
 		}

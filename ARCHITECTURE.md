@@ -33,7 +33,7 @@ The `view` command provides two modes of inspection:
 
 **Project view** (no service argument): queries systemd D-Bus for all units belonging to a project, computes aggregate health status (`healthy` / `degraded` / `down`), and displays a table of `UNIT`, `ACTIVE`, and `SUB` states.
 
-**Unit file view** (with service argument): resolves the quadlet file using four matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, or `cq-myapp-web.container`), reads the file, and prints its contents.
+**Unit file view** (with service argument): resolves the quadlet file using five matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, `cq-myapp-web.container`, or `myapp-web`), reads the file, and prints its contents.
 
 Unit resolution iterates over `state.Files` from `projects.json`, checking each pattern in order until a match is found.
 
@@ -57,7 +57,7 @@ The `logs` command queries systemd D-Bus to determine each unit's state and filt
 
 **Stopped / failed units**: no filter is applied, showing full historical logs.
 
-Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, or short name (after stripping `cq-<project>-` prefix). `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
+Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, short name (after stripping `cq-<project>-` prefix), or internal Podman name (after stripping `cq-` prefix). `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
 
 ## 🔄 Lifecycle Commands (Start, Stop, Restart)
 
@@ -72,6 +72,14 @@ The `start`, `stop`, and `restart` commands manage the runtime state of deployed
 **Restart** — Iterates over resolved unit names and calls `RestartUnit` via D-Bus, which tears down and recreates the unit cleanly.
 
 All three commands require the project to exist in `projects.json` state. They share a `resolveUnits()` helper that looks up the project state, matches service names, and deduplicates results.
+
+## 🐳 Exec Command
+
+The `exec` command runs a command inside a running container via `podman exec`. It requires a single service argument and allocates a TTY by default (like `docker compose exec`).
+
+**Service resolution:** Uses `MatchContainers` to resolve the service name to a container quadlet file. The container name is derived by stripping `cq-` prefix and `.container` suffix (e.g. `cq-myapp-web.container` → `myapp-web`). If the service matches multiple containers, an error is returned listing the ambiguous matches.
+
+**Flags:** `-u/--user` sets the user inside the container, `-t/--tty` controls TTY allocation (default `true`). The command is passed directly to `podman exec`, which handles `--` flag separation.
 
 ## 💾 State & File System Management
 
