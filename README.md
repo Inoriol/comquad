@@ -60,10 +60,15 @@ comquad up
 * **Remove a project:** `comquad down`
 * **Remove with volumes:** `comquad down -v` (also removes Podman volumes)
 * **List deployed projects:** `comquad list`
+* **Regenerate state from labels:** `comquad regenerate --force`
 * **Show unit status:** `comquad ps`
 * **View unit file:** `comquad view [project] [service]`
 * **Edit unit file:** `comquad edit [project] [service] [--no-reload]`
 * **Check prerequisites:** `comquad check`
+
+### Self-Healing
+
+* **Regenerate state from Podman labels:** `comquad regenerate --force` (scans containers, networks, and volumes for `com.comquad.managed` label and reconstructs the state file)
 
 ### Stream logs
 

@@ -227,6 +227,24 @@ var restartCmd = &cobra.Command{
 
 var execUser string
 var execTTY bool
+var dryRun bool
+
+var regenerateCmd = &cobra.Command{
+	Use:   "regenerate",
+	Short: "Restore state from Podman labels",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !force {
+			return fmt.Errorf("regenerate requires --force to overwrite existing state")
+		}
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+		return o.Regenerate()
+	},
+}
+
+var force bool
 
 var execCmd = &cobra.Command{
 	Use:   "exec [service] <command...>",
@@ -273,12 +291,15 @@ func init() {
 	execCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	execCmd.Flags().StringVarP(&execUser, "user", "u", "", "User to run as inside the container")
 	execCmd.Flags().BoolVarP(&execTTY, "tty", "t", true, "Allocate a TTY (default: true)")
+	regenerateCmd.Flags().BoolVar(&force, "force", false, "Force regeneration of state file")
+	regenerateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be regenerated without writing")
 }
 
 func main() {
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(downCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(regenerateCmd)
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(psCmd)
 	rootCmd.AddCommand(checkCmd)

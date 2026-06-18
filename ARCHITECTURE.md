@@ -99,6 +99,31 @@ The `exec` command runs a command inside a running container via `podman exec`. 
 
 **Flags:** `-u/--user` sets the user inside the container, `-t/--tty` controls TTY allocation (default `true`). The command is passed directly to `podman exec`, which handles `--` flag separation.
 
+## 🔄 Regenerate Command
+
+The `regenerate` command restores the state file by scanning Podman for managed resources. It is the foundation of comquad's self-healing state management.
+
+**Discovery pipeline:**
+
+1. Queries Podman for all containers with label `com.comquad.managed=true`
+2. Queries Podman for all networks with label `com.comquad.managed=true`
+3. Queries Podman for all volumes with label `com.comquad.managed=true`
+4. Groups all resources by their `com.comquad.project` label value
+5. Resolves quadlet files in the systemd target directory matching `cq-<project>-*.container`, `*.network`, `*.volume`
+6. Writes the reconstructed state to `projects.json`
+
+**Flags:**
+
+* `--force` — Required to overwrite existing state (safety guard)
+* `--dry-run` — Preview what would be regenerated without writing the state file
+
+**Usage:**
+
+```bash
+comquad regenerate --force              # regenerate state from Podman labels
+comquad regenerate --force --dry-run    # preview without writing
+```
+
 ## 💾 State & File System Management
 
 ### State File Location
@@ -107,6 +132,28 @@ The `exec` command runs a command inside a running container via `podman exec`. 
 
 * **Default:** `~/.local/share/comquad/projects.json`
 * **Overridden by:** `$XDG_DATA_HOME/comquad/projects.json`
+
+### State File Format
+
+Each project entry contains:
+
+```json
+{
+  "project_name": "myproject",
+  "source_path": "/home/user/projects/myproject",
+  "files": ["/path/to/cq-myproject-web.container"],
+  "resources": {
+    "containers": ["cq-myproject-web"],
+    "networks": ["cq-myproject-default-network"],
+    "volumes": []
+  }
+}
+```
+
+* **project_name** — The Comquad project name
+* **source_path** — Path to the compose file directory (empty when restored via `regenerate`)
+* **files** — List of quadlet file paths in the systemd target directory
+* **resources** — Podman resources discovered via labels (`containers`, `networks`, `volumes`). Populated by `regenerate` and kept in sync during `up`/`down`.
 
 ### Target Systemd Directories
 

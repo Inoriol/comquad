@@ -6,11 +6,19 @@ import (
 	"path/filepath"
 )
 
+// ResourceInfo tracks Podman resources for a managed project
+type ResourceInfo struct {
+	Containers []string `json:"containers"`
+	Networks   []string `json:"networks"`
+	Volumes    []string `json:"volumes"`
+}
+
 // ProjectState represents the state of a single managed project
 type ProjectState struct {
-	ProjectName string   `json:"project_name"`
-	SourcePath  string   `json:"source_path"`
-	Files       []string `json:"files"` // List of generated quadlet files
+	ProjectName string        `json:"project_name"`
+	SourcePath  string        `json:"source_path"`
+	Files       []string      `json:"files"`         // List of generated quadlet files
+	Resources   *ResourceInfo `json:"resources,omitempty"` // Podman resources discovered via labels
 }
 
 // StateManager manages the persistence of project states in a JSON file

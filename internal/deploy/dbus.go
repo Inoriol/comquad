@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -266,4 +267,131 @@ func RemoveVolumes(projectName string) error {
 	}
 
 	return nil
+}
+
+// PodmanResource represents a discovered Podman resource with its project label
+type PodmanResource struct {
+	Name        string
+	ProjectName string
+	Type        string // "container", "network", "volume"
+}
+
+// RegenerateState scans Podman for managed resources and reconstructs the state file.
+func RegenerateState() (*StateManager, error) {
+	stateMgr, err := NewStateManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize state manager: %w", err)
+	}
+
+	// Discover containers, networks, and volumes by label
+	containers := discoverResources("container", "com.comquad.managed")
+	networks := discoverResources("network", "com.comquad.managed")
+	volumes := discoverResources("volume", "com.comquad.managed")
+
+	// Group by project
+	projects := make(map[string]*ResourceInfo)
+	allResources := []PodmanResource{}
+
+	for _, r := range containers {
+		allResources = append(allResources, r)
+		if _, ok := projects[r.ProjectName]; !ok {
+			projects[r.ProjectName] = &ResourceInfo{}
+		}
+		projects[r.ProjectName].Containers = append(projects[r.ProjectName].Containers, r.Name)
+	}
+
+	for _, r := range networks {
+		allResources = append(allResources, r)
+		if _, ok := projects[r.ProjectName]; !ok {
+			projects[r.ProjectName] = &ResourceInfo{}
+		}
+		projects[r.ProjectName].Networks = append(projects[r.ProjectName].Networks, r.Name)
+	}
+
+	for _, r := range volumes {
+		allResources = append(allResources, r)
+		if _, ok := projects[r.ProjectName]; !ok {
+			projects[r.ProjectName] = &ResourceInfo{}
+		}
+		projects[r.ProjectName].Volumes = append(projects[r.ProjectName].Volumes, r.Name)
+	}
+
+	// Resolve quadlet files for each project
+	resolver := NewTargetDirResolver()
+	targetDir, err := resolver.GetSystemdPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve systemd path: %w", err)
+	}
+
+	for projectName, resources := range projects {
+		var files []string
+		entries, err := os.ReadDir(targetDir)
+		if err != nil {
+			fmt.Printf("Warning: failed to read target directory %s: %v\n", targetDir, err)
+			continue
+		}
+
+		prefix := "cq-" + projectName
+		for _, f := range entries {
+			if strings.HasPrefix(f.Name(), prefix) && (strings.HasSuffix(f.Name(), ".container") ||
+				strings.HasSuffix(f.Name(), ".network") || strings.HasSuffix(f.Name(), ".volume")) {
+				files = append(files, filepath.Join(targetDir, f.Name()))
+			}
+		}
+
+		stateMgr.Projects[projectName] = ProjectState{
+			ProjectName: projectName,
+			SourcePath:  "",
+			Files:       files,
+			Resources:   resources,
+		}
+	}
+
+	return stateMgr, nil
+}
+
+// discoverResources queries Podman for resources of a given type with the managed label
+func discoverResources(resourceType, label string) []PodmanResource {
+	var results []PodmanResource
+
+	var cmd *exec.Cmd
+	switch resourceType {
+	case "container":
+		cmd = exec.Command("podman", "ps", "-a", "--filter", "label="+label, "--format", "{{.Names}}|{{.Label \"com.comquad.project\"}}")
+	case "network":
+		cmd = exec.Command("podman", "network", "ls", "--filter", "label="+label, "--format", "{{.Name}}|{{.Label \"com.comquad.project\"}}")
+	case "volume":
+		cmd = exec.Command("podman", "volume", "ls", "--filter", "label="+label, "--format", "{{.Name}}|{{.Label \"com.comquad.project\"}}")
+	default:
+		return results
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Warning: failed to list %ss: %v\n", resourceType, err)
+		return results
+	}
+
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		name := parts[0]
+		project := parts[1]
+		if name == "" || project == "" {
+			continue
+		}
+		results = append(results, PodmanResource{
+			Name:        name,
+			ProjectName: project,
+			Type:        resourceType,
+		})
+	}
+
+	return results
 }
