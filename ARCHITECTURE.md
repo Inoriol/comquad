@@ -21,6 +21,7 @@ cmd/comquad/           # CLI entry point managed by Cobra commands
 internal/build/        # Image building and registry pulling routines
 internal/cooker/       # Post-processes quadlet files (renaming, reference rewriting)
 internal/deploy/       # Systemd D-Bus communication, target directories, and state tracking
+internal/logger/       # Colorized verbose logging utility
 internal/orchestrator/ # The engine that wires all packages together to drive the up/down lifecycle
 internal/preprocess/   # Pre-parser to normalize raw compose.yaml files
 internal/transpile/    # Wrapper executing the podlet binary
@@ -79,7 +80,7 @@ The `down` command performs a complete teardown of a deployed project in six ste
 
 1. **Stop units** — Stops all container units via systemd D-Bus `StopUnit`, then verifies all units are no longer active.
 2. **Remove networks** — Lists all Podman networks matching the `cq-<project>-` or `*-<project>` prefix and removes them via `podman network rm`.
-3. **Remove volumes (opt-in)** — When the `-v, --volumes` flag is provided, lists all Podman volumes matching the same prefix pattern and removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
+3. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes matching the same prefix pattern and removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
 4. **Remove quadlet files** — Deletes all `.container`, `.network`, and `.volume` files from the systemd target directory.
 5. **Reload daemon** — Triggers `daemon-reload` via D-Bus so systemd forgets the removed units.
 6. **Unregister project** — Removes the project entry from `projects.json` state file.
@@ -88,7 +89,7 @@ The `down` command performs a complete teardown of a deployed project in six ste
 
 ```bash
 comquad down          # stops containers, removes networks, removes quadlet files
-comquad down -v       # also removes Podman volumes
+comquad down -d       # also removes Podman volumes
 ```
 
 ## 🐳 Exec Command
@@ -218,4 +219,33 @@ services:
 When `comquad up -f` is used, after successfully deploying all units the CLI captures the current timestamp and streams all journal logs for every project unit (containers, networks, and volumes) from that point onward. This emulates the default `docker compose up` behavior (without `-d`), keeping the terminal attached to live output until interrupted with Ctrl+C.
 
 The deployment timestamp is captured after image handling completes but before `daemon-reload` and unit starts, ensuring no startup logs are missed.
+
+## 📊 Verbose Output
+
+When `-v` / `--verbose` is enabled, comquad logs every transformation applied during the deployment pipeline. The logger lives in `internal/logger/` and provides colorized output via ANSI codes (green=success, cyan=info, yellow=warning, red=error, blue=action). Colors are disabled when `NO_COLOR` is set.
+
+**Preprocess stage** logs:
+- `Injected container_name: <name>` — when a container name was auto-generated
+- `Normalized image: <original> → <normalized>` — image name normalization to full registry path
+- `Normalized volume path: <relative> → <absolute>` — relative volume path resolution
+- `Created default network: cq-default` — when a default bridge network was injected
+- `Auto-attached '<service>' to network 'cq-default'` — services auto-attached to default network
+
+**Cook stage** logs:
+- `Renamed <old> → <new>` — file renaming with `cq-<project>-` prefix
+- `Rewrote cross-unit references in <file>` — reference rewriting for Network=/Volume=/Pod= directives
+- `Added AutoUpdate=registry to <file>` — systemd auto-update optimization
+- `Added [Install] section to <file>` — systemd install section injection
+- `Added labels: Label=com.comquad.project=<name>, Label=com.comquad.managed=true` — label injection
+- `Offset port: PublishPort=<original> → PublishPort=<offset>` — rootless port offsetting
+
+**Build stage** logs:
+- `Building image for service <name>: <tag>` — local image builds
+- `Built image: <tag>` — build completion
+- `Pulling image: <image>` — image pulls
+- `Handled image: <image>` — image handling completion
+
+**Down stage** logs:
+- `Removing network: <name>` — network removal
+- `Removing volume: <name>` — volume removal
 

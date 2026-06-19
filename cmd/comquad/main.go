@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"comquad/internal/deploy"
+	"comquad/internal/logger"
 	"comquad/internal/orchestrator"
 )
 
@@ -33,6 +34,7 @@ var upCmd = &cobra.Command{
 			pullStr = "missing"
 		}
 
+		logger.SetVerbose(verbose)
 		return o.Up(forceBuild, pullStr, upFollow)
 	},
 }
@@ -50,6 +52,7 @@ var downCmd = &cobra.Command{
 }
 
 var downRemoveVolumes bool
+var verbose bool
 
 var listCmd = &cobra.Command{
 	Use:   "list",
@@ -276,8 +279,9 @@ func init() {
 	upCmd.Flags().BoolVarP(&forceBuild, "build", "b", false, "Force rebuild images even if they exist locally")
 	upCmd.Flags().StringVarP(&pullStrategy, "pull", "p", "missing", "Image pull strategy: 'always', 'missing' (default), or 'never'")
 	upCmd.Flags().BoolVarP(&upFollow, "follow", "f", false, "Follow logs after deployment")
+	upCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed information about changes made during deployment")
 	downCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
-	downCmd.Flags().BoolVarP(&downRemoveVolumes, "volumes", "v", false, "Remove named volumes declared in the compose file")
+	downCmd.Flags().BoolVarP(&downRemoveVolumes, "delete-volumes", "d", false, "Remove named volumes declared in the compose file")
 	listCmd.Flags().StringVarP(&projectName, "name", "n", "", "Filter by project name")
 	logsCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")

@@ -11,6 +11,7 @@ import (
 	"comquad/internal/build"
 	"comquad/internal/cooker"
 	"comquad/internal/deploy"
+	"comquad/internal/logger"
 	"comquad/internal/preprocess"
 	"comquad/internal/transpile"
 )
@@ -121,7 +122,7 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) err
 		return fmt.Errorf("units written but failed to start: %w", err)
 	}
 
-	fmt.Println("Successfully deployed project:", o.projectName)
+	logger.Success("Successfully deployed project: " + o.projectName)
 
 	if follow {
 		fmt.Println("Following logs for project:", o.projectName)
@@ -146,30 +147,30 @@ func (o *Orchestrator) Down(removeVolumes bool) error {
 
 	// Step 1: Stop all units via systemd
 	if err := o.stopUnits(state.Files); err != nil {
-		fmt.Printf("Warning: some units failed to stop: %v\n", err)
+		logger.Warn("Some units failed to stop: " + err.Error())
 	}
 
 	// Verify units are actually stopped
 	if err := o.verifyUnitsStopped(state.Files); err != nil {
-		fmt.Printf("Warning: %v\n", err)
+		logger.Warn(err.Error())
 	}
 
 	// Step 2: Remove networks
 	if err := deploy.RemoveNetworks(o.projectName); err != nil {
-		fmt.Printf("Warning: failed to remove networks: %v\n", err)
+		logger.Warn("Failed to remove networks: " + err.Error())
 	}
 
 	// Step 3: Remove volumes if requested
 	if removeVolumes {
 		if err := deploy.RemoveVolumes(o.projectName); err != nil {
-			fmt.Printf("Warning: failed to remove volumes: %v\n", err)
+			logger.Warn("Failed to remove volumes: " + err.Error())
 		}
 	}
 
 	// Step 4: Remove quadlet files from target dir
 	for _, f := range state.Files {
 		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
-			fmt.Printf("Warning: failed to remove file %s: %v\n", f, err)
+			logger.Warn("Failed to remove file " + f + ": " + err.Error())
 		}
 	}
 
@@ -189,7 +190,7 @@ func (o *Orchestrator) Down(removeVolumes bool) error {
 		return fmt.Errorf("failed to unregister project: %w", err)
 	}
 
-	fmt.Println("Successfully removed project:", o.projectName)
+	logger.Success("Successfully removed project: " + o.projectName)
 	return nil
 }
 
@@ -293,7 +294,7 @@ func (o *Orchestrator) startUnits(projectFiles []string) error {
 	for _, f := range projectFiles {
 		if strings.HasSuffix(f, ".container") {
 			unitName := containerFileToUnitName(f)
-			fmt.Printf("Starting unit: %s\n", unitName)
+			logger.Action("Starting unit: " + unitName)
 
 			if err := dbusMgr.WaitForUnit(unitName, 10*time.Second); err != nil {
 				return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
@@ -333,8 +334,9 @@ func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]
 			); err != nil {
 				return fmt.Errorf("failed to build image for service %s: %w", serviceName, err)
 			}
+			logger.Success("Built image: " + imageTag)
 		} else {
-			fmt.Printf("Image already exists locally, skipping build: %s\n", imageTag)
+			logger.Info("Image already exists locally, skipping build: " + imageTag)
 		}
 	}
 
@@ -373,6 +375,7 @@ func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]
 				if err := engine.HandleImage("unknown", image); err != nil {
 					return fmt.Errorf("failed to handle image %s: %w", image, err)
 				}
+				logger.Success("Handled image: " + image)
 				break
 			}
 		}

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"comquad/internal/logger"
 	"github.com/coreos/go-systemd/v22/dbus"
 )
 
@@ -224,10 +225,10 @@ func RemoveNetworks(projectName string) error {
 	}
 
 	for _, name := range networks {
-		fmt.Printf("Removing network: %s\n", name)
+		logger.Warn("Removing network: " + name)
 		rmCmd := exec.Command("podman", "network", "rm", name)
 		if err := rmCmd.Run(); err != nil {
-			fmt.Printf("Warning: failed to remove network %s: %v\n", name, err)
+			logger.Warn("Failed to remove network " + name + ": " + err.Error())
 		}
 	}
 
@@ -259,10 +260,10 @@ func RemoveVolumes(projectName string) error {
 	}
 
 	for _, name := range volumes {
-		fmt.Printf("Removing volume: %s\n", name)
+		logger.Warn("Removing volume: " + name)
 		rmCmd := exec.Command("podman", "volume", "rm", name)
 		if err := rmCmd.Run(); err != nil {
-			fmt.Printf("Warning: failed to remove volume %s: %v\n", name, err)
+			logger.Warn("Failed to remove volume " + name + ": " + err.Error())
 		}
 	}
 

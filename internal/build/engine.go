@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"comquad/internal/logger"
 )
 
 // PullStrategy defines how images should be pulled
@@ -64,7 +66,7 @@ func (e *Engine) BuildService(service string, context string, dockerfile string,
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	fmt.Printf("Building image for service %s: %s\n", service, tag)
+	logger.Action("Building image for service " + service + ": " + tag)
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to build image for service %s: %w", service, err)
@@ -75,7 +77,7 @@ func (e *Engine) BuildService(service string, context string, dockerfile string,
 
 // PullImage pulls an image from a registry
 func (e *Engine) PullImage(image string) error {
-	fmt.Printf("Pulling image: %s\n", image)
+	logger.Action("Pulling image: " + image)
 
 	cmd := exec.Command("podman", "pull", image)
 	cmd.Stdout = os.Stdout
@@ -97,11 +99,11 @@ func (e *Engine) HandleImage(service, image string) error {
 		if !e.ImageExists(image) {
 			return fmt.Errorf("image %s not found locally and pull strategy is 'never'", image)
 		}
-		fmt.Printf("Using local image: %s\n", image)
+		logger.Info("Using local image: " + image)
 		return nil
 	case PullMissing:
 		if e.ImageExists(image) {
-			fmt.Printf("Image already exists locally: %s\n", image)
+			logger.Info("Image already exists locally: " + image)
 			return nil
 		}
 		return e.PullImage(image)

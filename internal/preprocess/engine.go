@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"comquad/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,11 +44,16 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 	for serviceName, service := range cf.Services {
 		if service.ContainerName == "" {
 			service.ContainerName = fmt.Sprintf("%s-%s", e.ProjectName, serviceName)
+			logger.Info(fmt.Sprintf("Injected container_name: %s-%s", e.ProjectName, serviceName))
 		}
 
 		// Normalize image names only for services without build config
 		if service.Image != "" && service.Build == nil {
+			originalImage := service.Image
 			service.Image = normalizeImage(service.Image)
+			if service.Image != originalImage {
+				logger.Info(fmt.Sprintf("Normalized image: %s → %s", originalImage, service.Image))
+			}
 		}
 
 		// Absolute-ize volumes
@@ -66,6 +72,7 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 				} else {
 					service.Volumes[i] = absPath
 				}
+				logger.Info(fmt.Sprintf("Normalized volume path: %s → %s", vol, service.Volumes[i]))
 			}
 		}
 	}
@@ -75,12 +82,14 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		cf.Networks["cq-default"] = &Network{
 			Driver: "bridge",
 		}
+		logger.Info("Created default network: cq-default")
 	}
 
 	// Ensure all services are attached to at least one network
-	for _, service := range cf.Services {
+	for serviceName, service := range cf.Services {
 		if len(service.Networks) == 0 {
 			service.Networks = append(service.Networks, "cq-default")
+			logger.Info(fmt.Sprintf("Auto-attached '%s' to network 'cq-default'", serviceName))
 		}
 	}
 

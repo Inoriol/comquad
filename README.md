@@ -49,8 +49,34 @@ comquad up
 * **Override project name:** `comquad up -n my-service`
 * **Force rebuild all images:** `comquad up --build`
 * **Control image pulls:** `comquad up --pull [always|missing|never]` *(default: missing)*
+* **Verbose output:** `comquad up -v` shows all transformations (port offsets, label additions, path normalizations, etc.)
 * **Rootless port offset:** Set `ROOTLESS_PORT_OFFSET` env variable (default 2000) to shift privileged ports (< 1024) for rootless mode
 * **Follow logs after deploy:** `comquad up -f` streams journal logs from the deployment timestamp until interrupted
+
+### Verbose Output
+
+Use `-v` / `--verbose` with `up` to see every transformation comquad applies during deployment. Output uses ANSI colors (green=success, cyan=info, yellow=warning, blue=action) and respects `NO_COLOR`.
+
+```bash
+comquad up -v
+```
+
+Typical verbose output:
+
+```
+comquad: Injected container_name: myapp-web
+comquad: Normalized image: nginx → docker.io/library/nginx
+comquad: Normalized volume path: ./data → /home/user/project/data
+comquad: Created default network: cq-default
+comquad: Renamed web.container → cq-myapp-web.container
+comquad: Rewrote cross-unit references in cq-myapp-web.container
+comquad: Added AutoUpdate=registry to cq-myapp-web.container
+comquad: Added [Install] section to cq-myapp-web.container
+comquad: Added labels: Label=com.comquad.project=myapp, Label=com.comquad.managed=true
+comquad: Offset port: PublishPort=80:80 → PublishPort=2080:80
+comquad: Built image: myapp-web:latest
+comquad: Successfully deployed project: myapp
+```
 
 ### Manage & Monitor
 
@@ -58,7 +84,7 @@ comquad up
 * **Stop a project:** `comquad stop [service ...]`
 * **Restart a project:** `comquad restart [service ...]`
 * **Remove a project:** `comquad down`
-* **Remove with volumes:** `comquad down -v` (also removes Podman volumes)
+* **Remove with volumes:** `comquad down -d` (also removes Podman volumes)
 * **List deployed projects:** `comquad list`
 * **Regenerate state from labels:** `comquad regenerate --force`
 * **Show unit status:** `comquad ps`

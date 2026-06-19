@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"comquad/internal/logger"
 )
 
 // Cooker handles the post-processing of Quadlet files
@@ -47,6 +49,7 @@ func (c *Cooker) Cook() error {
 		oldName := entry.Name()
 		newName := c.buildNewFileName(oldName)
 		renameMap[oldName] = newName
+		logger.Info(fmt.Sprintf("Renamed %s → %s", oldName, newName))
 	}
 
 	// Second pass: copy files with new names and rewrite internal references
@@ -68,14 +71,18 @@ func (c *Cooker) Cook() error {
 
 		// Rewrite all internal references using the rename map
 		updatedContent := c.rewriteReferences(string(content), renameMap)
+		logger.Info(fmt.Sprintf("Rewrote cross-unit references in %s", newName))
 
 		// Add systemd optimizations for .container and .network files
 		if strings.HasSuffix(newName, ".container") || strings.HasSuffix(newName, ".network") {
 			updatedContent = c.addSystemdOptimizations(updatedContent)
+			logger.Info(fmt.Sprintf("Added AutoUpdate=registry to %s", newName))
+			logger.Info(fmt.Sprintf("Added [Install] section to %s", newName))
 		}
 
 		// Add labels to all file types
 		updatedContent = c.addProjectLabels(updatedContent, newName)
+		logger.Info(fmt.Sprintf("Added labels to %s", newName))
 
 		if err := os.WriteFile(dstPath, []byte(updatedContent), 0644); err != nil {
 			return fmt.Errorf("failed to write file %s: %w", newName, err)
@@ -87,6 +94,7 @@ func (c *Cooker) Cook() error {
 		if err := c.offsetPorts(); err != nil {
 			return fmt.Errorf("failed to offset ports: %w", err)
 		}
+		logger.Info(fmt.Sprintf("Applied port offset %d for rootless mode", c.PortOffset))
 	}
 
 	return nil
@@ -279,6 +287,7 @@ func (c *Cooker) offsetPorts() error {
 			if err := os.WriteFile(dstPath, []byte(strings.Join(lines, "\n")), 0644); err != nil {
 				return fmt.Errorf("failed to update port in %s: %w", p.filename, err)
 			}
+			logger.Info(fmt.Sprintf("Offset port in %s: %s → %s", p.filename, portStr, newPortStr))
 		}
 	}
 
@@ -399,6 +408,7 @@ func (c *Cooker) addProjectLabels(content string, fileName string) string {
 	var labels []string
 	labels = append(labels, "Label=com.comquad.project="+c.ProjectName)
 	labels = append(labels, "Label=com.comquad.managed=true")
+	logger.Info(fmt.Sprintf("Added labels: Label=com.comquad.project=%s, Label=com.comquad.managed=true", c.ProjectName))
 
 	lines = append(lines[:insertAt+1], append(labels, lines[insertAt+1:]...)...)
 
