@@ -119,6 +119,18 @@ func (sm *StateManager) UnregisterProject(projectName string) error {
 	return sm.Save()
 }
 
+// GetProject returns the state for the named project and whether it exists.
+// This satisfies the StateStore interface without exposing the raw Projects map.
+func (sm *StateManager) GetProject(name string) (ProjectState, bool) {
+	p, ok := sm.Projects[name]
+	return p, ok
+}
+
+// GetStateFilePath returns the path of the state file on disk.
+func (sm *StateManager) GetStateFilePath() string {
+	return sm.StateFilePath
+}
+
 func (sm *StateManager) ListProjects() []ProjectState {
 	projects := make([]ProjectState, 0, len(sm.Projects))
 	for _, p := range sm.Projects {

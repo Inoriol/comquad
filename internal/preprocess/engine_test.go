@@ -607,3 +607,195 @@ services:
 	}
 }
 
+// ---------------------------------------------------------------------------
+// buildArgValue edge cases
+// ---------------------------------------------------------------------------
+
+func TestBuildArgValue_Nil(t *testing.T) {
+	if got := buildArgValue(nil); got != "" {
+		t.Errorf("nil → expected \"\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_String(t *testing.T) {
+	if got := buildArgValue("hello"); got != "hello" {
+		t.Errorf("string → expected \"hello\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_EmptyString(t *testing.T) {
+	if got := buildArgValue(""); got != "" {
+		t.Errorf("empty string → expected \"\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_BoolTrue(t *testing.T) {
+	if got := buildArgValue(true); got != "true" {
+		t.Errorf("bool true → expected \"true\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_BoolFalse(t *testing.T) {
+	if got := buildArgValue(false); got != "false" {
+		t.Errorf("bool false → expected \"false\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_Int(t *testing.T) {
+	if got := buildArgValue(42); got != "42" {
+		t.Errorf("int → expected \"42\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_Int64(t *testing.T) {
+	if got := buildArgValue(int64(99)); got != "99" {
+		t.Errorf("int64 → expected \"99\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_Float64_WholeNumber(t *testing.T) {
+	// YAML unmarshals plain integers as float64; whole floats should format
+	// without a decimal point (e.g. 1.0 → "1", not "1.0").
+	if got := buildArgValue(float64(1)); got != "1" {
+		t.Errorf("float64(1) → expected \"1\", got %q", got)
+	}
+	if got := buildArgValue(float64(42)); got != "42" {
+		t.Errorf("float64(42) → expected \"42\", got %q", got)
+	}
+}
+
+func TestBuildArgValue_Float64_WithDecimal(t *testing.T) {
+	if got := buildArgValue(1.5); got != "1.5" {
+		t.Errorf("float64(1.5) → expected \"1.5\", got %q", got)
+	}
+	if got := buildArgValue(3.14); got != "3.14" {
+		t.Errorf("float64(3.14) → expected \"3.14\", got %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetBuildInfo edge cases
+// ---------------------------------------------------------------------------
+
+func TestGetBuildInfo_EmptyStringContext(t *testing.T) {
+	// A build: block with an explicit empty context should fall back to "."
+	// (resolved to the working directory).
+	input := []byte(`
+services:
+  web:
+    build:
+      context: ""
+      dockerfile: Dockerfile
+`)
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo(input)
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web'")
+	}
+	// An empty context string is treated the same as omitted — defaults to "."
+	// resolved against the working directory.
+	if webInfo.Context != "/workdir" {
+		t.Errorf("empty context → expected \"/workdir\", got %q", webInfo.Context)
+	}
+}
+
+func TestGetBuildInfo_EmptyArgsMap(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build:
+      context: .
+      args: {}
+`)
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo(input)
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web'")
+	}
+	if len(webInfo.Args) != 0 {
+		t.Errorf("empty args map → expected 0 args, got %v", webInfo.Args)
+	}
+}
+
+func TestGetBuildInfo_NonStringArgTypes(t *testing.T) {
+	// YAML bool, integer, and float args must be serialised correctly, not
+	// as "<nil>" or with Go-specific formatting.
+	input := []byte(`
+services:
+  web:
+    build:
+      context: .
+      args:
+        DEBUG: true
+        COUNT: 3
+        RATIO: 1.5
+        EMPTY:
+`)
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo(input)
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web'")
+	}
+
+	want := map[string]string{
+		"DEBUG": "true",
+		"COUNT": "3",
+		"RATIO": "1.5",
+		"EMPTY": "",
+	}
+	got := make(map[string]string)
+	for _, arg := range webInfo.Args {
+		// args are "KEY=VALUE" strings
+		idx := 0
+		for idx < len(arg) && arg[idx] != '=' {
+			idx++
+		}
+		if idx < len(arg) {
+			got[arg[:idx]] = arg[idx+1:]
+		}
+	}
+	for k, wantV := range want {
+		if gotV, ok := got[k]; !ok {
+			t.Errorf("expected arg %q to be present", k)
+		} else if gotV != wantV {
+			t.Errorf("arg %q: expected %q, got %q", k, wantV, gotV)
+		}
+	}
+}
+
+func TestGetBuildInfo_ServiceWithLabelsAndBuild(t *testing.T) {
+	// Labels alongside build: should not interfere with build info extraction.
+	input := []byte(`
+services:
+  web:
+    build: ./app
+    labels:
+      com.example.team: backend
+      comquad-no-autoupdate: "true"
+`)
+	engine := NewEngine("myapp", "/workdir")
+	buildInfo, err := engine.GetBuildInfo(input)
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+	webInfo, ok := buildInfo["web"]
+	if !ok {
+		t.Fatal("expected build info for 'web'")
+	}
+	if webInfo.Context != "/workdir/app" {
+		t.Errorf("expected context \"/workdir/app\", got %q", webInfo.Context)
+	}
+}
+

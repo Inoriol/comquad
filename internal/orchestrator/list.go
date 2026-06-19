@@ -3,13 +3,11 @@ package orchestrator
 import (
 	"fmt"
 	"strings"
-
-	"comquad/internal/deploy"
 )
 
 // List prints all currently deployed projects and their files
 func (o *Orchestrator) List() error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}

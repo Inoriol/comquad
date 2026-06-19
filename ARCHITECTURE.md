@@ -12,6 +12,16 @@ When you run `comquad up`, the engine moves your configuration through a five-st
 4. **Build** — Handles local images via `podman build` if `build:` contexts are defined, validates existing local images, or pulls missing ones from the registry.
 5. **Deploy** — Relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus.
 
+### Dry Run Mode (`--dry-run`)
+
+When `comquad up --dry-run` is used, the pipeline runs steps 1–3 into a private temporary directory instead of the real systemd target. After cooking, `printDryRun` reads each generated file and prints:
+
+- The **target path** it *would* be written to
+- The full **file content** of each quadlet
+- **Image actions** (build/pull) that *would* be taken per service, based on the pull strategy and whether images exist locally
+
+Steps 4–5 are skipped entirely: no files are written to the systemd directory, no state is registered, and no units are started. The temporary preview directory is cleaned up automatically.
+
 ## 📦 Project Directory Structure
 
 The codebase is organized cleanly into domains matching the execution lifecycle steps:
@@ -20,7 +30,8 @@ The codebase is organized cleanly into domains matching the execution lifecycle 
 cmd/comquad/           # CLI entry point managed by Cobra commands
 internal/build/        # Image building and registry pulling routines
 internal/cooker/       # Post-processes quadlet files (renaming, reference rewriting)
-internal/deploy/       # Systemd D-Bus communication, target directories, and state tracking
+internal/deploy/       # Systemd D-Bus communication, target directories, state tracking,
+                       # and the SystemdClient / StateStore interfaces used for testing
 internal/logger/       # Colorized verbose logging utility
 internal/orchestrator/ # The engine that wires all packages together to drive the up/down lifecycle
 internal/preprocess/   # Pre-parser to normalize raw compose.yaml files
@@ -215,15 +226,50 @@ services:
 
 ```
 
+## 🧪 Testing Architecture
+
+The orchestrator package was historically untestable because it constructed `SystemdManager` and `StateManager` directly inside every method. Two interfaces in `internal/deploy/interfaces.go` solve this:
+
+- **`SystemdClient`** — all nine D-Bus methods used by the orchestrator (`StartUnit`, `StopUnit`, `RestartUnit`, `ReloadDaemon`, `WaitForUnit`, `ListUnitsByNames`, `ListAllUnits`, `GetInvocationID`, `Close`). The concrete `SystemdManager` satisfies this interface.
+- **`StateStore`** — all state operations used by the orchestrator (`GetProject`, `GetStateFilePath`, `ListProjects`, `RegisterProject`, `UnregisterProject`, `Save`). The concrete `StateManager` satisfies this interface. `GetProject` replaces direct `Projects[name]` map access, making the interface satisfiable without exposing the map.
+
+`Orchestrator` holds two factory fields instead of calling the constructors directly:
+
+```go
+newState   func() (deploy.StateStore, error)
+newSystemd func() (deploy.SystemdClient, error)
+```
+
+`NewOrchestrator` wires in the real implementations. Tests override these fields with in-memory fakes (`mockStateStore`, `mockSystemdClient`) that record calls and return canned responses, enabling full unit-test coverage without a live D-Bus or Podman daemon.
+
+The `transpile` package is tested via a fake `podlet` shell script placed on a temp PATH entry, exercising the stdin pipe, argument passing, and error paths without requiring the real binary.
+
 ## 📋 Follow Logs on Deploy
 
 When `comquad up -f` is used, after successfully deploying all units the CLI captures the current timestamp and streams all journal logs for every project unit (containers, networks, and volumes) from that point onward. This emulates the default `docker compose up` behavior (without `-d`), keeping the terminal attached to live output until interrupted with Ctrl+C.
 
 The deployment timestamp is captured after image handling completes but before `daemon-reload` and unit starts, ensuring no startup logs are missed.
 
-## 📊 Verbose Output
+## 📊 Output Levels
 
-When `-v` / `--verbose` is enabled, comquad logs every transformation applied during the deployment pipeline. The logger lives in `internal/logger/` and provides colorized output via ANSI codes (green=success, cyan=info, yellow=warning, red=error, blue=action). Colors are disabled when `NO_COLOR` is set.
+comquad has three output modes, controlled by flags on the root command:
+
+| Mode | Flag | What's shown |
+|---|---|---|
+| Normal (default) | *(none)* | Operational messages: unit starts/stops, deploy success, errors |
+| Verbose | `-v` / `--verbose` | All of the above plus every pipeline transformation |
+| Quiet | `-q` / `--quiet` | Errors only (stderr). All other output is suppressed. Useful in scripts. |
+
+`--quiet` takes precedence over `--verbose`. `logger.Error(...)` always writes to stderr regardless of either flag.
+
+The logger lives in `internal/logger/` and exposes three tiers:
+- **`logger.Print(msg)`** — normal operational output, suppressed by `--quiet`
+- **`logger.Action/Info/Success/Warn(msg)`** — verbose-only, also suppressed by `--quiet`
+- **`logger.Error(msg)`** — always to stderr, never suppressed
+
+Colors use ANSI codes (green=success, cyan=info, yellow=warning, red=error, blue=action) and are disabled when `NO_COLOR` is set.
+
+When `-v` / `--verbose` is enabled, comquad additionally logs every transformation applied during the deployment pipeline:
 
 **Preprocess stage** logs:
 - `Injected container_name: <name>` — when a container name was auto-generated

@@ -13,12 +13,12 @@ import (
 
 // View shows systemd units for a project or the contents of a specific unit file.
 func (o *Orchestrator) View(projectArg string) error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	state, exists := stateMgr.Projects[o.projectName]
+	state, exists := stateMgr.GetProject(o.projectName)
 	if !exists {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
@@ -31,7 +31,7 @@ func (o *Orchestrator) View(projectArg string) error {
 }
 
 func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}

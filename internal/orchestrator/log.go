@@ -6,8 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"comquad/internal/deploy"
 )
 
 // Logs prints logs for a deployed project's services via journalctl.
@@ -16,12 +14,12 @@ import (
 // If follow is true, streams logs continuously.
 // If services is empty, logs from all services are shown.
 func (o *Orchestrator) Logs(services []string, follow bool) error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	state, exists := stateMgr.Projects[o.projectName]
+	state, exists := stateMgr.GetProject(o.projectName)
 	if !exists {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
@@ -58,7 +56,7 @@ func (o *Orchestrator) Logs(services []string, follow bool) error {
 		return fmt.Errorf("no container units found for project %s", o.projectName)
 	}
 
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}
@@ -137,12 +135,12 @@ func (o *Orchestrator) runJournalctl(unitNames []string, invocationID string, fo
 // FollowLogs streams all journalctl logs for every unit in the project
 // from the given timestamp onward.
 func (o *Orchestrator) FollowLogs(since string) error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	state, exists := stateMgr.Projects[o.projectName]
+	state, exists := stateMgr.GetProject(o.projectName)
 	if !exists {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}

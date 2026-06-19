@@ -1,15 +1,26 @@
 ## 🗺️ Roadmap & Next Steps
 
-The utility is functional, but the following low-level system integrations are targeted for development:
+### Difficulty: Easy
 
-* **`logs` command improvement** — Get cleaner logs - more options and include logs for volumes and networks. Don't show user and other systemd info left on logs by default
-* **`ps` command improvement** — Clean data-frame formatting to aggregate unit statuses cleanly. Aggregate containers, networks and volumes differently. Get status, running time, cpu and memory from systemd. Get everything else from podman inspect or podman ps --format json
-* **Lifecycle Integration Testing** — End-to-end sandbox execution suites to protect the translation pipeline logic. Build a container with podman, go, podlet. Run it with systemd. Privileged, so it can run podman-in-podman
-* **Orchestrator package tests** — Extract dependencies behind interfaces (Filesystem, SystemdClient, CommandRunner) for mocking. Test Up/Down error paths, resolveUnits, collectProjectFiles, and lifecycle scenarios.
-* **GetBuildInfo edge case tests** — Test empty string context, build with labels, empty args map. The coercion bug (bool/int/nil arg values) is fixed; typed coverage is still missing.
-* **Verbosity improvements** — Add verbose logging to `down`, `start`, `stop`, `restart` commands (currently use plain `fmt.Printf`). Consider adding `--quiet` flag to suppress non-error output.
+
+
+### Difficulty: Medium
+
+* **`logs` command improvement** *(Medium)* — Pass `--output=short-iso` to journalctl to strip raw systemd metadata (boot ID, machine ID lines). Add `-n/--tail <N>` and `--since <time>` flags. Extend `FollowLogs` to include `.network` and `.volume` unit logs alongside containers.
+
+* **`ps` command improvement** *(Medium)* — Reformat output to match `docker compose ps` style: container name, image, command, status, ports. Run `podman ps --format json` filtered by `com.comquad.project` label, merge with D-Bus active/sub state. Show networks and volumes in a separate section below. Replace the current bare systemd table.
+
+### Difficulty: Hard
+
+* **Lifecycle Integration Testing** *(Hard)* — End-to-end sandbox execution suite. Build a privileged OCI image containing podman, Go, podlet, and systemd. Run `comquad up` / `down` inside it via podman-in-podman. Validate that quadlet files are generated, units start, and state is correctly written and cleaned up. Requires significant CI infrastructure work.
 
 ## ✅ Resolved
+
+* **`--dry-run` for `up`** — Runs the full preprocess → transpile → cook pipeline into a temporary preview directory, then prints each generated quadlet file alongside the target path it *would* be written to, plus image build/pull actions that *would* be taken. Nothing is written to the systemd directory, no state is registered, and no units are started. 12 tests added in `dryrun_test.go`.
+* **`GetBuildInfo` edge case tests** — 13 tests added: `buildArgValue` with nil, string, empty string, bool true/false, int, int64, float64 whole number, float64 with decimal; `GetBuildInfo` with empty context, empty args map, non-string arg types, and labels alongside build config.
+* **Verbosity improvements** — `start`, `stop`, `restart`, and `down` now use `logger.Print` instead of bare `fmt.Printf`, so their operational messages are suppressed by `--quiet`. Added `--quiet`/`-q` persistent root flag that suppresses all non-error output across all commands. `logger.Error` continues to always write to stderr.
+* **Orchestrator package tests** — `SystemdClient` and `StateStore` interfaces extracted into `internal/deploy`. Orchestrator uses injected factory functions instead of direct construction calls. 88 tests added across `resolve_test.go`, `lifecycle_test.go`, `down_test.go`, `up_test.go`, and `commands_test.go`.
+* **Transpile package tests** — `NewPodletRunner` and `Transpile` covered via a fake `podlet` shell script injected through PATH. 10 tests added.
 
 * **`exec` command broken** — Container name was derived from a full path instead of the filename; fixed with `filepath.Base`.
 * **`--dry-run` on `regenerate` non-functional** — Flag was registered but never passed to `Regenerate()`; wired through.

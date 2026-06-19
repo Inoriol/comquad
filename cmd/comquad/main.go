@@ -14,9 +14,14 @@ import (
 	"comquad/internal/orchestrator"
 )
 
+var quiet bool
+
 var rootCmd = &cobra.Command{
 	Use:   "comquad",
 	Short: "comquad is a developer-friendly CLI for deploying Podman Quadlets.",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		logger.SetQuiet(quiet)
+	},
 }
 
 var projectName string
@@ -36,7 +41,7 @@ var upCmd = &cobra.Command{
 		}
 
 		logger.SetVerbose(verbose)
-		return o.Up(forceBuild, pullStr, upFollow)
+		return o.Up(forceBuild, pullStr, upFollow, dryRun)
 	},
 }
 
@@ -286,11 +291,13 @@ var execCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress all non-error output")
 	upCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	upCmd.Flags().BoolVarP(&forceBuild, "build", "b", false, "Force rebuild images even if they exist locally")
 	upCmd.Flags().StringVarP(&pullStrategy, "pull", "p", "missing", "Image pull strategy: 'always', 'missing' (default), or 'never'")
 	upCmd.Flags().BoolVarP(&upFollow, "follow", "f", false, "Follow logs after deployment")
 	upCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed information about changes made during deployment")
+	upCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview generated quadlet files without writing or starting anything")
 	downCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	downCmd.Flags().BoolVarP(&downRemoveVolumes, "delete-volumes", "d", false, "Remove named volumes declared in the compose file")
 	listCmd.Flags().StringVarP(&projectName, "name", "n", "", "Filter by project name")

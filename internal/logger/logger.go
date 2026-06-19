@@ -16,9 +16,10 @@ const (
 )
 
 var (
-	mu       sync.Mutex
-	verbose  = false
-	noColor  = false
+	mu      sync.Mutex
+	verbose = false
+	quiet   = false
+	noColor = false
 )
 
 func init() {
@@ -38,6 +39,32 @@ func IsVerbose() bool {
 	return verbose
 }
 
+// SetQuiet suppresses all non-error output. Takes precedence over verbose.
+func SetQuiet(q bool) {
+	mu.Lock()
+	defer mu.Unlock()
+	quiet = q
+}
+
+func IsQuiet() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return quiet
+}
+
+// Print outputs a plain (uncolored, unprefixed) operational message.
+// It is suppressed when quiet mode is active, but does not require verbose.
+// Use this for normal runtime messages like "Starting unit: foo".
+func Print(msg string) {
+	mu.Lock()
+	q := quiet
+	mu.Unlock()
+	if q {
+		return
+	}
+	fmt.Println(msg)
+}
+
 func colorize(colorCode, msg string) string {
 	if noColor {
 		return msg
@@ -46,33 +73,33 @@ func colorize(colorCode, msg string) string {
 }
 
 func Info(msg string) {
-	if !IsVerbose() {
+	if !IsVerbose() || IsQuiet() {
 		return
 	}
 	fmt.Println(colorize(cyan, "comquad: "+msg))
 }
 
 func Success(msg string) {
-	if !IsVerbose() {
+	if !IsVerbose() || IsQuiet() {
 		return
 	}
 	fmt.Println(colorize(green, "comquad: "+msg))
 }
 
 func Warn(msg string) {
-	if !IsVerbose() {
+	if !IsVerbose() || IsQuiet() {
 		return
 	}
 	fmt.Println(colorize(yellow, "comquad: "+msg))
 }
 
-// Error always prints to stderr regardless of verbose mode.
+// Error always prints to stderr regardless of verbose or quiet mode.
 func Error(msg string) {
 	fmt.Fprintln(os.Stderr, colorize(red, "comquad: "+msg))
 }
 
 func Action(msg string) {
-	if !IsVerbose() {
+	if !IsVerbose() || IsQuiet() {
 		return
 	}
 	fmt.Println(colorize(blue, "comquad: "+msg))

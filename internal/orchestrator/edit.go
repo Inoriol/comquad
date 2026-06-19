@@ -13,12 +13,12 @@ import (
 // Edit opens project units or a specific unit file in the editor.
 // If noReload is false, systemd is reloaded and units are restarted after changes.
 func (o *Orchestrator) Edit(projectArg string, noReload bool) error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	state, exists := stateMgr.Projects[o.projectName]
+	state, exists := stateMgr.GetProject(o.projectName)
 	if !exists {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
@@ -128,7 +128,7 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	}
 
 	// Reload systemd daemon
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}

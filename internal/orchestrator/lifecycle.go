@@ -5,18 +5,19 @@ import (
 	"strings"
 
 	"comquad/internal/deploy"
+	"comquad/internal/logger"
 )
 
 // resolveUnits resolves unit names from the project state.
 // If services is empty, all container units are returned.
 // If services is non-empty, only matching container units are returned.
 func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	state, exists := stateMgr.Projects[o.projectName]
+	state, exists := stateMgr.GetProject(o.projectName)
 	if !exists {
 		return nil, fmt.Errorf("project %s is not deployed", o.projectName)
 	}
@@ -57,23 +58,23 @@ func (o *Orchestrator) Start(services []string) error {
 		return err
 	}
 
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return err
 	}
 	defer dbusMgr.Close()
 
 	for _, unitName := range units {
-		fmt.Printf("Starting unit: %s\n", unitName)
+		logger.Print("Starting unit: " + unitName)
 		if err := dbusMgr.StartUnit(unitName); err != nil {
 			return fmt.Errorf("failed to start unit %s: %w", unitName, err)
 		}
 	}
 
 	if len(services) == 0 {
-		fmt.Printf("Successfully started project: %s\n", o.projectName)
+		logger.Print("Successfully started project: " + o.projectName)
 	} else {
-		fmt.Printf("Successfully started %d unit(s) for project: %s\n", len(units), o.projectName)
+		logger.Print(fmt.Sprintf("Successfully started %d unit(s) for project: %s", len(units), o.projectName))
 	}
 
 	return nil
@@ -86,14 +87,14 @@ func (o *Orchestrator) Stop(services []string) error {
 		return err
 	}
 
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return err
 	}
 	defer dbusMgr.Close()
 
 	for _, unitName := range units {
-		fmt.Printf("Stopping unit: %s\n", unitName)
+		logger.Print("Stopping unit: " + unitName)
 		if err := dbusMgr.StopUnit(unitName); err != nil {
 			return fmt.Errorf("failed to stop unit %s: %w", unitName, err)
 		}
@@ -105,9 +106,9 @@ func (o *Orchestrator) Stop(services []string) error {
 	}
 
 	if len(services) == 0 {
-		fmt.Printf("Successfully stopped project: %s\n", o.projectName)
+		logger.Print("Successfully stopped project: " + o.projectName)
 	} else {
-		fmt.Printf("Successfully stopped %d unit(s) for project: %s\n", len(units), o.projectName)
+		logger.Print(fmt.Sprintf("Successfully stopped %d unit(s) for project: %s", len(units), o.projectName))
 	}
 
 	return nil
@@ -120,30 +121,30 @@ func (o *Orchestrator) Restart(services []string) error {
 		return err
 	}
 
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return err
 	}
 	defer dbusMgr.Close()
 
 	for _, unitName := range units {
-		fmt.Printf("Restarting unit: %s\n", unitName)
+		logger.Print("Restarting unit: " + unitName)
 		if err := dbusMgr.RestartUnit(unitName); err != nil {
 			return fmt.Errorf("failed to restart unit %s: %w", unitName, err)
 		}
 	}
 
 	if len(services) == 0 {
-		fmt.Printf("Successfully restarted project: %s\n", o.projectName)
+		logger.Print("Successfully restarted project: " + o.projectName)
 	} else {
-		fmt.Printf("Successfully restarted %d unit(s) for project: %s\n", len(units), o.projectName)
+		logger.Print(fmt.Sprintf("Successfully restarted %d unit(s) for project: %s", len(units), o.projectName))
 	}
 
 	return nil
 }
 
 // verifyUnitsStoppedByNames verifies that the given unit names are no longer active.
-func (o *Orchestrator) verifyUnitsStoppedByNames(dbusMgr *deploy.SystemdManager, unitNames []string) error {
+func (o *Orchestrator) verifyUnitsStoppedByNames(dbusMgr deploy.SystemdClient, unitNames []string) error {
 	units, err := dbusMgr.ListUnitsByNames(unitNames)
 	if err != nil {
 		return fmt.Errorf("failed to list units: %w", err)

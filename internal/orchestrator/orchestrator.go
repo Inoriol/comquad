@@ -21,6 +21,12 @@ import (
 type Orchestrator struct {
 	projectName string
 	cwd         string
+
+	// newState and newSystemd are factories that create the state store and
+	// systemd client respectively. They default to the real implementations
+	// and can be overridden in tests to inject fakes.
+	newState   func() (deploy.StateStore, error)
+	newSystemd func() (deploy.SystemdClient, error)
 }
 
 // NewOrchestrator creates a new Orchestrator for the current working directory.
@@ -38,13 +44,23 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 	return &Orchestrator{
 		projectName: projectName,
 		cwd:         cwd,
+		newState: func() (deploy.StateStore, error) {
+			return deploy.NewStateManager()
+		},
+		newSystemd: func() (deploy.SystemdClient, error) {
+			return deploy.NewSystemdManager()
+		},
 	}, nil
 }
 
 // Up preprocesses, transpiles, cooks and deploys the project
 // defined in the compose.yaml in the current working directory.
+// If dryRun is true, the pipeline runs through the cook stage but nothing is
+// written to the systemd directory, no state is registered, and no units are
+// started — instead each generated quadlet file and its intended target path
+// are printed to stdout.
 // If follow is true, streams logs from the deployment timestamp onward.
-func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) error {
+func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dryRun bool) error {
 	composeFile := findComposeFile(o.cwd)
 	if composeFile == "" {
 		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
@@ -85,6 +101,28 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) err
 	}
 
 	isRootless := deploy.IsRootless()
+
+	if dryRun {
+		// In dry-run mode, cook into a dedicated preview dir inside the temp
+		// directory so the real systemd target dir is never touched.
+		previewDir, err := os.MkdirTemp("", "comquad-preview-*")
+		if err != nil {
+			return fmt.Errorf("failed to create preview directory: %w", err)
+		}
+		defer os.RemoveAll(previewDir)
+
+		if err := o.cook(tempDir, previewDir, isRootless); err != nil {
+			return err
+		}
+
+		projectFiles, err := o.collectProjectFiles(previewDir)
+		if err != nil {
+			return err
+		}
+
+		return o.printDryRun(projectFiles, previewDir, targetDir, buildInfo, pullStrategy)
+	}
+
 	if err := o.cook(tempDir, targetDir, isRootless); err != nil {
 		return err
 	}
@@ -100,7 +138,7 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) err
 		for _, f := range projectFiles {
 			os.Remove(f)
 		}
-		if dbusMgr, err := deploy.NewSystemdManager(); err == nil {
+		if dbusMgr, err := o.newSystemd(); err == nil {
 			defer dbusMgr.Close()
 			dbusMgr.ReloadDaemon(projectFiles...)
 		}
@@ -137,18 +175,18 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) err
 // Down stops all units, removes quadlet files, removes networks, and unregisters the project.
 // If removeVolumes is true, also removes Podman volumes.
 func (o *Orchestrator) Down(removeVolumes bool) error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	state, exists := stateMgr.Projects[o.projectName]
+	state, exists := stateMgr.GetProject(o.projectName)
 	if !exists {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
 
 	// Open a single D-Bus connection for the entire down sequence.
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}
@@ -269,7 +307,7 @@ func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
 }
 
 func (o *Orchestrator) registerState(projectFiles []string) error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
@@ -282,7 +320,7 @@ func (o *Orchestrator) registerState(projectFiles []string) error {
 }
 
 func (o *Orchestrator) startUnits(projectFiles []string) error {
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}
@@ -385,11 +423,111 @@ func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]
 	return nil
 }
 
-func (o *Orchestrator) stopUnits(dbusMgr *deploy.SystemdManager, projectFiles []string) error {
+// printDryRun prints a preview of what `comquad up` would deploy without
+// writing anything to the real systemd directory or starting any units.
+//
+// projectFiles are paths inside previewDir. targetDir is the real systemd
+// directory that would receive the files in a live run.
+func (o *Orchestrator) printDryRun(
+	projectFiles []string,
+	previewDir string,
+	targetDir string,
+	buildInfo map[string]*preprocess.BuildInfo,
+	pullStrategy string,
+) error {
+	fmt.Printf("Dry run — project: %s\n", o.projectName)
+	fmt.Printf("Target directory: %s\n\n", targetDir)
+
+	// --- Image actions ---
+	imagePullStrategy, err := build.ParsePullStrategy(pullStrategy)
+	if err != nil {
+		return err
+	}
+
+	// Build services
+	for serviceName, info := range buildInfo {
+		imageTag := build.GenerateBuildTag(o.projectName, serviceName)
+		engine := &build.Engine{}
+		if engine.ImageExists(imageTag) {
+			fmt.Printf("[image] %-12s %s  (already exists locally, would skip build)\n", serviceName, imageTag)
+		} else {
+			fmt.Printf("[image] %-12s %s  (would build from %s)\n", serviceName, imageTag, info.Context)
+		}
+	}
+
+	// Pull-only services — read Image= from the cooked container files
+	for _, f := range projectFiles {
+		if !strings.HasSuffix(f, ".container") {
+			continue
+		}
+		content, err := os.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("failed to read preview file %s: %w", f, err)
+		}
+		for _, line := range strings.Split(string(content), "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "Image=") {
+				continue
+			}
+			image := strings.TrimSpace(strings.TrimPrefix(line, "Image="))
+			if strings.Contains(image, ":") {
+				// build-generated image — already reported above
+				break
+			}
+			switch imagePullStrategy {
+			case build.PullAlways:
+				fmt.Printf("[image] %-12s %s  (would pull: always)\n", filepath.Base(f), image)
+			case build.PullMissing:
+				engine := &build.Engine{}
+				if engine.ImageExists(image) {
+					fmt.Printf("[image] %-12s %s  (already exists locally, would skip pull)\n", filepath.Base(f), image)
+				} else {
+					fmt.Printf("[image] %-12s %s  (would pull: not found locally)\n", filepath.Base(f), image)
+				}
+			case build.PullNever:
+				fmt.Printf("[image] %-12s %s  (pull skipped: never)\n", filepath.Base(f), image)
+			}
+			break
+		}
+	}
+
+	if len(buildInfo) > 0 || len(projectFiles) > 0 {
+		fmt.Println()
+	}
+
+	// --- Quadlet files ---
+	fmt.Printf("%d quadlet file(s) would be written:\n\n", len(projectFiles))
+	separator := strings.Repeat("─", 60)
+
+	for _, f := range projectFiles {
+		// Compute the target path: replace previewDir prefix with targetDir
+		rel, err := filepath.Rel(previewDir, f)
+		if err != nil {
+			return fmt.Errorf("failed to compute relative path: %w", err)
+		}
+		targetPath := filepath.Join(targetDir, rel)
+
+		content, err := os.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("failed to read preview file %s: %w", f, err)
+		}
+
+		fmt.Printf("%s\n", separator)
+		fmt.Printf("  %s\n", targetPath)
+		fmt.Printf("%s\n", separator)
+		fmt.Println(strings.TrimRight(string(content), "\n"))
+		fmt.Println()
+	}
+
+	fmt.Println("Dry run complete — nothing was written, no units started.")
+	return nil
+}
+
+func (o *Orchestrator) stopUnits(dbusMgr deploy.SystemdClient, projectFiles []string) error {
 	for _, f := range projectFiles {
 		if strings.HasSuffix(f, ".container") {
 			unitName := containerFileToUnitName(f)
-			fmt.Printf("Stopping unit: %s\n", unitName)
+			logger.Print("Stopping unit: " + unitName)
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				return fmt.Errorf("failed to stop unit %s: %w", unitName, err)
 			}
@@ -399,7 +537,7 @@ func (o *Orchestrator) stopUnits(dbusMgr *deploy.SystemdManager, projectFiles []
 	return nil
 }
 
-func (o *Orchestrator) verifyUnitsStopped(dbusMgr *deploy.SystemdManager, projectFiles []string) error {
+func (o *Orchestrator) verifyUnitsStopped(dbusMgr deploy.SystemdClient, projectFiles []string) error {
 	var activeUnits []string
 	for _, f := range projectFiles {
 		if !strings.HasSuffix(f, ".container") {

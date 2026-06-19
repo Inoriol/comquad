@@ -5,22 +5,20 @@ import (
 	"strings"
 
 	"github.com/coreos/go-systemd/v22/dbus"
-
-	"comquad/internal/deploy"
 )
 
 // Ps shows the current state of units for the project.
 func (o *Orchestrator) Ps() error {
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	if _, exists := stateMgr.Projects[o.projectName]; !exists {
+	if _, exists := stateMgr.GetProject(o.projectName); !exists {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
 
-	dbusMgr, err := deploy.NewSystemdManager()
+	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}

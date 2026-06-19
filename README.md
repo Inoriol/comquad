@@ -52,6 +52,8 @@ comquad up
 * **Verbose output:** `comquad up -v` shows all transformations (port offsets, label additions, path normalizations, etc.)
 * **Rootless port offset:** Set `ROOTLESS_PORT_OFFSET` env variable (default 2000) to shift privileged ports (< 1024) for rootless mode
 * **Follow logs after deploy:** `comquad up -f` streams journal logs from the deployment timestamp until interrupted
+* **Dry run:** `comquad up --dry-run` previews what would be deployed without writing any files or starting units
+* **Quiet mode:** `comquad -q <command>` suppresses all non-error output (useful in scripts)
 
 ### Verbose Output
 
@@ -76,6 +78,36 @@ comquad: Added labels: Label=com.comquad.project=myapp, Label=com.comquad.manage
 comquad: Offset port: PublishPort=80:80 → PublishPort=2080:80
 comquad: Built image: myapp-web:latest
 comquad: Successfully deployed project: myapp
+```
+
+### Dry Run
+
+Use `--dry-run` to preview exactly what `comquad up` would generate and deploy, without touching the systemd directory or starting anything:
+
+```bash
+comquad up --dry-run
+```
+
+Typical output:
+
+```
+Dry run — project: myapp
+Target directory: /home/user/.config/containers/systemd
+
+[image] web          myapp-web:latest  (would build from /home/user/project)
+[image] db           docker.io/library/postgres  (already exists locally, would skip pull)
+
+2 quadlet file(s) would be written:
+
+────────────────────────────────────────────────────────────
+  /home/user/.config/containers/systemd/cq-myapp-web.container
+────────────────────────────────────────────────────────────
+[Container]
+Image=myapp-web:latest
+Network=cq-myapp-default.network
+...
+
+Dry run complete — nothing was written, no units started.
 ```
 
 ### Manage & Monitor

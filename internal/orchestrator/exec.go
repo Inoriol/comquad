@@ -6,8 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"comquad/internal/deploy"
 )
 
 // Exec runs a command inside a single running container via podman exec.
@@ -16,12 +14,12 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 		return fmt.Errorf("exec requires a command to run")
 	}
 
-	stateMgr, err := deploy.NewStateManager()
+	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	state, exists := stateMgr.Projects[o.projectName]
+	state, exists := stateMgr.GetProject(o.projectName)
 	if !exists {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
