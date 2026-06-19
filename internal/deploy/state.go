@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // ResourceInfo tracks Podman resources for a managed project
@@ -65,8 +66,8 @@ func (sm *StateManager) load() error {
 }
 
 func (sm *StateManager) Save() error {
-	err := os.MkdirAll(filepath.Dir(sm.StateFilePath), 0755)
-	if err != nil {
+	dir := filepath.Dir(sm.StateFilePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
@@ -75,10 +76,40 @@ func (sm *StateManager) Save() error {
 		return err
 	}
 
-	return os.WriteFile(sm.StateFilePath, data, 0644)
+	// Write atomically: write to a temp file in the same directory, then rename.
+	// This prevents a corrupted state file if the process is killed mid-write.
+	tmp, err := os.CreateTemp(dir, ".projects-*.json.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+
+	if err := os.Rename(tmpName, sm.StateFilePath); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+
+	return nil
 }
 
 func (sm *StateManager) RegisterProject(project ProjectState) error {
+	// Preserve the existing Resources field if the caller didn't supply one.
+	// This prevents up from silently clearing resource info written by regenerate.
+	if project.Resources == nil {
+		if existing, ok := sm.Projects[project.ProjectName]; ok {
+			project.Resources = existing.Resources
+		}
+	}
 	sm.Projects[project.ProjectName] = project
 	return sm.Save()
 }
@@ -93,5 +124,8 @@ func (sm *StateManager) ListProjects() []ProjectState {
 	for _, p := range sm.Projects {
 		projects = append(projects, p)
 	}
+	sort.Slice(projects, func(i, j int) bool {
+		return projects[i].ProjectName < projects[j].ProjectName
+	})
 	return projects
 }

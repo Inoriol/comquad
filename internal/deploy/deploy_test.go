@@ -6,7 +6,19 @@ import (
 	"testing"
 )
 
+// isolateStateDir redirects XDG_DATA_HOME to a fresh temp directory for the
+// duration of the test, preventing any state writes from leaking into the
+// real ~/.local/share/comquad/projects.json.
+func isolateStateDir(t *testing.T) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	old := os.Getenv("XDG_DATA_HOME")
+	os.Setenv("XDG_DATA_HOME", tmpDir)
+	t.Cleanup(func() { os.Setenv("XDG_DATA_HOME", old) })
+}
+
 func TestStateManager_RegisterAndUnregister(t *testing.T) {
+	isolateStateDir(t)
 	sm, err := NewStateManager()
 	if err != nil {
 		t.Fatalf("NewStateManager failed: %v", err)
@@ -44,6 +56,7 @@ func TestStateManager_RegisterAndUnregister(t *testing.T) {
 }
 
 func TestStateManager_PersistsToDisk(t *testing.T) {
+	isolateStateDir(t)
 	sm, err := NewStateManager()
 	if err != nil {
 		t.Fatalf("NewStateManager failed: %v", err)
@@ -71,6 +84,7 @@ func TestStateManager_PersistsToDisk(t *testing.T) {
 }
 
 func TestStateManager_ListProjects(t *testing.T) {
+	isolateStateDir(t)
 	sm, err := NewStateManager()
 	if err != nil {
 		t.Fatalf("NewStateManager failed: %v", err)

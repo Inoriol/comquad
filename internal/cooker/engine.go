@@ -70,14 +70,19 @@ func (c *Cooker) Cook() error {
 		}
 
 		// Rewrite all internal references using the rename map
-		updatedContent := c.rewriteReferences(string(content), renameMap)
-		logger.Info(fmt.Sprintf("Rewrote cross-unit references in %s", newName))
+		original := string(content)
+		updatedContent := c.rewriteReferences(original, renameMap)
+		if updatedContent != original {
+			logger.Info(fmt.Sprintf("Rewrote cross-unit references in %s", newName))
+		}
 
 		// Add systemd optimizations for .container and .network files
 		if strings.HasSuffix(newName, ".container") || strings.HasSuffix(newName, ".network") {
 			updatedContent = c.addSystemdOptimizations(updatedContent)
-			logger.Info(fmt.Sprintf("Added AutoUpdate=registry to %s", newName))
 			logger.Info(fmt.Sprintf("Added [Install] section to %s", newName))
+			if strings.Contains(updatedContent, "AutoUpdate=registry") {
+				logger.Info(fmt.Sprintf("Added AutoUpdate=registry to %s", newName))
+			}
 		}
 
 		// Add labels to all file types
@@ -399,15 +404,40 @@ func (c *Cooker) addProjectLabels(content string, fileName string) string {
 		}
 	}
 
+	// Check which labels are already present to avoid duplicates on re-deploy.
+	hasProjectLabel := false
+	hasManagedLabel := false
+	for i := sectionIdx; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "[") && i > sectionIdx {
+			break
+		}
+		if trimmed == "Label=com.comquad.project="+c.ProjectName {
+			hasProjectLabel = true
+		}
+		if trimmed == "Label=com.comquad.managed=true" {
+			hasManagedLabel = true
+		}
+	}
+
+	var labels []string
+	if !hasProjectLabel {
+		labels = append(labels, "Label=com.comquad.project="+c.ProjectName)
+	}
+	if !hasManagedLabel {
+		labels = append(labels, "Label=com.comquad.managed=true")
+	}
+
+	if len(labels) == 0 {
+		return strings.Join(lines, "\n")
+	}
+
 	// Insert new labels after the last Label= line (or after section header)
 	insertAt := lastLabelIdx
 	if insertAt < 0 {
 		insertAt = sectionIdx
 	}
 
-	var labels []string
-	labels = append(labels, "Label=com.comquad.project="+c.ProjectName)
-	labels = append(labels, "Label=com.comquad.managed=true")
 	logger.Info(fmt.Sprintf("Added labels: Label=com.comquad.project=%s, Label=com.comquad.managed=true", c.ProjectName))
 
 	lines = append(lines[:insertAt+1], append(labels, lines[insertAt+1:]...)...)

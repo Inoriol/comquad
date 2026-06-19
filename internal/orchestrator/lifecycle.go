@@ -31,6 +31,7 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 		return units, nil
 	}
 
+	seen := make(map[string]struct{})
 	var units []string
 	for _, svc := range services {
 		matches := MatchContainers(o.projectName, state, svc)
@@ -39,15 +40,8 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 		}
 		for _, f := range matches {
 			unitName := containerFileToUnitName(f)
-			// Deduplicate
-			found := false
-			for _, u := range units {
-				if u == unitName {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if _, exists := seen[unitName]; !exists {
+				seen[unitName] = struct{}{}
 				units = append(units, unitName)
 			}
 		}
@@ -105,8 +99,8 @@ func (o *Orchestrator) Stop(services []string) error {
 		}
 	}
 
-	// Verify units are actually stopped
-	if err := o.verifyUnitsStoppedByNames(units); err != nil {
+	// Verify units are actually stopped (reuse the existing D-Bus connection)
+	if err := o.verifyUnitsStoppedByNames(dbusMgr, units); err != nil {
 		return err
 	}
 
@@ -149,13 +143,7 @@ func (o *Orchestrator) Restart(services []string) error {
 }
 
 // verifyUnitsStoppedByNames verifies that the given unit names are no longer active.
-func (o *Orchestrator) verifyUnitsStoppedByNames(unitNames []string) error {
-	dbusMgr, err := deploy.NewSystemdManager()
-	if err != nil {
-		return err
-	}
-	defer dbusMgr.Close()
-
+func (o *Orchestrator) verifyUnitsStoppedByNames(dbusMgr *deploy.SystemdManager, unitNames []string) error {
 	units, err := dbusMgr.ListUnitsByNames(unitNames)
 	if err != nil {
 		return fmt.Errorf("failed to list units: %w", err)

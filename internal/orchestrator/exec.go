@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"comquad/internal/deploy"
@@ -50,14 +51,14 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 	if len(matches) > 1 {
 		names := make([]string, 0, len(matches))
 		for _, f := range matches {
-			base := strings.TrimSuffix(f, ".container")
+			base := strings.TrimSuffix(filepath.Base(f), ".container")
 			names = append(names, strings.TrimPrefix(base, "cq-"))
 		}
 		return fmt.Errorf("ambiguous service '%s', matched multiple containers: %s. Please specify a single container", service, strings.Join(names, ", "))
 	}
 
-	// Derive container name: cq-myapp-web.container -> myapp-web
-	base := strings.TrimSuffix(matches[0], ".container")
+	// Derive container name from the base filename: cq-myapp-web.container -> myapp-web
+	base := strings.TrimSuffix(filepath.Base(matches[0]), ".container")
 	containerName := strings.TrimPrefix(base, "cq-")
 
 	// Build podman exec command

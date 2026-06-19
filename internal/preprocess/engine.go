@@ -77,19 +77,27 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 2. Automatic Networking: Ensure a default bridge network exists
+	// 2. Automatic Networking: Ensure a default bridge network exists.
+	// Only inject cq-default when the compose file defines no networks at all.
+	// Services are only auto-attached to cq-default if it was actually injected,
+	// preventing dangling network references when user-defined networks exist.
+	defaultNetworkInjected := false
 	if len(cf.Networks) == 0 {
 		cf.Networks["cq-default"] = &Network{
 			Driver: "bridge",
 		}
+		defaultNetworkInjected = true
 		logger.Info("Created default network: cq-default")
 	}
 
-	// Ensure all services are attached to at least one network
-	for serviceName, service := range cf.Services {
-		if len(service.Networks) == 0 {
-			service.Networks = append(service.Networks, "cq-default")
-			logger.Info(fmt.Sprintf("Auto-attached '%s' to network 'cq-default'", serviceName))
+	// Ensure all services are attached to at least one network.
+	// Only attach to cq-default if we just created it.
+	if defaultNetworkInjected {
+		for serviceName, service := range cf.Services {
+			if len(service.Networks) == 0 {
+				service.Networks = append(service.Networks, "cq-default")
+				logger.Info(fmt.Sprintf("Auto-attached '%s' to network 'cq-default'", serviceName))
+			}
 		}
 	}
 

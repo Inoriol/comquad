@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -200,74 +201,51 @@ func (s *SystemdManager) GetInvocationID(unitName string) (string, error) {
 	return "", nil
 }
 
-// RemoveNetworks removes all Podman networks matching the cq-<projectName> prefix.
-func RemoveNetworks(projectName string) error {
-	cmd := exec.Command("podman", "network", "ls", "--format", "{{.Name}}")
-	output, err := cmd.Output()
+// removePodmanResources lists and removes Podman resources of the given type
+// (network or volume) that match the cq-<projectName>- prefix pattern.
+func removePodmanResources(resourceType, projectName string) error {
+	listCmd := exec.Command("podman", resourceType, "ls", "--format", "{{.Name}}")
+	output, err := listCmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to list networks: %w", err)
+		return fmt.Errorf("failed to list %ss: %w", resourceType, err)
 	}
 
 	prefix := "cq-" + projectName + "-"
-	var networks []string
+	var names []string
 	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
 		if strings.HasPrefix(name, prefix) || strings.HasSuffix(name, "-"+projectName) {
-			networks = append(networks, name)
+			names = append(names, name)
 		}
 	}
 
-	if len(networks) == 0 {
+	if len(names) == 0 {
 		return nil
 	}
 
-	for _, name := range networks {
-		logger.Warn("Removing network: " + name)
-		rmCmd := exec.Command("podman", "network", "rm", name)
+	var errs []error
+	for _, name := range names {
+		logger.Info(fmt.Sprintf("Removing %s: %s", resourceType, name))
+		rmCmd := exec.Command("podman", resourceType, "rm", name)
 		if err := rmCmd.Run(); err != nil {
-			logger.Warn("Failed to remove network " + name + ": " + err.Error())
+			errs = append(errs, fmt.Errorf("failed to remove %s %s: %w", resourceType, name, err))
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
+}
+
+// RemoveNetworks removes all Podman networks matching the cq-<projectName> prefix.
+func RemoveNetworks(projectName string) error {
+	return removePodmanResources("network", projectName)
 }
 
 // RemoveVolumes removes all Podman volumes matching the cq-<projectName> prefix.
 func RemoveVolumes(projectName string) error {
-	cmd := exec.Command("podman", "volume", "ls", "--format", "{{.Name}}")
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to list volumes: %w", err)
-	}
-
-	prefix := "cq-" + projectName + "-"
-	var volumes []string
-	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		if strings.HasPrefix(name, prefix) || strings.HasSuffix(name, "-"+projectName) {
-			volumes = append(volumes, name)
-		}
-	}
-
-	if len(volumes) == 0 {
-		return nil
-	}
-
-	for _, name := range volumes {
-		logger.Warn("Removing volume: " + name)
-		rmCmd := exec.Command("podman", "volume", "rm", name)
-		if err := rmCmd.Run(); err != nil {
-			logger.Warn("Failed to remove volume " + name + ": " + err.Error())
-		}
-	}
-
-	return nil
+	return removePodmanResources("volume", projectName)
 }
 
 // PodmanResource represents a discovered Podman resource with its project label
@@ -328,7 +306,7 @@ func RegenerateState() (*StateManager, error) {
 		var files []string
 		entries, err := os.ReadDir(targetDir)
 		if err != nil {
-			fmt.Printf("Warning: failed to read target directory %s: %v\n", targetDir, err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to read target directory %s: %v\n", targetDir, err)
 			continue
 		}
 
@@ -369,7 +347,7 @@ func discoverResources(resourceType, label string) []PodmanResource {
 
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Printf("Warning: failed to list %ss: %v\n", resourceType, err)
+		fmt.Fprintf(os.Stderr, "Warning: failed to list %ss: %v\n", resourceType, err)
 		return results
 	}
 

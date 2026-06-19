@@ -12,12 +12,18 @@ type PodletRunner struct {
 	TempDir    string
 }
 
-// NewPodletRunner creates a new runner
-func NewPodletRunner(tempDir string) *PodletRunner {
-	return &PodletRunner{
-		PodletPath: "podlet", // Assumes podlet is in PATH
-		TempDir:    tempDir,
+// NewPodletRunner creates a new runner. It resolves the podlet binary in PATH
+// immediately so callers get a clear error before the pipeline starts rather
+// than a confusing failure deep in Transpile.
+func NewPodletRunner(tempDir string) (*PodletRunner, error) {
+	path, err := exec.LookPath("podlet")
+	if err != nil {
+		return nil, fmt.Errorf("podlet not found in PATH: %w", err)
 	}
+	return &PodletRunner{
+		PodletPath: path,
+		TempDir:    tempDir,
+	}, nil
 }
 
 // Transpile takes the processed YAML and runs podlet against it
@@ -35,6 +41,7 @@ func (r *PodletRunner) Transpile(input []byte) error {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
+		stdin.Close() // prevent pipe leak if Start fails
 		return fmt.Errorf("failed to start podlet: %w", err)
 	}
 

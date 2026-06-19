@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -136,9 +137,19 @@ var checkCmd = &cobra.Command{
 		resolver := deploy.NewTargetDirResolver()
 		targetDir, err := resolver.GetSystemdPath()
 		if err == nil {
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
+			// Check writability without creating the directory as a side effect.
+			// If the directory already exists, probe it with a temp file.
+			// If it doesn't exist yet, check that its parent is writable.
+			probeDir := targetDir
+			if _, statErr := os.Stat(targetDir); os.IsNotExist(statErr) {
+				probeDir = filepath.Dir(targetDir)
+			}
+			tmp, writeErr := os.CreateTemp(probeDir, ".comquad-check-*")
+			if writeErr != nil {
 				warnings = append(warnings, "target directory not writable: "+targetDir)
 			} else {
+				tmp.Close()
+				os.Remove(tmp.Name())
 				fmt.Printf("  Target dir: %s (writable)\n", targetDir)
 			}
 		}
@@ -243,7 +254,7 @@ var regenerateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Regenerate()
+		return o.Regenerate(dryRun)
 	},
 }
 

@@ -7,7 +7,8 @@ import (
 )
 
 // Regenerate scans Podman for managed resources and reconstructs the state file.
-func (o *Orchestrator) Regenerate() error {
+// When dryRun is true, it prints what would be written without saving the state file.
+func (o *Orchestrator) Regenerate(dryRun bool) error {
 	stateMgr, err := deploy.RegenerateState()
 	if err != nil {
 		return err
@@ -19,7 +20,11 @@ func (o *Orchestrator) Regenerate() error {
 		return nil
 	}
 
-	fmt.Printf("Discovered %d project(s) from Podman labels:\n\n", len(projects))
+	if dryRun {
+		fmt.Printf("Dry run — would regenerate %d project(s) from Podman labels:\n\n", len(projects))
+	} else {
+		fmt.Printf("Discovered %d project(s) from Podman labels:\n\n", len(projects))
+	}
 
 	for _, p := range projects {
 		resources := p.Resources
@@ -46,6 +51,11 @@ func (o *Orchestrator) Regenerate() error {
 			fmt.Printf("    Quadlet files: 0 (not found in systemd directory)\n")
 		}
 		fmt.Println()
+	}
+
+	if dryRun {
+		fmt.Printf("Dry run — state file not written: %s\n", stateMgr.StateFilePath)
+		return nil
 	}
 
 	if err := stateMgr.Save(); err != nil {

@@ -95,6 +95,7 @@ comquad: Successfully deployed project: myapp
 ### Self-Healing
 
 * **Regenerate state from Podman labels:** `comquad regenerate --force` (scans containers, networks, and volumes for `com.comquad.managed` label and reconstructs the state file)
+* **Preview without writing:** `comquad regenerate --force --dry-run` (shows what would be regenerated without modifying the state file)
 
 ### Stream logs
 

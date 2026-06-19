@@ -2,6 +2,7 @@ package preprocess
 
 import (
 	"fmt"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,11 +15,11 @@ type ComposeFile struct {
 	Config   *ProjectConfig      `yaml:"-"` // Internal use
 }
 
-// ServiceWithRaw wraps Service to capture raw build values
-type ServiceWithRaw struct {
+// serviceBase holds fields shared between Service and serviceWithRaw to avoid
+// duplicating the yaml struct tags in both types.
+type serviceBase struct {
 	ContainerName string            `yaml:"container_name,omitempty"`
 	Image         string            `yaml:"image,omitempty"`
-	BuildRaw      interface{}       `yaml:"build,omitempty"`
 	Ports         []string          `yaml:"ports,omitempty"`
 	Volumes       []string          `yaml:"volumes,omitempty"`
 	Networks      []string          `yaml:"networks,omitempty"`
@@ -27,9 +28,16 @@ type ServiceWithRaw struct {
 	Deploy        interface{}       `yaml:"deploy,omitempty"`
 }
 
+// serviceWithRaw embeds serviceBase and adds the raw build field so the YAML
+// decoder can handle build as either a string or a map.
+type serviceWithRaw struct {
+	serviceBase `yaml:",inline"`
+	BuildRaw    interface{} `yaml:"build,omitempty"`
+}
+
 // UnmarshalYAML implements custom unmarshaling to handle build field
 func (s *Service) UnmarshalYAML(node *yaml.Node) error {
-	var raw ServiceWithRaw
+	var raw serviceWithRaw
 	if err := node.Decode(&raw); err != nil {
 		return err
 	}
@@ -65,7 +73,7 @@ func (s *Service) UnmarshalYAML(node *yaml.Node) error {
 			if args, ok := v["args"].(map[string]interface{}); ok {
 				config.Args = make(map[string]string)
 				for k, val := range args {
-					config.Args[k] = fmt.Sprintf("%v", val)
+					config.Args[k] = buildArgValue(val)
 				}
 			}
 			s.Build = config
@@ -120,4 +128,32 @@ type Volume struct {
 type ProjectConfig struct {
 	ProjectName      string
 	WorkingDirectory string
+}
+
+// buildArgValue converts a YAML build arg value to its string representation.
+// Handles string, bool, integer, float, and nil types explicitly to avoid
+// surprises from fmt.Sprintf("%v", val) (e.g. nil becoming "<nil>").
+func buildArgValue(val interface{}) string {
+	if val == nil {
+		return ""
+	}
+	switch v := val.(type) {
+	case string:
+		return v
+	case bool:
+		return strconv.FormatBool(v)
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case float64:
+		// YAML unmarshals all numbers as float64; format without trailing zeros
+		// for integers (e.g. 1.0 → "1", 1.5 → "1.5")
+		if v == float64(int64(v)) {
+			return strconv.FormatInt(int64(v), 10)
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }

@@ -73,7 +73,9 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool) err
 		return err
 	}
 
-	processedYaml, err := o.preprocess(composeFile)
+	// Reuse composeData already read above — avoids a second disk read and
+	// eliminates a TOCTOU window if the file changes between reads.
+	processedYaml, err := o.preprocess(composeData)
 	if err != nil {
 		return err
 	}
@@ -145,25 +147,32 @@ func (o *Orchestrator) Down(removeVolumes bool) error {
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
 
+	// Open a single D-Bus connection for the entire down sequence.
+	dbusMgr, err := deploy.NewSystemdManager()
+	if err != nil {
+		return fmt.Errorf("failed to connect to systemd: %w", err)
+	}
+	defer dbusMgr.Close()
+
 	// Step 1: Stop all units via systemd
-	if err := o.stopUnits(state.Files); err != nil {
+	if err := o.stopUnits(dbusMgr, state.Files); err != nil {
 		logger.Warn("Some units failed to stop: " + err.Error())
 	}
 
 	// Verify units are actually stopped
-	if err := o.verifyUnitsStopped(state.Files); err != nil {
+	if err := o.verifyUnitsStopped(dbusMgr, state.Files); err != nil {
 		logger.Warn(err.Error())
 	}
 
 	// Step 2: Remove networks
 	if err := deploy.RemoveNetworks(o.projectName); err != nil {
-		logger.Warn("Failed to remove networks: " + err.Error())
+		fmt.Fprintf(os.Stderr, "Warning: failed to remove networks: %v\n", err)
 	}
 
 	// Step 3: Remove volumes if requested
 	if removeVolumes {
 		if err := deploy.RemoveVolumes(o.projectName); err != nil {
-			logger.Warn("Failed to remove volumes: " + err.Error())
+			fmt.Fprintf(os.Stderr, "Warning: failed to remove volumes: %v\n", err)
 		}
 	}
 
@@ -175,12 +184,6 @@ func (o *Orchestrator) Down(removeVolumes bool) error {
 	}
 
 	// Step 5: Reload daemon so systemd forgets the removed units
-	dbusMgr, err := deploy.NewSystemdManager()
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd: %w", err)
-	}
-	defer dbusMgr.Close()
-
 	if err := dbusMgr.ReloadDaemon(); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
@@ -205,12 +208,7 @@ func (o *Orchestrator) resolveTargetDir() (string, error) {
 	return targetDir, nil
 }
 
-func (o *Orchestrator) preprocess(composeFile string) ([]byte, error) {
-	composeData, err := os.ReadFile(composeFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read compose file: %w", err)
-	}
-
+func (o *Orchestrator) preprocess(composeData []byte) ([]byte, error) {
 	engine := preprocess.NewEngine(o.projectName, o.cwd)
 	processed, err := engine.Process(composeData)
 	if err != nil {
@@ -226,7 +224,10 @@ func (o *Orchestrator) getBuildInfo(composeData []byte) (map[string]*preprocess.
 }
 
 func (o *Orchestrator) transpile(processedYaml []byte, tempDir string) error {
-	podlet := transpile.NewPodletRunner(tempDir)
+	podlet, err := transpile.NewPodletRunner(tempDir)
+	if err != nil {
+		return err
+	}
 	if err := podlet.Transpile(processedYaml); err != nil {
 		return fmt.Errorf("transpilation failed: %w", err)
 	}
@@ -384,13 +385,7 @@ func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]
 	return nil
 }
 
-func (o *Orchestrator) stopUnits(projectFiles []string) error {
-	dbusMgr, err := deploy.NewSystemdManager()
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd: %w", err)
-	}
-	defer dbusMgr.Close()
-
+func (o *Orchestrator) stopUnits(dbusMgr *deploy.SystemdManager, projectFiles []string) error {
 	for _, f := range projectFiles {
 		if strings.HasSuffix(f, ".container") {
 			unitName := containerFileToUnitName(f)
@@ -404,13 +399,7 @@ func (o *Orchestrator) stopUnits(projectFiles []string) error {
 	return nil
 }
 
-func (o *Orchestrator) verifyUnitsStopped(projectFiles []string) error {
-	dbusMgr, err := deploy.NewSystemdManager()
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd: %w", err)
-	}
-	defer dbusMgr.Close()
-
+func (o *Orchestrator) verifyUnitsStopped(dbusMgr *deploy.SystemdManager, projectFiles []string) error {
 	var activeUnits []string
 	for _, f := range projectFiles {
 		if !strings.HasSuffix(f, ".container") {
@@ -433,11 +422,14 @@ func (o *Orchestrator) verifyUnitsStopped(projectFiles []string) error {
 	return nil
 }
 
+// ContainerFileToUnitName derives the systemd unit name from a quadlet file path.
+// e.g. /path/to/cq-myapp-web.container -> cq-myapp-web.service
 func ContainerFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	return strings.TrimSuffix(base, ".container") + ".service"
 }
 
+// containerFileToUnitName is an unexported alias kept for internal call sites.
 func containerFileToUnitName(filePath string) string {
 	return ContainerFileToUnitName(filePath)
 }

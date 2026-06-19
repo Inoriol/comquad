@@ -7,38 +7,11 @@ import (
 	"comquad/internal/deploy"
 )
 
-// MatchContainer finds a container quadlet file matching the given arg.
-func MatchContainer(projectName string, state deploy.ProjectState, arg string) string {
-	servicePrefix := "cq-" + projectName + "-"
-
-	for _, f := range state.Files {
-		if !strings.HasSuffix(f, ".container") {
-			continue
-		}
-		base := filepath.Base(f)
-		nameWithoutExt := strings.TrimSuffix(base, ".container")
-
-		if base == arg {
-			return f
-		}
-		if nameWithoutExt == arg {
-			return f
-		}
-		if strings.TrimSuffix(arg, ".service") == nameWithoutExt {
-			return f
-		}
-		if strings.TrimPrefix(nameWithoutExt, servicePrefix) == arg {
-			return f
-		}
-		if strings.TrimPrefix(nameWithoutExt, "cq-") == arg {
-			return f
-		}
-	}
-	return ""
-}
-
-// MatchContainers finds all container quadlet files matching the given arg.
-func MatchContainers(projectName string, state deploy.ProjectState, arg string) []string {
+// matchAllContainers returns all container quadlet files from state that match arg.
+// Five patterns are tried in order: exact base name, name without extension,
+// name without .service suffix, short name (strip cq-<project>- prefix),
+// internal Podman name (strip cq- prefix).
+func matchAllContainers(projectName string, state deploy.ProjectState, arg string) []string {
 	servicePrefix := "cq-" + projectName + "-"
 	var matches []string
 
@@ -49,28 +22,29 @@ func MatchContainers(projectName string, state deploy.ProjectState, arg string) 
 		base := filepath.Base(f)
 		nameWithoutExt := strings.TrimSuffix(base, ".container")
 
-		if base == arg {
+		if base == arg ||
+			nameWithoutExt == arg ||
+			strings.TrimSuffix(arg, ".service") == nameWithoutExt ||
+			strings.TrimPrefix(nameWithoutExt, servicePrefix) == arg ||
+			strings.TrimPrefix(nameWithoutExt, "cq-") == arg {
 			matches = append(matches, f)
-			continue
-		}
-		if nameWithoutExt == arg {
-			matches = append(matches, f)
-			continue
-		}
-		if strings.TrimSuffix(arg, ".service") == nameWithoutExt {
-			matches = append(matches, f)
-			continue
-		}
-		if strings.TrimPrefix(nameWithoutExt, servicePrefix) == arg {
-			matches = append(matches, f)
-			continue
-		}
-		if strings.TrimPrefix(nameWithoutExt, "cq-") == arg {
-			matches = append(matches, f)
-			continue
 		}
 	}
 	return matches
+}
+
+// MatchContainer finds the first container quadlet file matching the given arg.
+func MatchContainer(projectName string, state deploy.ProjectState, arg string) string {
+	matches := matchAllContainers(projectName, state, arg)
+	if len(matches) == 0 {
+		return ""
+	}
+	return matches[0]
+}
+
+// MatchContainers finds all container quadlet files matching the given arg.
+func MatchContainers(projectName string, state deploy.ProjectState, arg string) []string {
+	return matchAllContainers(projectName, state, arg)
 }
 
 // MatchNetworkOrVolume finds a network or volume quadlet file matching the given arg.

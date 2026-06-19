@@ -55,18 +55,20 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 		return nil
 	}
 
-	healthy := true
+	activeCount := 0
 	for _, u := range projectUnits {
-		if u.ActiveState != "active" {
-			healthy = false
-			break
+		if u.ActiveState == "active" {
+			activeCount++
 		}
 	}
 
-	status := "down"
-	if healthy {
+	var status string
+	switch {
+	case activeCount == len(projectUnits):
 		status = "healthy"
-	} else {
+	case activeCount == 0:
+		status = "down"
+	default:
 		status = "degraded"
 	}
 

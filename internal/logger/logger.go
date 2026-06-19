@@ -46,36 +46,34 @@ func colorize(colorCode, msg string) string {
 }
 
 func Info(msg string) {
-	if !verbose {
+	if !IsVerbose() {
 		return
 	}
-	fmt.Println(colorize(cyan, "comquad: " + msg))
+	fmt.Println(colorize(cyan, "comquad: "+msg))
 }
 
 func Success(msg string) {
-	if !verbose {
+	if !IsVerbose() {
 		return
 	}
-	fmt.Println(colorize(green, "comquad: " + msg))
+	fmt.Println(colorize(green, "comquad: "+msg))
 }
 
 func Warn(msg string) {
-	if !verbose {
+	if !IsVerbose() {
 		return
 	}
-	fmt.Println(colorize(yellow, "comquad: " + msg))
+	fmt.Println(colorize(yellow, "comquad: "+msg))
 }
 
+// Error always prints to stderr regardless of verbose mode.
 func Error(msg string) {
-	if !verbose {
-		return
-	}
-	fmt.Println(colorize(red, "comquad: " + msg))
+	fmt.Fprintln(os.Stderr, colorize(red, "comquad: "+msg))
 }
 
 func Action(msg string) {
-	if !verbose {
+	if !IsVerbose() {
 		return
 	}
-	fmt.Println(colorize(blue, "comquad: " + msg))
+	fmt.Println(colorize(blue, "comquad: "+msg))
 }

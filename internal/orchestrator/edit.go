@@ -80,14 +80,18 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 		originals[f] = string(content)
 	}
 
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vi"
+	editorEnv := os.Getenv("EDITOR")
+	if editorEnv == "" {
+		editorEnv = "vi"
 	}
 
+	// Split $EDITOR on whitespace so that values like "vim -o" or "code --wait" work.
+	editorParts := strings.Fields(editorEnv)
+	editorBin := editorParts[0]
+	editorArgs := append(editorParts[1:], files...)
+
 	// Build editor command with all files
-	cmd := exec.Command(editor)
-	cmd.Args = append(cmd.Args, files...)
+	cmd := exec.Command(editorBin, editorArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

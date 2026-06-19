@@ -32,7 +32,7 @@ internal/transpile/    # Wrapper executing the podlet binary
 
 The `view` command provides two modes of inspection:
 
-**Project view** (no service argument): queries systemd D-Bus for all units belonging to a project, computes aggregate health status (`healthy` / `degraded` / `down`), and displays a table of `UNIT`, `ACTIVE`, and `SUB` states.
+**Project view** (no service argument): queries systemd D-Bus for all units belonging to a project, computes aggregate health status, and displays a table of `UNIT`, `ACTIVE`, and `SUB` states. Status is `healthy` when all units are active, `down` when none are active, and `degraded` when only some are active.
 
 **Unit file view** (with service argument): resolves the quadlet file using five matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, `cq-myapp-web.container`, or `myapp-web`), reads the file, and prints its contents.
 
@@ -42,7 +42,7 @@ Unit resolution iterates over `state.Files` from `projects.json`, checking each 
 
 The `edit` command provides two modes of file editing:
 
-**Project edit** (no service argument): resolves all `.container`, `.network`, and `.volume` quadlet files for a project and opens them in `$EDITOR` (falls back to `vi`). After the editor exits, comquad compares file contents and auto-reloads systemd, restarting any changed container units.
+**Project edit** (no service argument): resolves all `.container`, `.network`, and `.volume` quadlet files for a project and opens them in `$EDITOR` (falls back to `vi`). `$EDITOR` is split on whitespace, so values like `"vim -o"` or `"code --wait"` work correctly. After the editor exits, comquad compares file contents and auto-reloads systemd, restarting any changed container units.
 
 **Unit file edit** (with service argument): resolves a single quadlet file using the same matching patterns as `view`, opens it in the editor, and reloads systemd if changes were detected.
 
@@ -96,7 +96,7 @@ comquad down -d       # also removes Podman volumes
 
 The `exec` command runs a command inside a running container via `podman exec`. It requires a single service argument and allocates a TTY by default (like `docker compose exec`).
 
-**Service resolution:** Uses `MatchContainers` to resolve the service name to a container quadlet file. The container name is derived by stripping `cq-` prefix and `.container` suffix (e.g. `cq-myapp-web.container` → `myapp-web`). If the service matches multiple containers, an error is returned listing the ambiguous matches.
+**Service resolution:** Uses `MatchContainers` to resolve the service name to a container quadlet file. The container name is derived from the base filename by stripping the `cq-` prefix and `.container` suffix (e.g. `cq-myapp-web.container` → `myapp-web`). If the service matches multiple containers, an error is returned listing the ambiguous matches.
 
 **Flags:** `-u/--user` sets the user inside the container, `-t/--tty` controls TTY allocation (default `true`). The command is passed directly to `podman exec`, which handles `--` flag separation.
 
@@ -116,7 +116,7 @@ The `regenerate` command restores the state file by scanning Podman for managed 
 **Flags:**
 
 * `--force` — Required to overwrite existing state (safety guard)
-* `--dry-run` — Preview what would be regenerated without writing the state file
+* `--dry-run` — Preview what would be regenerated without writing the state file. Can be combined with `--force` to safely inspect what `regenerate` would do.
 
 **Usage:**
 
@@ -154,7 +154,9 @@ Each project entry contains:
 * **project_name** — The Comquad project name
 * **source_path** — Path to the compose file directory (empty when restored via `regenerate`)
 * **files** — List of quadlet file paths in the systemd target directory
-* **resources** — Podman resources discovered via labels (`containers`, `networks`, `volumes`). Populated by `regenerate` and kept in sync during `up`/`down`.
+* **resources** — Podman resources discovered via labels (`containers`, `networks`, `volumes`). Populated by `regenerate`. When `up` re-registers an existing project, any previously stored resource info is preserved.
+
+The state file is written atomically: comquad writes to a `.tmp` file in the same directory and renames it, so a crash mid-write never produces a corrupt state file.
 
 ### Target Systemd Directories
 
@@ -174,14 +176,13 @@ Quadlet configurations are copied into paths dictated by your execution context:
 To ensure the transition to Quadlets is frictionless, the internal engine enforces several rules:
 
 * Relative volume host paths are automatically fully-qualified to absolute paths.
-* A default bridge network is implicitly injected if your file omits a network definition.
-* Every service container without an assigned network is auto-attached to that default project network.
+* A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Services without an explicit `networks:` key are auto-attached to `cq-default` only when that network was injected — preventing dangling network references when user-defined networks exist.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
 * An identifying label (`com.comquad.project`) is attached to all generated units.
 * A `com.comquad.managed` label is attached to all files to indicate comquad management.
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
 * Services marked with local `build:` blocks bypass image registry name validation.
-* In rootless mode, privileged ports (< 1024) are automatically offset by `COMQUAD_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
+* In rootless mode, privileged ports (< 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
 
 ### Local Build Rules
 
@@ -245,7 +246,11 @@ When `-v` / `--verbose` is enabled, comquad logs every transformation applied du
 - `Pulling image: <image>` — image pulls
 - `Handled image: <image>` — image handling completion
 
-**Down stage** logs:
+**Down stage** logs (verbose):
 - `Removing network: <name>` — network removal
 - `Removing volume: <name>` — volume removal
+
+Network and volume removal errors are always printed to stderr regardless of verbose mode, so cleanup failures are never silently dropped.
+
+**Error output:** `logger.Error(...)` always writes to stderr regardless of the verbose setting. Only informational, success, warning, and action messages are gated behind `-v`.
 
