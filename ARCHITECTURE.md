@@ -71,6 +71,14 @@ The `logs` command queries systemd D-Bus to determine each unit's state and filt
 
 Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, short name (after stripping `cq-<project>-` prefix), or internal Podman name (after stripping `cq-` prefix). `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
 
+### Flags
+
+- `--tail <N>` — Limit output to the last N lines
+- `--since <time>` — Show logs since a specific time (e.g. `10m`, `2024-01-01 12:00:00`)
+- `--output <format>` — Override journalctl output format (default: `cat` to strip raw systemd metadata like boot ID and machine ID)
+
+When querying multiple units, each log line is prefixed with `[<unit-name>]` to identify its source. Lines already starting with `--` (journalctl's timestamp separators) are passed through unmodified. All empty lines (journalctl's `--output cat` entry separators) are stripped in every code path.
+
 ## 🔄 Lifecycle Commands (Start, Stop, Restart)
 
 The `start`, `stop`, and `restart` commands manage the runtime state of deployed projects without touching quadlet files or triggering daemon-reload. They operate directly via D-Bus.
@@ -249,6 +257,8 @@ The `transpile` package is tested via a fake `podlet` shell script placed on a t
 When `comquad up -f` is used, after successfully deploying all units the CLI captures the current timestamp and streams all journal logs for every project unit (containers, networks, and volumes) from that point onward. This emulates the default `docker compose up` behavior (without `-d`), keeping the terminal attached to live output until interrupted with Ctrl+C.
 
 The deployment timestamp is captured after image handling completes but before `daemon-reload` and unit starts, ensuring no startup logs are missed.
+
+The follow mode uses the same `cat` default output format and supports the `-n/--tail` and `--output` flags via the `FollowLogs()` function.
 
 ## 📊 Output Levels
 

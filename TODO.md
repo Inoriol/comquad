@@ -1,14 +1,12 @@
 ## 🗺️ Roadmap & Next Steps
 
-### Difficulty: Easy
+### Uncategorized
 
 
 
 ### Difficulty: Medium
 
-* **`logs` command improvement** *(Medium)* — Pass `--output=short-iso` to journalctl to strip raw systemd metadata (boot ID, machine ID lines). Add `-n/--tail <N>` and `--since <time>` flags. Extend `FollowLogs` to include `.network` and `.volume` unit logs alongside containers.
-
-* **`ps` command improvement** *(Medium)* — Reformat output to match `docker compose ps` style: container name, image, command, status, ports. Run `podman ps --format json` filtered by `com.comquad.project` label, merge with D-Bus active/sub state. Show networks and volumes in a separate section below. Replace the current bare systemd table.
+* **`ps` command improvement** *(Medium)* — Reformat output to match `docker compose ps` style: container name, image, command, service (short name), created, status, ports. Run `podman ps --format json` filtered by `com.comquad.project` label, merge with D-Bus active/sub state. Show networks and volumes in a separate section below. Replace the current bare systemd table.
 
 ### Difficulty: Hard
 
@@ -16,6 +14,8 @@
 
 ## ✅ Resolved
 
+* **`logs` empty lines from `--output cat`** — `journalctl --output cat` inserts blank entry-separator lines after every journal entry. All three log code paths (`logs` single-unit, `logs` multi-unit with `[<unit>]` prefix, and `FollowLogs` for `up -f`) now strip empty lines via a shared `writeFilteredLines` helper.
+* **`logs` command improvement** — Added `--output=short-iso` (default) to strip raw systemd metadata, `-n/--tail <N>` and `--since <time>` flags. `FollowLogs` includes `.network` and `.volume` unit logs. Log lines are prefixed with `[<unit-name>]` when querying multiple units.
 * **`--dry-run` for `up`** — Runs the full preprocess → transpile → cook pipeline into a temporary preview directory, then prints each generated quadlet file alongside the target path it *would* be written to, plus image build/pull actions that *would* be taken. Nothing is written to the systemd directory, no state is registered, and no units are started. 12 tests added in `dryrun_test.go`.
 * **`GetBuildInfo` edge case tests** — 13 tests added: `buildArgValue` with nil, string, empty string, bool true/false, int, int64, float64 whole number, float64 with decimal; `GetBuildInfo` with empty context, empty args map, non-string arg types, and labels alongside build config.
 * **Verbosity improvements** — `start`, `stop`, `restart`, and `down` now use `logger.Print` instead of bare `fmt.Printf`, so their operational messages are suppressed by `--quiet`. Added `--quiet`/`-q` persistent root flag that suppresses all non-error output across all commands. `logger.Error` continues to always write to stderr.

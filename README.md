@@ -136,10 +136,12 @@ comquad logs                  # all services (one-shot)
 comquad logs -f               # all services (follow)
 comquad logs web              # single service
 comquad logs -n myapp web db  # specific project/services
-
+comquad logs --tail 50        # last 50 lines
+comquad logs --since 10m      # logs from the last 10 minutes
+comquad logs --output short   # use a different output format
 ```
 
-For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown.
+For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown. When querying multiple units, each log line is prefixed with `[<unit-name>]` to identify its source. Logs default to `short-iso` output format to strip raw systemd metadata.
 
 ### View
 
