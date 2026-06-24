@@ -101,7 +101,19 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 3. Marshal back to YAML
+	// 3. Inject force-volume labels into top-level named volumes to ensure podlet generates .volume files.
+	for name, vol := range cf.Volumes {
+		if vol == nil {
+			cf.Volumes[name] = &Volume{}
+			vol = cf.Volumes[name]
+		}
+		if vol.Labels == nil {
+			vol.Labels = make(map[string]string)
+		}
+		vol.Labels["com.comquad.force-volume"] = "true"
+	}
+
+	// 4. Marshal back to YAML
 	output, err := yaml.Marshal(&cf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal processed compose file: %w", err)

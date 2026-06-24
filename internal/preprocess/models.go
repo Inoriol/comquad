@@ -121,7 +121,8 @@ type Network struct {
 
 // Volume represents a volume definition
 type Volume struct {
-	Driver string `yaml:"driver,omitempty"`
+	Driver string            `yaml:"driver,omitempty"`
+	Labels map[string]string `yaml:"labels,omitempty"`
 }
 
 // ProjectConfig holds metadata injected during pre-processing

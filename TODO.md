@@ -2,17 +2,23 @@
 
 ### Uncategorized
 
+* **Deeper dive into :z label on volume** Currently it's not being created. It also should combine with whatever label volume already has (for example for :ro it should become :ro,z )
 
+* **Fix down behavior** for networks and volumes. They are not getting deleted
 
 ### Difficulty: Medium
 
-* **`ps` command improvement** *(Medium)* — Reformat output to match `docker compose ps` style: container name, image, command, service (short name), created, status, ports. Run `podman ps --format json` filtered by `com.comquad.project` label, merge with D-Bus active/sub state. Show networks and volumes in a separate section below. Replace the current bare systemd table.
+* **`ps` command improvement** *(Medium)* — Reformat output to match `docker compose ps` style: container name, image, command, service (short name), created, status, ports. Run `podman ps --format json` filtered by `com.comquad.project` label (example: podman ps --filter "label=com.comquad.project=cqtest" --format json), merge with D-Bus active/sub state. Show networks and volumes in a separate section below. Replace the current bare systemd table.
 
 ### Difficulty: Hard
 
 * **Lifecycle Integration Testing** *(Hard)* — End-to-end sandbox execution suite. Build a privileged OCI image containing podman, Go, podlet, and systemd. Run `comquad up` / `down` inside it via podman-in-podman. Validate that quadlet files are generated, units start, and state is correctly written and cleaned up. Requires significant CI infrastructure work.
 
 ## ✅ Resolved
+
+* **Named volumes not generated** — Added `com.comquad.force-volume: "true"` label injection during preprocessing to force podlet to generate `.volume` files for named volumes without a driver. Also fixed nil pointer crash when volumes have no children and combined `Label=` lines being split into separate lines.
+
+* **Volume host path corruption** — `rewriteReferences` now skips host paths (bind mounts) when rewriting volume references, preventing volume names from being replaced inside absolute/relative paths.
 
 * **`logs` empty lines from `--output cat`** — `journalctl --output cat` inserts blank entry-separator lines after every journal entry. All three log code paths (`logs` single-unit, `logs` multi-unit with `[<unit>]` prefix, and `FollowLogs` for `up -f`) now strip empty lines via a shared `writeFilteredLines` helper.
 * **`logs` command improvement** — Added `--output=short-iso` (default) to strip raw systemd metadata, `-n/--tail <N>` and `--since <time>` flags. `FollowLogs` includes `.network` and `.volume` unit logs. Log lines are prefixed with `[<unit-name>]` when querying multiple units.

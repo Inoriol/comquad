@@ -140,7 +140,7 @@ func (c *Cooker) rewriteReferences(content string, renameMap map[string]string) 
 			oldRef := stripQuadletExtension(oldName)
 			newRef := stripQuadletExtension(newName)
 			if oldRef != newRef {
-				lines[i] = strings.ReplaceAll(lines[i], oldRef, newRef)
+				lines[i] = c.replaceDirectiveValue(lines[i], oldRef, newRef)
 			}
 		}
 	}
@@ -170,6 +170,59 @@ func stripQuadletExtension(name string) string {
 		}
 	}
 	return name
+}
+
+// replaceDirectiveValue replaces oldRef with newRef in a quadlet directive value,
+// respecting the semantics of each directive type. For Volume= only the volume
+// name (first colon-delimited component) is replaced; container paths are left
+// untouched. For Network= and Pod= the entire value is replaced since they hold
+// only a unit name.
+func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
+	colonIdx := strings.Index(line, "=")
+	if colonIdx < 0 {
+		return line
+	}
+	directive := line[:colonIdx]
+	value := line[colonIdx+1:]
+
+	switch directive {
+	case "Volume":
+		parts := strings.SplitN(value, ":", 2)
+		// If the first part contains '/', it's a host path (bind mount), not a volume name.
+		// Never touch host paths — only replace named volume references.
+		if len(parts) >= 2 && strings.Contains(parts[0], "/") {
+			return line
+		}
+		if strings.Contains(parts[0], oldRef) {
+			replaced := strings.Replace(parts[0], oldRef, newRef, 1)
+			if len(parts) == 2 {
+				return directive + "=" + replaced + ":" + parts[1]
+			}
+			return directive + "=" + replaced
+		}
+		return line
+	default:
+		return directive + "=" + strings.Replace(value, oldRef, newRef, 1)
+	}
+}
+
+// splitCombinedLabels splits combined Label= lines into separate Label= lines.
+// e.g. "Label=a=b c=d" → "Label=a=b\nLabel=c=d"
+func (c *Cooker) splitCombinedLabels(lines []string) []string {
+	var result []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Label=") {
+			value := strings.TrimPrefix(trimmed, "Label=")
+			pairs := strings.Fields(value)
+			for _, pair := range pairs {
+				result = append(result, "Label="+pair)
+			}
+		} else {
+			result = append(result, line)
+		}
+	}
+	return result
 }
 
 // addSystemdOptimizations adds [Install] sections and AutoUpdate where appropriate.
@@ -378,6 +431,9 @@ func (c *Cooker) addProjectLabels(content string, fileName string) string {
 	}
 
 	lines := strings.Split(content, "\n")
+
+	// Split combined Label= lines (e.g. "Label=a=b c=d") into separate lines.
+	lines = c.splitCombinedLabels(lines)
 
 	// Find the section header
 	sectionIdx := -1
