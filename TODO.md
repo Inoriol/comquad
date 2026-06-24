@@ -2,9 +2,9 @@
 
 ### Uncategorized
 
-* **Deeper dive into :z label on volume** Currently it's not being created. It also should combine with whatever label volume already has (for example for :ro it should become :ro,z )
+* **Fix down behavior** for networks and volumes. They are not getting deleted. Run `podman network remove` and `podman volume remove` (if flag exist) with filter for project labels after clean of systemd units.
 
-* **Fix down behavior** for networks and volumes. They are not getting deleted
+* **Review of function names** for example now we have MatchContainer and MatchContainers fuctions. Probably one of them should be renamed to something more clear.
 
 ### Difficulty: Medium
 
@@ -17,6 +17,8 @@
 ## ✅ Resolved
 
 * **Named volumes not generated** — Added `com.comquad.force-volume: "true"` label injection during preprocessing to force podlet to generate `.volume` files for named volumes without a driver. Also fixed nil pointer crash when volumes have no children and combined `Label=` lines being split into separate lines.
+
+* **SELinux `:z` label on volumes** — Added SELinux detection via `/sys/fs/selinux/enforce` (supports Enforcing, Permissive, Disabled modes). When SELinux is enabled, all `Volume=` directives in `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present. Verbose log shows detected mode.
 
 * **Volume host path corruption** — `rewriteReferences` now skips host paths (bind mounts) when rewriting volume references, preventing volume names from being replaced inside absolute/relative paths.
 

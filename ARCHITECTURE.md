@@ -195,6 +195,7 @@ Quadlet configurations are copied into paths dictated by your execution context:
 To ensure the transition to Quadlets is frictionless, the internal engine enforces several rules:
 
 * Relative volume host paths are automatically fully-qualified to absolute paths.
+* When SELinux is detected (via `/sys/fs/selinux/enforce`), all `Volume=` directives in generated `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present.
 * A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Services without an explicit `networks:` key are auto-attached to `cq-default` only when that network was injected — preventing dangling network references when user-defined networks exist.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
 * An identifying label (`com.comquad.project`) is attached to all generated units.

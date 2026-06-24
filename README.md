@@ -187,6 +187,14 @@ comquad exec web -- cat /etc/hostname # pass through to podman
 
 For a deep dive into how `comquad` processes your compose files, manages state, and maps directories, please see dedicated [Architecture Guide](./ARCHITECTURE.md) guide.
 
+### Automatic Behaviors
+
+* Relative volume host paths are automatically fully-qualified to absolute paths.
+* When SELinux is enabled on the host, all `Volume=` directives in generated `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present.
+* A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all.
+* Generated containers follow a strict naming blueprint: `<project>-<service>`.
+* In rootless mode, privileged ports (< 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000).
+
 ## 📄 License
 
 MIT

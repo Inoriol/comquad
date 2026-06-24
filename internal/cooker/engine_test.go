@@ -19,7 +19,7 @@ func TestCook_RenamesFiles(t *testing.T) {
 		}
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestCook_AlreadyHasPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestCook_ReplacesGenericComquadPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCook_RewritesNetworkReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestCook_RewritesVolumeReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestCook_AddsInstallSectionToContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestCook_AddsInstallSectionToNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestCook_SkipsAutoUpdateWhenNoAutoupdateLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestCook_AddsAutoUpdateWhenNoLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestCook_CreatesTargetDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestCook_IgnoresDirectories(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 0)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -360,7 +360,7 @@ func TestStripQuadletExtension(t *testing.T) {
 }
 
 func TestNewCooker(t *testing.T) {
-	c := NewCooker("/tmp", "/target", "myproject", true, 0)
+	c := NewCooker("/tmp", "/target", "myproject", true, 0, false)
 	if c.TempDir != "/tmp" {
 		t.Errorf("expected TempDir '/tmp', got %q", c.TempDir)
 	}
@@ -372,6 +372,9 @@ func TestNewCooker(t *testing.T) {
 	}
 	if !c.IsRootless {
 		t.Error("expected IsRootless to be true")
+	}
+	if c.SELinuxEnabled {
+		t.Error("expected SELinuxEnabled to be false")
 	}
 }
 
@@ -450,7 +453,7 @@ func TestCook_PortOffsetting_PrivilegedPorts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", true, 2000)
+	c := NewCooker(tempDir, targetDir, "myproject", true, 2000, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -480,7 +483,7 @@ func TestCook_PortOffsetting_UnprivilegedPorts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", true, 2000)
+	c := NewCooker(tempDir, targetDir, "myproject", true, 2000, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -506,7 +509,7 @@ func TestCook_PortOffsetting_NoOffsetForNonRootless(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", false, 2000)
+	c := NewCooker(tempDir, targetDir, "myproject", false, 2000, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -541,7 +544,7 @@ func TestCook_PortOffsetting_InternalConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewCooker(tempDir, targetDir, "myproject", true, 2000)
+	c := NewCooker(tempDir, targetDir, "myproject", true, 2000, false)
 	if err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
@@ -563,5 +566,91 @@ func TestCook_PortOffsetting_InternalConflict(t *testing.T) {
 	}
 	if !strings.Contains(string(apiOut), "PublishPort=2081") {
 		t.Errorf("api: expected PublishPort=2081, got:\n%s", string(apiOut))
+	}
+}
+
+func TestAddSELinuxLabels_NoOptions(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=appvol:/data"
+	c := &Cooker{SELinuxEnabled: true}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=appvol:/data:z") {
+		t.Errorf("expected :z appended, got:\n%s", result)
+	}
+}
+
+func TestAddSELinuxLabels_RoOption(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=appvol:/data:ro"
+	c := &Cooker{SELinuxEnabled: true}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=appvol:/data:ro,z") {
+		t.Errorf("expected :ro,z appended, got:\n%s", result)
+	}
+}
+
+func TestAddSELinuxLabels_RwOption(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=appvol:/data:rw"
+	c := &Cooker{SELinuxEnabled: true}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=appvol:/data:rw,z") {
+		t.Errorf("expected :rw,z appended, got:\n%s", result)
+	}
+}
+
+func TestAddSELinuxLabels_AlreadyHasZ(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=appvol:/data:z"
+	c := &Cooker{SELinuxEnabled: true}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=appvol:/data:z") {
+		t.Errorf("expected :z preserved without duplication, got:\n%s", result)
+	}
+	if strings.Contains(result, "z,z") {
+		t.Errorf("expected no double :z, got:\n%s", result)
+	}
+}
+
+func TestAddSELinuxLabels_AlreadyHasZUpper(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=appvol:/data:Z"
+	c := &Cooker{SELinuxEnabled: true}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=appvol:/data:Z") {
+		t.Errorf("expected :Z preserved without modification, got:\n%s", result)
+	}
+}
+
+func TestAddSELinuxLabels_Disabled(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=appvol:/data"
+	c := &Cooker{SELinuxEnabled: false}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=appvol:/data") {
+		t.Errorf("expected no modification when SELinux disabled, got:\n%s", result)
+	}
+	if strings.Contains(result, ":z") {
+		t.Errorf("expected no :z added when SELinux disabled, got:\n%s", result)
+	}
+}
+
+func TestAddSELinuxLabels_BindMount(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=/host/path:/container/path"
+	c := &Cooker{SELinuxEnabled: true}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=/host/path:/container/path:z") {
+		t.Errorf("expected :z appended to bind mount, got:\n%s", result)
+	}
+}
+
+func TestAddSELinuxLabels_BindMountRo(t *testing.T) {
+	content := "[Container]\nImage=nginx\nVolume=/host/path:/container/path:ro"
+	c := &Cooker{SELinuxEnabled: true}
+	result := c.addSELinuxLabels(content)
+
+	if !strings.Contains(result, "Volume=/host/path:/container/path:ro,z") {
+		t.Errorf("expected :ro,z appended to bind mount, got:\n%s", result)
 	}
 }

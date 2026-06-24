@@ -11,21 +11,23 @@ import (
 
 // Cooker handles the post-processing of Quadlet files
 type Cooker struct {
-	TempDir     string
-	TargetDir   string
-	ProjectName string
-	IsRootless  bool
-	PortOffset  int
+	TempDir         string
+	TargetDir       string
+	ProjectName     string
+	IsRootless      bool
+	PortOffset      int
+	SELinuxEnabled  bool
 }
 
 // NewCooker creates a new cooker instance
-func NewCooker(tempDir, targetDir, projectName string, isRootless bool, portOffset int) *Cooker {
+func NewCooker(tempDir, targetDir, projectName string, isRootless bool, portOffset int, selinuxEnabled bool) *Cooker {
 	return &Cooker{
-		TempDir:     tempDir,
-		TargetDir:   targetDir,
-		ProjectName: projectName,
-		IsRootless:  isRootless,
-		PortOffset:  portOffset,
+		TempDir:        tempDir,
+		TargetDir:      targetDir,
+		ProjectName:    projectName,
+		IsRootless:     isRootless,
+		PortOffset:     portOffset,
+		SELinuxEnabled: selinuxEnabled,
 	}
 }
 
@@ -75,6 +77,9 @@ func (c *Cooker) Cook() error {
 		if updatedContent != original {
 			logger.Info(fmt.Sprintf("Rewrote cross-unit references in %s", newName))
 		}
+
+		// Add SELinux :z label to Volume= directives
+		updatedContent = c.addSELinuxLabels(updatedContent)
 
 		// Add systemd optimizations for .container and .network files
 		if strings.HasSuffix(newName, ".container") || strings.HasSuffix(newName, ".network") {
@@ -484,7 +489,7 @@ func (c *Cooker) addProjectLabels(content string, fileName string) string {
 		labels = append(labels, "Label=com.comquad.managed=true")
 	}
 
-	if len(labels) == 0 {
+if len(labels) == 0 {
 		return strings.Join(lines, "\n")
 	}
 
@@ -499,6 +504,46 @@ func (c *Cooker) addProjectLabels(content string, fileName string) string {
 	lines = append(lines[:insertAt+1], append(labels, lines[insertAt+1:]...)...)
 
 	return strings.Join(lines, "\n")
+}
+
+// addSELinuxLabels appends the :z SELinux label to all Volume= directives
+// in the content when SELinux is enabled on the host.
+func (c *Cooker) addSELinuxLabels(content string) string {
+	if !c.SELinuxEnabled {
+		return content
+	}
+
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "Volume=") {
+			continue
+		}
+		value := strings.TrimPrefix(trimmed, "Volume=")
+		lines[i] = "Volume=" + c.addSELinuxToVolume(value)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// addSELinuxToVolume appends the ,z SELinux mount option to a Volume= directive value.
+// It handles all cases: no options, :ro, :rw, already has :z/:Z, etc.
+func (c *Cooker) addSELinuxToVolume(value string) string {
+	parts := strings.SplitN(value, ":", 3)
+
+	// No options present — add :z
+	if len(parts) == 2 {
+		return value + ":z"
+	}
+
+	// Options present — check if already has z or Z
+	if len(parts) == 3 {
+		if !strings.Contains(parts[2], "z") && !strings.Contains(parts[2], "Z") {
+			return parts[0] + ":" + parts[1] + ":" + parts[2] + ",z"
+		}
+	}
+
+	return value
 }
 
 

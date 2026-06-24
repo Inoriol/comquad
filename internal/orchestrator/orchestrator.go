@@ -282,7 +282,13 @@ func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) error {
 			}
 		}
 	}
-	cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless, portOffset)
+
+	selinuxEnabled := preprocess.IsSELinuxEnabled()
+	if selinuxEnabled {
+		logger.Info(fmt.Sprintf("SELinux detected (%s), adding :z labels to all volumes", preprocess.SELinuxMode()))
+	}
+
+	cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless, portOffset, selinuxEnabled)
 	if err := cookerEngine.Cook(); err != nil {
 		return fmt.Errorf("cooking failed: %w", err)
 	}
