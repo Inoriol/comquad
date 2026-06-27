@@ -247,7 +247,7 @@ func TestPs_ProjectNotDeployed(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", t.TempDir(), state, newMockSystemdClient())
 
-	err := o.Ps()
+	err := o.Ps(false)
 	if err == nil || !strings.Contains(err.Error(), "not deployed") {
 		t.Errorf("expected 'not deployed' error, got %v", err)
 	}
@@ -255,7 +255,7 @@ func TestPs_ProjectNotDeployed(t *testing.T) {
 
 func TestPs_StateError(t *testing.T) {
 	o := newTestOrchestratorWithStateErr("myapp", t.TempDir(), errors.New("state gone"))
-	err := o.Ps()
+	err := o.Ps(false)
 	if err == nil || !strings.Contains(err.Error(), "state gone") {
 		t.Errorf("expected state error, got %v", err)
 	}
@@ -267,8 +267,13 @@ func TestPs_SystemdConnectionError(t *testing.T) {
 		"myapp": makeProjectState("myapp", dir, nil),
 	})
 	o := newTestOrchestratorWithSystemdErr("myapp", dir, state, errors.New("dbus gone"))
+	o.listContainers = func(projectName string, all bool) ([]ContainerInfo, error) {
+		return []ContainerInfo{
+			{Name: "myapp-web", Image: "nginx:latest", State: "running", Status: "Up 1m"},
+		}, nil
+	}
 
-	err := o.Ps()
+	err := o.Ps(false)
 	if err == nil || !strings.Contains(err.Error(), "dbus gone") {
 		t.Errorf("expected dbus error, got %v", err)
 	}
@@ -284,8 +289,13 @@ func TestPs_PrintsUnitsForProject(t *testing.T) {
 		{name: "cq-myapp-web.service", activeState: "active", subState: "running"},
 	}
 	o := newTestOrchestrator("myapp", dir, state, sys)
+	o.listContainers = func(projectName string, all bool) ([]ContainerInfo, error) {
+		return []ContainerInfo{
+			{Name: "myapp-web", Image: "nginx:latest", Command: "nginx", Service: "web", State: "running", Status: "Up 1m", DBusActive: "active", DBusSub: "running"},
+		}, nil
+	}
 
-	if err := o.Ps(); err != nil {
+	if err := o.Ps(false); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

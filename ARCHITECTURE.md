@@ -39,6 +39,32 @@ internal/transpile/    # Wrapper executing the podlet binary
 
 ```
 
+## 📊 Ps Command
+
+The `ps` command shows container runtime status in `docker compose ps` style. It queries Podman for container data and merges it with systemd D-Bus unit state.
+
+**Data sources:**
+
+1. **Podman** — Runs `podman ps --filter "label=com.comquad.managed=true" --filter "label=com.comquad.project=<name>" --format json` (or `-a` flag for exited containers). Parses JSON to extract container name, image, command, state, status, ports, networks, mounts, exit code, and timestamps.
+2. **D-Bus** — Queries `ListAllUnits()` and builds a map keyed by unit name. Merges `ActiveState` and `SubState` into each container record.
+
+**Output format:**
+
+```
+NAME                 IMAGE                          COMMAND                   SERVICE      CREATED              STATUS               PORTS
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+my_nginx             docker.io/library/nginx:alpine nginx -g daemon off;      nginx        2 minutes ago        Up 2 minutes         0.0.0.0:2080->80/tcp
+2nginx               docker.io/library/nginx:alpine nginx -g daemon off;      nginx2       2 minutes ago        Up 2 minutes         0.0.0.0:2081->80/tcp
+```
+
+Columns are auto-width based on content. Exited containers show `Exited (<code>) <time>` in the status column. Dead containers show `Dead`. Ports are formatted as `host_ip:host_port->container_port/protocol`. Created time uses relative format (`just now`, `5m ago`, `2d ago`, or `Jan 02 2006` for older entries).
+
+**Flags:**
+
+* `-a, --all` — Include exited/dead containers (uses `podman ps -a`)
+
+**Testability:** `Orchestrator.listContainers` is an injectable function field (`func(projectName string, all bool) ([]ContainerInfo, error)`), allowing tests to provide canned container data without a live Podman daemon.
+
 ## 👁️ View Command
 
 The `view` command provides two modes of inspection:
@@ -242,11 +268,12 @@ The orchestrator package was historically untestable because it constructed `Sys
 - **`SystemdClient`** — all nine D-Bus methods used by the orchestrator (`StartUnit`, `StopUnit`, `RestartUnit`, `ReloadDaemon`, `WaitForUnit`, `ListUnitsByNames`, `ListAllUnits`, `GetInvocationID`, `Close`). The concrete `SystemdManager` satisfies this interface.
 - **`StateStore`** — all state operations used by the orchestrator (`GetProject`, `GetStateFilePath`, `ListProjects`, `RegisterProject`, `UnregisterProject`, `Save`). The concrete `StateManager` satisfies this interface. `GetProject` replaces direct `Projects[name]` map access, making the interface satisfiable without exposing the map.
 
-`Orchestrator` holds two factory fields instead of calling the constructors directly:
+`Orchestrator` holds three factory fields instead of calling the constructors directly:
 
 ```go
-newState   func() (deploy.StateStore, error)
-newSystemd func() (deploy.SystemdClient, error)
+newState       func() (deploy.StateStore, error)
+newSystemd     func() (deploy.SystemdClient, error)
+listContainers func(projectName string, all bool) ([]ContainerInfo, error)
 ```
 
 `NewOrchestrator` wires in the real implementations. Tests override these fields with in-memory fakes (`mockStateStore`, `mockSystemdClient`) that record calls and return canned responses, enabling full unit-test coverage without a live D-Bus or Podman daemon.

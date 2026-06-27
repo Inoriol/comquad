@@ -119,7 +119,7 @@ Dry run complete — nothing was written, no units started.
 * **Remove with volumes:** `comquad down -d` (also removes Podman volumes)
 * **List deployed projects:** `comquad list`
 * **Regenerate state from labels:** `comquad regenerate --force`
-* **Show unit status:** `comquad ps`
+* **Show container status:** `comquad ps` (docker compose ps style), `comquad ps -a` (include exited)
 * **View unit file:** `comquad view [project] [service]`
 * **Edit unit file:** `comquad edit [project] [service] [--no-reload]`
 * **Check prerequisites:** `comquad check`
@@ -141,7 +141,7 @@ comquad logs --since 10m      # logs from the last 10 minutes
 comquad logs --output short   # use a different output format
 ```
 
-For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown. When querying multiple units, each log line is prefixed with `[<unit-name>]` to identify its source. Logs default to `short-iso` output format to strip raw systemd metadata.
+For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown. When querying multiple units, each log line is prefixed with `[<unit-name>]` to identify its source. Logs default to `cat` output format to strip raw systemd metadata.
 
 ### View
 

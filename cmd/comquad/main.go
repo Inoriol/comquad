@@ -102,7 +102,7 @@ var psCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Ps()
+		return o.Ps(psAll)
 	},
 }
 
@@ -250,6 +250,7 @@ var restartCmd = &cobra.Command{
 var execUser string
 var execTTY bool
 var dryRun bool
+var psAll bool
 
 var regenerateCmd = &cobra.Command{
 	Use:   "regenerate",
@@ -310,6 +311,7 @@ func init() {
 	logsCmd.Flags().StringVar(&logSince, "since", "", "Show logs since a specific time (e.g. '10m', '2024-01-01 12:00:00')")
 	logsCmd.Flags().StringVar(&logOutput, "output", "", "Output format (default: 'short-iso' to strip systemd metadata)")
 	psCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	psCmd.Flags().BoolVarP(&psAll, "all", "a", false, "Show all containers including exited ones")
 	viewCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	editCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	editCmd.Flags().BoolVar(&noReload, "no-reload", false, "Open files in editor without reloading systemd")

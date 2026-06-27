@@ -25,8 +25,9 @@ type Orchestrator struct {
 	// newState and newSystemd are factories that create the state store and
 	// systemd client respectively. They default to the real implementations
 	// and can be overridden in tests to inject fakes.
-	newState   func() (deploy.StateStore, error)
-	newSystemd func() (deploy.SystemdClient, error)
+	newState       func() (deploy.StateStore, error)
+	newSystemd     func() (deploy.SystemdClient, error)
+	listContainers func(projectName string, all bool) ([]ContainerInfo, error)
 }
 
 // NewOrchestrator creates a new Orchestrator for the current working directory.
@@ -49,6 +50,9 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 		},
 		newSystemd: func() (deploy.SystemdClient, error) {
 			return deploy.NewSystemdManager()
+		},
+		listContainers: func(projectName string, all bool) ([]ContainerInfo, error) {
+			return listContainersFromPodman(projectName, all)
 		},
 	}, nil
 }

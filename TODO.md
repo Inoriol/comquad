@@ -4,48 +4,37 @@
 
 * **Fix down behavior** for networks and volumes. They are not getting deleted. Run `podman network remove` and `podman volume remove` (if flag exist) with filter for project labels after clean of systemd units.
 
-* **Review of function names** for example now we have MatchContainer and MatchContainers fuctions. Probably one of them should be renamed to something more clear.
-
-### Difficulty: Medium
-
-* **`ps` command improvement** *(Medium)* — Reformat output to match `docker compose ps` style: container name, image, command, service (short name), created, status, ports. Run `podman ps --format json` filtered by `com.comquad.project` label (example: podman ps --filter "label=com.comquad.project=cqtest" --format json), merge with D-Bus active/sub state. Show networks and volumes in a separate section below. Replace the current bare systemd table.
+* **Review of function names** for example now we have MatchContainer and MatchContainers functions. Probably one of them should be renamed to something more clear.
 
 ### Difficulty: Hard
 
 * **Lifecycle Integration Testing** *(Hard)* — End-to-end sandbox execution suite. Build a privileged OCI image containing podman, Go, podlet, and systemd. Run `comquad up` / `down` inside it via podman-in-podman. Validate that quadlet files are generated, units start, and state is correctly written and cleaned up. Requires significant CI infrastructure work.
 
-## ✅ Resolved
+### Bugs & Robustness
 
-* **Named volumes not generated** — Added `com.comquad.force-volume: "true"` label injection during preprocessing to force podlet to generate `.volume` files for named volumes without a driver. Also fixed nil pointer crash when volumes have no children and combined `Label=` lines being split into separate lines.
+* **`addSELinuxToVolume` missing single-part case** — When Volume= has only one part (e.g. `Volume=appvol` with no colon), `:z` is not appended. Should handle `len(parts) == 1` case. (`internal/cooker/engine.go:547`)
+* **`findComposeFile` doesn't verify regular file** — `os.Stat` returns nil for directories too. If a directory is named `compose.yaml`, it would be accepted as a valid compose file. Add `info.Mode().IsRegular()` check. (`internal/orchestrator/orchestrator.go:590`)
+* **Port offsetting loop has no upper bound** — `offsetPorts()` uses `for { finalPort++; ... }` with no max port check. Could infinite-loop if all ports in range are claimed. Add check against 65535 and return an error if no available port found. (`internal/cooker/engine.go:327`)
+* **`rewriteReferences` non-deterministic order** — Iterates over `renameMap` (Go map) without sorting. If two old names are substrings of each other (e.g. `cq-app` and `cq-application`), replacement order matters and could produce incorrect results. Sort keys before iterating (longest first would be safest). (`internal/cooker/engine.go:144`)
+* **`handleImages` and `printDryRun` non-deterministic** — Both iterate over `buildInfo` map without sorting, causing non-deterministic output order between runs. Sort service names before iterating. (`internal/orchestrator/orchestrator.go:360, 454`)
+* **SELinux detection data race** — `IsSELinuxEnabled()` and `SELinuxMode()` use package-level vars (`selinuxEnabled`, `selinuxMode`) without synchronization. Concurrent calls during initialization could cause a data race. Add `sync.Once` or mutex. (`internal/preprocess/selinux.go:40`)
 
-* **SELinux `:z` label on volumes** — Added SELinux detection via `/sys/fs/selinux/enforce` (supports Enforcing, Permissive, Disabled modes). When SELinux is enabled, all `Volume=` directives in `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present. Verbose log shows detected mode.
+### Code Smells
 
-* **Volume host path corruption** — `rewriteReferences` now skips host paths (bind mounts) when rewriting volume references, preventing volume names from being replaced inside absolute/relative paths.
+* **Remove `containerFileToUnitName` no-op alias** — Unexported `containerFileToUnitName` is just `return ContainerFileToUnitName(filePath)`. Remove the alias and use the exported version directly at all call sites. (`internal/orchestrator/orchestrator.go:575`)
+* **Remove unused `Engine.ForceBuild` field** — Field on `build.Engine` struct is never read anywhere in the codebase. (`internal/build/engine.go:26`)
+* **Remove dead-code stub `Engine.HandleBuild`** — Returns `nil` unimplemented. The orchestrator calls `BuildService()` directly instead. Either implement or remove. (`internal/build/engine.go:116`)
+* **Inconsistent logging in `Down()`** — Uses `fmt.Fprintf(os.Stderr, ...)` for network/volume removal warnings instead of `logger.Warn()`/`logger.Error()`. Inconsistent with project logging philosophy. (`internal/orchestrator/orchestrator.go:207`)
+* **`splitCombinedLabels` missing quote handling** — Uses `strings.Fields()` which splits on all whitespace. If a label value contains spaces (even quoted), it would split incorrectly. Consider proper tokenizer. (`internal/cooker/engine.go:216`)
 
-* **`logs` empty lines from `--output cat`** — `journalctl --output cat` inserts blank entry-separator lines after every journal entry. All three log code paths (`logs` single-unit, `logs` multi-unit with `[<unit>]` prefix, and `FollowLogs` for `up -f`) now strip empty lines via a shared `writeFilteredLines` helper.
-* **`logs` command improvement** — Added `--output=short-iso` (default) to strip raw systemd metadata, `-n/--tail <N>` and `--since <time>` flags. `FollowLogs` includes `.network` and `.volume` unit logs. Log lines are prefixed with `[<unit-name>]` when querying multiple units.
-* **`--dry-run` for `up`** — Runs the full preprocess → transpile → cook pipeline into a temporary preview directory, then prints each generated quadlet file alongside the target path it *would* be written to, plus image build/pull actions that *would* be taken. Nothing is written to the systemd directory, no state is registered, and no units are started. 12 tests added in `dryrun_test.go`.
-* **`GetBuildInfo` edge case tests** — 13 tests added: `buildArgValue` with nil, string, empty string, bool true/false, int, int64, float64 whole number, float64 with decimal; `GetBuildInfo` with empty context, empty args map, non-string arg types, and labels alongside build config.
-* **Verbosity improvements** — `start`, `stop`, `restart`, and `down` now use `logger.Print` instead of bare `fmt.Printf`, so their operational messages are suppressed by `--quiet`. Added `--quiet`/`-q` persistent root flag that suppresses all non-error output across all commands. `logger.Error` continues to always write to stderr.
-* **Orchestrator package tests** — `SystemdClient` and `StateStore` interfaces extracted into `internal/deploy`. Orchestrator uses injected factory functions instead of direct construction calls. 88 tests added across `resolve_test.go`, `lifecycle_test.go`, `down_test.go`, `up_test.go`, and `commands_test.go`.
-* **Transpile package tests** — `NewPodletRunner` and `Transpile` covered via a fake `podlet` shell script injected through PATH. 10 tests added.
+### Test Gaps
 
-* **`exec` command broken** — Container name was derived from a full path instead of the filename; fixed with `filepath.Base`.
-* **`--dry-run` on `regenerate` non-functional** — Flag was registered but never passed to `Regenerate()`; wired through.
-* **`down` networks not deleted** — `RemoveNetworks`/`RemoveVolumes` errors were silently swallowed; now returned and printed to stderr.
-* **`checkCmd` created target directory as side effect** — Replaced `os.MkdirAll` with a temp-file write probe.
-* **`logger.Error` suppressed in non-verbose mode** — `Error()` now always writes to stderr regardless of verbose setting.
-* **Default network / service attachment inconsistency** — Services are only auto-attached to `cq-default` when that network was actually injected, preventing dangling references.
-* **Duplicate labels on re-deploy** — `addProjectLabels` now checks for existing labels before inserting.
-* **`RegisterProject` dropped existing `Resources`** — Existing resources are preserved when re-registering after `up`.
-* **`$EDITOR` not split on whitespace** — `strings.Fields` used so values like `"vim -o"` or `"code --wait"` work correctly.
-* **Build arg coercion (`fmt.Sprintf("%v")`)** — Replaced with a proper type-switch (`buildArgValue`) handling nil, bool, int, and float64.
-* **State file written non-atomically** — `Save()` now writes to a temp file and renames atomically.
-* **Test state leaking into real state file** — Deploy tests now use an isolated temp dir via `XDG_DATA_HOME`.
-* **`COMQUAD_PORT_OFFSET` vs `ROOTLESS_PORT_OFFSET` mismatch** — ARCHITECTURE.md corrected to match code and README.
-* **`ListProjects` non-deterministic order** — Results sorted alphabetically by project name.
-* **`"down"` status dead code in view** — `viewProject` now correctly distinguishes `healthy` / `degraded` / `down`.
-* **Multiple D-Bus connections per operation** — `Down()` and `Stop()` now share a single connection across their sub-calls.
-* **Compose file read 3× in `Up()`** — `composeData` bytes reused; `preprocess()` no longer reads from disk.
-* **`podlet` not validated at startup** — `NewPodletRunner` returns an error immediately if `podlet` is not in PATH.
-* **stdin pipe leak in `podlet_runner.go`** — Pipe is closed if `cmd.Start()` fails.
+* **No tests for `regenerate.go`** — `Regenerate()` orchestrator method has zero test coverage.
+* **No tests for `edit.go`** — `Edit()` orchestrator method has zero test coverage.
+* **No tests for `ps.go`** — `Ps()` orchestrator method has zero test coverage.
+
+### Quick Wins
+
+* **Extract `ensureProjectDeployed()` helper** — 7+ methods (`View`, `Edit`, `Exec`, `Logs`, `Ps`, `FollowLogs`, `Regenerate`) repeat the pattern: create state manager → `GetProject` → fail if not exists. Extract into a single helper.
+* **Add `--dry-run` to `down`, `start`, `stop`, `restart`** — `regenerate` already supports it. Adding dry-run to lifecycle commands would improve safety for users.
+* **Rename `MatchContainer` / `MatchContainers`** — The singular name is misleading: `MatchContainer` doesn't mean "match exactly one", it means "return one". A caller can't tell if other matches exist. Rename to `MatchFirstContainer` / `MatchAllContainers` or similar. (`internal/orchestrator/resolve.go:37, 46`)
