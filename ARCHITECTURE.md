@@ -95,7 +95,7 @@ The `logs` command queries systemd D-Bus to determine each unit's state and filt
 
 **Stopped / failed units**: no filter is applied, showing full historical logs.
 
-Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, short name (after stripping `cq-<project>-` prefix), or internal Podman name (after stripping `cq-` prefix). `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
+Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, short name (after stripping `cq-<project>-` prefix), internal Podman name (after stripping `cq-` prefix), or `ContainerName=` directive from the unit file. `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
 
 ### Flags
 
@@ -124,10 +124,10 @@ All three commands require the project to exist in `projects.json` state. They s
 The `down` command performs a complete teardown of a deployed project in six steps:
 
 1. **Stop units** — Stops all container units via systemd D-Bus `StopUnit`, then verifies all units are no longer active.
-2. **Remove networks** — Lists all Podman networks matching the `cq-<project>-` or `*-<project>` prefix and removes them via `podman network rm`.
-3. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes matching the same prefix pattern and removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
-4. **Remove quadlet files** — Deletes all `.container`, `.network`, and `.volume` files from the systemd target directory.
-5. **Reload daemon** — Triggers `daemon-reload` via D-Bus so systemd forgets the removed units.
+2. **Remove quadlet files** — Deletes all `.container`, `.network`, and `.volume` files from the systemd target directory.
+3. **Reload daemon** — Triggers `daemon-reload` via D-Bus so systemd forgets the removed units and releases its references to networks and volumes.
+4. **Remove networks** — Lists all Podman networks with label `com.comquad.managed=true` and project label matching the current project, then removes them via `podman network rm`.
+5. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes with label `com.comquad.managed=true` and project label matching the current project, then removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
 6. **Unregister project** — Removes the project entry from `projects.json` state file.
 
 **Usage:**

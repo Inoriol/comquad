@@ -166,3 +166,37 @@ func TestDown_UnregisterError_PropagatesError(t *testing.T) {
 		t.Errorf("expected unregister error, got %v", err)
 	}
 }
+
+func TestDown_StopsNetworkAndVolumeUnits(t *testing.T) {
+	dir := t.TempDir()
+	containerPath := filepath.Join(dir, "cq-myapp-web.container")
+	networkPath := filepath.Join(dir, "cq-myapp-default.network")
+	volumePath := filepath.Join(dir, "cq-myapp-data.volume")
+	writeFile(t, containerPath, "[Container]\nImage=nginx\n")
+	writeFile(t, networkPath, "[Network]\n")
+	writeFile(t, volumePath, "[Volume]\n")
+
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, []string{containerPath, networkPath, volumePath}),
+	})
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", dir, state, sys)
+
+	if err := o.Down(false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedUnits := []string{"cq-myapp-web.service", "cq-myapp-default-network.service", "cq-myapp-data-volume.service"}
+	for _, expected := range expectedUnits {
+		found := false
+		for _, stopped := range sys.stoppedUnits {
+			if stopped == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected unit %q to be stopped, got %v", expected, sys.stoppedUnits)
+		}
+	}
+}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -235,15 +234,14 @@ func (o *Orchestrator) FollowLogs(since string, tail, output string) error {
 
 	var unitNames []string
 	for _, f := range state.Files {
-		base := filepath.Base(f)
 		var unitName string
 		switch {
 		case strings.HasSuffix(f, ".container"):
-			unitName = strings.TrimSuffix(base, ".container") + ".service"
+			unitName = ContainerFileToUnitName(f)
 		case strings.HasSuffix(f, ".network"):
-			unitName = strings.TrimSuffix(base, ".network") + ".network"
+			unitName = NetworkFileToUnitName(f)
 		case strings.HasSuffix(f, ".volume"):
-			unitName = strings.TrimSuffix(base, ".volume") + ".volume"
+			unitName = VolumeFileToUnitName(f)
 		}
 		if unitName != "" {
 			unitNames = append(unitNames, unitName)

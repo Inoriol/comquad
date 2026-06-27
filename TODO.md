@@ -2,8 +2,6 @@
 
 ### Uncategorized
 
-* **Fix down behavior** for networks and volumes. They are not getting deleted. Run `podman network remove` and `podman volume remove` (if flag exist) with filter for project labels after clean of systemd units.
-
 * **Review of function names** for example now we have MatchContainer and MatchContainers functions. Probably one of them should be renamed to something more clear.
 
 ### Difficulty: Hard
@@ -19,12 +17,15 @@
 * **`handleImages` and `printDryRun` non-deterministic** — Both iterate over `buildInfo` map without sorting, causing non-deterministic output order between runs. Sort service names before iterating. (`internal/orchestrator/orchestrator.go:360, 454`)
 * **SELinux detection data race** — `IsSELinuxEnabled()` and `SELinuxMode()` use package-level vars (`selinuxEnabled`, `selinuxMode`) without synchronization. Concurrent calls during initialization could cause a data race. Add `sync.Once` or mutex. (`internal/preprocess/selinux.go:40`)
 
+### Resolved
+
+* **`down` doesn't stop network/volume units** — `Down()` only stopped `.container` units, leaving systemd believing `.network` and `.volume` units were still active. Subsequent `up` would fail because systemd returned "skipped" for already-active network units. Fixed by stopping network and volume units before removing quadlet files. (`internal/orchestrator/orchestrator.go`)
+
 ### Code Smells
 
 * **Remove `containerFileToUnitName` no-op alias** — Unexported `containerFileToUnitName` is just `return ContainerFileToUnitName(filePath)`. Remove the alias and use the exported version directly at all call sites. (`internal/orchestrator/orchestrator.go:575`)
 * **Remove unused `Engine.ForceBuild` field** — Field on `build.Engine` struct is never read anywhere in the codebase. (`internal/build/engine.go:26`)
 * **Remove dead-code stub `Engine.HandleBuild`** — Returns `nil` unimplemented. The orchestrator calls `BuildService()` directly instead. Either implement or remove. (`internal/build/engine.go:116`)
-* **Inconsistent logging in `Down()`** — Uses `fmt.Fprintf(os.Stderr, ...)` for network/volume removal warnings instead of `logger.Warn()`/`logger.Error()`. Inconsistent with project logging philosophy. (`internal/orchestrator/orchestrator.go:207`)
 * **`splitCombinedLabels` missing quote handling** — Uses `strings.Fields()` which splits on all whitespace. If a label value contains spaces (even quoted), it would split incorrectly. Consider proper tokenizer. (`internal/cooker/engine.go:216`)
 
 ### Test Gaps

@@ -196,38 +196,56 @@ func (o *Orchestrator) Down(removeVolumes bool) error {
 	}
 	defer dbusMgr.Close()
 
-	// Step 1: Stop all units via systemd
+	// Step 1: Stop all container units via systemd
 	if err := o.stopUnits(dbusMgr, state.Files); err != nil {
 		logger.Warn("Some units failed to stop: " + err.Error())
 	}
 
-	// Verify units are actually stopped
-	if err := o.verifyUnitsStopped(dbusMgr, state.Files); err != nil {
-		logger.Warn(err.Error())
-	}
-
-	// Step 2: Remove networks
-	if err := deploy.RemoveNetworks(o.projectName); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to remove networks: %v\n", err)
-	}
-
-	// Step 3: Remove volumes if requested
-	if removeVolumes {
-		if err := deploy.RemoveVolumes(o.projectName); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to remove volumes: %v\n", err)
+	// Step 1a: Stop network units
+	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".network") {
+			unitName := NetworkFileToUnitName(f)
+			logger.Print("Stopping unit: " + unitName)
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop network unit " + unitName + ": " + err.Error())
+			}
 		}
 	}
 
-	// Step 4: Remove quadlet files from target dir
+	// Step 1b: Stop volume units
+	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".volume") {
+			unitName := VolumeFileToUnitName(f)
+			logger.Print("Stopping unit: " + unitName)
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop volume unit " + unitName + ": " + err.Error())
+			}
+		}
+	}
+
+	// Step 2: Remove quadlet files from target dir
 	for _, f := range state.Files {
 		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
 			logger.Warn("Failed to remove file " + f + ": " + err.Error())
 		}
 	}
 
-	// Step 5: Reload daemon so systemd forgets the removed units
+	// Step 3: Reload daemon so systemd forgets the removed units and
+	// releases its references to networks/volumes before we try to remove them.
 	if err := dbusMgr.ReloadDaemon(); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+	}
+
+	// Step 4: Remove networks (after daemon-reload releases systemd references)
+	if err := deploy.RemoveNetworks(o.projectName); err != nil {
+		logger.Error("failed to remove networks: " + err.Error())
+	}
+
+	// Step 5: Remove volumes if requested
+	if removeVolumes {
+		if err := deploy.RemoveVolumes(o.projectName); err != nil {
+			logger.Error("failed to remove volumes: " + err.Error())
+		}
 	}
 
 	// Step 6: Unregister project from state
@@ -580,6 +598,22 @@ func ContainerFileToUnitName(filePath string) string {
 // containerFileToUnitName is an unexported alias kept for internal call sites.
 func containerFileToUnitName(filePath string) string {
 	return ContainerFileToUnitName(filePath)
+}
+
+// NetworkFileToUnitName derives the systemd unit name from a network quadlet file path.
+// e.g. /path/to/cq-myapp-default.network -> cq-myapp-default-network.service
+func NetworkFileToUnitName(filePath string) string {
+	base := filepath.Base(filePath)
+	nameWithoutExt := strings.TrimSuffix(base, ".network")
+	return nameWithoutExt + "-network.service"
+}
+
+// VolumeFileToUnitName derives the systemd unit name from a volume quadlet file path.
+// e.g. /path/to/cq-myapp-data.volume -> cq-myapp-data-volume.service
+func VolumeFileToUnitName(filePath string) string {
+	base := filepath.Base(filePath)
+	nameWithoutExt := strings.TrimSuffix(base, ".volume")
+	return nameWithoutExt + "-volume.service"
 }
 
 func findComposeFile(dir string) string {

@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -202,22 +203,32 @@ func (s *SystemdManager) GetInvocationID(unitName string) (string, error) {
 }
 
 // removePodmanResources lists and removes Podman resources of the given type
-// (network or volume) that match the cq-<projectName>- prefix pattern.
+// (network or volume) that match the cq-<projectName>- prefix pattern and
+// carry the com.comquad.managed label.
 func removePodmanResources(resourceType, projectName string) error {
-	listCmd := exec.Command("podman", resourceType, "ls", "--format", "{{.Name}}")
-	output, err := listCmd.Output()
+	var cmd *exec.Cmd
+	switch resourceType {
+	case "network":
+		cmd = exec.Command("podman", "network", "ls",
+			"--filter", "label=com.comquad.project="+projectName,
+			"--format", "{{.Name}}")
+	case "volume":
+		cmd = exec.Command("podman", "volume", "ls",
+			"--filter", "label=com.comquad.project="+projectName,
+			"--format", "{{.Name}}")
+	default:
+		return fmt.Errorf("unknown resource type: %s", resourceType)
+	}
+
+	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to list %ss: %w", resourceType, err)
 	}
 
-	prefix := "cq-" + projectName + "-"
 	var names []string
 	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		if strings.HasPrefix(name, prefix) || strings.HasSuffix(name, "-"+projectName) {
+		if name != "" {
 			names = append(names, name)
 		}
 	}
@@ -238,12 +249,14 @@ func removePodmanResources(resourceType, projectName string) error {
 	return errors.Join(errs...)
 }
 
-// RemoveNetworks removes all Podman networks matching the cq-<projectName> prefix.
+// RemoveNetworks removes all Podman networks with label com.comquad.managed=true
+// and com.comquad.project=<projectName>.
 func RemoveNetworks(projectName string) error {
 	return removePodmanResources("network", projectName)
 }
 
-// RemoveVolumes removes all Podman volumes matching the cq-<projectName> prefix.
+// RemoveVolumes removes all Podman volumes with label com.comquad.managed=true
+// and com.comquad.project=<projectName>.
 func RemoveVolumes(projectName string) error {
 	return removePodmanResources("volume", projectName)
 }
@@ -338,9 +351,9 @@ func discoverResources(resourceType, label string) []PodmanResource {
 	case "container":
 		cmd = exec.Command("podman", "ps", "-a", "--filter", "label="+label, "--format", "{{.Names}}|{{.Label \"com.comquad.project\"}}")
 	case "network":
-		cmd = exec.Command("podman", "network", "ls", "--filter", "label="+label, "--format", "{{.Name}}|{{.Label \"com.comquad.project\"}}")
+		cmd = exec.Command("podman", "network", "ls", "--filter", "label="+label, "--format", "{{json .}}")
 	case "volume":
-		cmd = exec.Command("podman", "volume", "ls", "--filter", "label="+label, "--format", "{{.Name}}|{{.Label \"com.comquad.project\"}}")
+		cmd = exec.Command("podman", "volume", "ls", "--filter", "label="+label, "--format", "{{json .}}")
 	default:
 		return results
 	}
@@ -356,20 +369,59 @@ func discoverResources(resourceType, label string) []PodmanResource {
 		if line == "" {
 			continue
 		}
-		parts := strings.SplitN(line, "|", 2)
-		if len(parts) != 2 {
-			continue
+
+		switch resourceType {
+		case "network":
+			var net struct {
+				Name   string            `json:"name"`
+				Labels map[string]string `json:"labels"`
+			}
+			if err := json.Unmarshal([]byte(line), &net); err != nil {
+				continue
+			}
+			if net.Name != "" && net.Labels != nil {
+				if project, ok := net.Labels["com.comquad.project"]; ok && project != "" {
+					results = append(results, PodmanResource{
+						Name:        net.Name,
+						ProjectName: project,
+						Type:        resourceType,
+					})
+				}
+			}
+		case "volume":
+			var vol struct {
+				Name   string            `json:"Name"`
+				Labels map[string]string `json:"Labels"`
+			}
+			if err := json.Unmarshal([]byte(line), &vol); err != nil {
+				continue
+			}
+			if vol.Name != "" && vol.Labels != nil {
+				if project, ok := vol.Labels["com.comquad.project"]; ok && project != "" {
+					results = append(results, PodmanResource{
+						Name:        vol.Name,
+						ProjectName: project,
+						Type:        resourceType,
+					})
+				}
+			}
+		default:
+			// container: use the original pipe-delimited format
+			parts := strings.SplitN(line, "|", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			name := parts[0]
+			project := parts[1]
+			if name == "" || project == "" {
+				continue
+			}
+			results = append(results, PodmanResource{
+				Name:        name,
+				ProjectName: project,
+				Type:        resourceType,
+			})
 		}
-		name := parts[0]
-		project := parts[1]
-		if name == "" || project == "" {
-			continue
-		}
-		results = append(results, PodmanResource{
-			Name:        name,
-			ProjectName: project,
-			Type:        resourceType,
-		})
 	}
 
 	return results

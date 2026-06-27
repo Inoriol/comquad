@@ -143,6 +143,62 @@ func TestMatchContainer_SkipsNetworkFiles(t *testing.T) {
 	}
 }
 
+func TestMatchContainer_ByContainerName(t *testing.T) {
+	dir := t.TempDir()
+	containerFile := filepath.Join(dir, "cq-myapp-web.container")
+	writeFile(t, containerFile, "[Container]\nImage=nginx\nContainerName=myapp-web-custom\n")
+
+	state := stateWithFiles(dir, "cq-myapp-web.container")
+	got := MatchContainer("myapp", state, "myapp-web-custom")
+	if got == "" {
+		t.Error("expected match by ContainerName= directive")
+	}
+	if got != containerFile {
+		t.Errorf("expected %q, got %q", containerFile, got)
+	}
+}
+
+func TestMatchContainer_ByContainerNameNoMatch(t *testing.T) {
+	dir := t.TempDir()
+	containerFile := filepath.Join(dir, "cq-myapp-web.container")
+	writeFile(t, containerFile, "[Container]\nImage=nginx\nContainerName=myapp-web-custom\n")
+
+	state := stateWithFiles(dir, "cq-myapp-web.container")
+	got := MatchContainer("myapp", state, "nonexistent")
+	if got != "" {
+		t.Errorf("expected no match, got %q", got)
+	}
+}
+
+func TestReadContainerName_NoContainerName(t *testing.T) {
+	dir := t.TempDir()
+	containerFile := filepath.Join(dir, "cq-myapp-web.container")
+	writeFile(t, containerFile, "[Container]\nImage=nginx\n")
+
+	got := readContainerName(containerFile)
+	if got != "" {
+		t.Errorf("expected empty string, got %q", got)
+	}
+}
+
+func TestReadContainerName_WithContainerName(t *testing.T) {
+	dir := t.TempDir()
+	containerFile := filepath.Join(dir, "cq-myapp-web.container")
+	writeFile(t, containerFile, "[Container]\nImage=nginx\nContainerName=myapp-web-custom\n")
+
+	got := readContainerName(containerFile)
+	if got != "myapp-web-custom" {
+		t.Errorf("expected 'myapp-web-custom', got %q", got)
+	}
+}
+
+func TestReadContainerName_MissingFile(t *testing.T) {
+	got := readContainerName("/nonexistent/path/container.container")
+	if got != "" {
+		t.Errorf("expected empty string for missing file, got %q", got)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // MatchContainers
 // ---------------------------------------------------------------------------

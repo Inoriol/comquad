@@ -1,16 +1,33 @@
 package orchestrator
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
 	"comquad/internal/deploy"
 )
 
+// readContainerName reads the ContainerName= value from a .container quadlet file.
+// Returns empty string if not found or if the file cannot be read.
+func readContainerName(filePath string) string {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "ContainerName=") {
+			return strings.TrimPrefix(line, "ContainerName=")
+		}
+	}
+	return ""
+}
+
 // matchAllContainers returns all container quadlet files from state that match arg.
-// Five patterns are tried in order: exact base name, name without extension,
+// Six patterns are tried in order: exact base name, name without extension,
 // name without .service suffix, short name (strip cq-<project>- prefix),
-// internal Podman name (strip cq- prefix).
+// internal Podman name (strip cq- prefix), ContainerName= directive in the unit file.
 func matchAllContainers(projectName string, state deploy.ProjectState, arg string) []string {
 	servicePrefix := "cq-" + projectName + "-"
 	var matches []string
@@ -27,6 +44,12 @@ func matchAllContainers(projectName string, state deploy.ProjectState, arg strin
 			strings.TrimSuffix(arg, ".service") == nameWithoutExt ||
 			strings.TrimPrefix(nameWithoutExt, servicePrefix) == arg ||
 			strings.TrimPrefix(nameWithoutExt, "cq-") == arg {
+			matches = append(matches, f)
+			continue
+		}
+
+		// Sixth pattern: ContainerName= directive in the unit file
+		if cn := readContainerName(f); cn == arg {
 			matches = append(matches, f)
 		}
 	}
