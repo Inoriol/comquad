@@ -198,3 +198,7 @@ For a deep dive into how `comquad` processes your compose files, manages state, 
 ## 📄 License
 
 MIT
+
+## 📝 Compose Compatibility
+
+`comquad` uses a schema-less YAML model to preserve all compose file fields through the preprocessing pipeline. Any field not explicitly handled (e.g. `depends_on`, `restart`, `healthcheck`, `x-` extensions) is passed through unchanged to `podlet`. This means compose files with newer or custom Docker Compose fields will not silently drop data — they flow through to quadlet generation intact.

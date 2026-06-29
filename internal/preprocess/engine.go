@@ -33,46 +33,51 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 	}
 
 	if cf.Services == nil {
-		cf.Services = make(map[string]*Service)
+		cf.Services = make(map[string]map[string]interface{})
 	}
 
 	if cf.Networks == nil {
-		cf.Networks = make(map[string]*Network)
+		cf.Networks = make(map[string]interface{})
 	}
 
 	// 1. Inject Container Names, Absolute-ize Paths & Inject Labels
 	for serviceName, service := range cf.Services {
-		if service.ContainerName == "" {
-			service.ContainerName = fmt.Sprintf("%s-%s", e.ProjectName, serviceName)
+		if _, has := service["container_name"]; !has {
+			service["container_name"] = fmt.Sprintf("%s-%s", e.ProjectName, serviceName)
 			logger.Info(fmt.Sprintf("Injected container_name: %s-%s", e.ProjectName, serviceName))
 		}
 
 		// Normalize image names only for services without build config
-		if service.Image != "" && service.Build == nil {
-			originalImage := service.Image
-			service.Image = normalizeImage(service.Image)
-			if service.Image != originalImage {
-				logger.Info(fmt.Sprintf("Normalized image: %s → %s", originalImage, service.Image))
+		if img, ok := service["image"].(string); ok {
+			if _, hasBuild := service["build"]; !hasBuild {
+				originalImage := img
+				service["image"] = normalizeImage(img)
+				if service["image"] != originalImage {
+					logger.Info(fmt.Sprintf("Normalized image: %s → %s", originalImage, service["image"]))
+				}
 			}
 		}
 
 		// Absolute-ize volumes
-		for i, vol := range service.Volumes {
-			if strings.HasPrefix(vol, "./") || strings.HasPrefix(vol, "..") {
-				parts := strings.Split(vol, ":")
-
-				absPath, err := filepath.Abs(filepath.Join(e.WorkingDirectory, parts[0]))
-				if err != nil {
-					return nil, fmt.Errorf("failed to resolve path for volume %s: %w", vol, err)
+		if vols, ok := service["volumes"].([]interface{}); ok {
+			for i, volInterface := range vols {
+				vol, ok := volInterface.(string)
+				if !ok {
+					continue
 				}
-
-				// Rejoin from parts[1:] to preserve all options (e.g. :ro, :z, :cached)
-				if len(parts) > 1 {
-					service.Volumes[i] = fmt.Sprintf("%s:%s", absPath, strings.Join(parts[1:], ":"))
-				} else {
-					service.Volumes[i] = absPath
+				if strings.HasPrefix(vol, "./") || strings.HasPrefix(vol, "..") {
+					parts := strings.Split(vol, ":")
+					absPath, err := filepath.Abs(filepath.Join(e.WorkingDirectory, parts[0]))
+					if err != nil {
+						return nil, fmt.Errorf("failed to resolve path for volume %s: %w", vol, err)
+					}
+					if len(parts) > 1 {
+						vols[i] = fmt.Sprintf("%s:%s", absPath, strings.Join(parts[1:], ":"))
+					} else {
+						vols[i] = absPath
+					}
+					logger.Info(fmt.Sprintf("Normalized volume path: %s → %s", vol, vols[i]))
 				}
-				logger.Info(fmt.Sprintf("Normalized volume path: %s → %s", vol, service.Volumes[i]))
 			}
 		}
 	}
@@ -83,8 +88,8 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 	// preventing dangling network references when user-defined networks exist.
 	defaultNetworkInjected := false
 	if len(cf.Networks) == 0 {
-		cf.Networks["cq-default"] = &Network{
-			Driver: "bridge",
+		cf.Networks["cq-default"] = map[string]interface{}{
+			"driver": "bridge",
 		}
 		defaultNetworkInjected = true
 		logger.Info("Created default network: cq-default")
@@ -94,8 +99,8 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 	// Only attach to cq-default if we just created it.
 	if defaultNetworkInjected {
 		for serviceName, service := range cf.Services {
-			if len(service.Networks) == 0 {
-				service.Networks = append(service.Networks, "cq-default")
+			if _, hasNetworks := service["networks"]; !hasNetworks {
+				service["networks"] = []string{"cq-default"}
 				logger.Info(fmt.Sprintf("Auto-attached '%s' to network 'cq-default'", serviceName))
 			}
 		}
@@ -104,13 +109,28 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 	// 3. Inject force-volume labels into top-level named volumes to ensure podlet generates .volume files.
 	for name, vol := range cf.Volumes {
 		if vol == nil {
-			cf.Volumes[name] = &Volume{}
+			cf.Volumes[name] = make(map[string]interface{})
 			vol = cf.Volumes[name]
 		}
-		if vol.Labels == nil {
-			vol.Labels = make(map[string]string)
+		switch labels := vol["labels"].(type) {
+		case StringMap:
+			labels["com.comquad.force-volume"] = "true"
+			vol["labels"] = labels
+		case []interface{}:
+			// Convert list format to StringMap, preserving existing entries
+			sm := make(StringMap)
+			for _, item := range labels {
+				if s, ok := item.(string); ok {
+					if idx := strings.Index(s, "="); idx >= 0 {
+						sm[s[:idx]] = s[idx+1:]
+					}
+				}
+			}
+			sm["com.comquad.force-volume"] = "true"
+			vol["labels"] = sm
+		default:
+			vol["labels"] = StringMap{"com.comquad.force-volume": "true"}
 		}
-		vol.Labels["com.comquad.force-volume"] = "true"
 	}
 
 	// 4. Marshal back to YAML
@@ -133,11 +153,45 @@ func (e *Engine) GetBuildInfo(input []byte) (map[string]*BuildInfo, error) {
 	buildInfo := make(map[string]*BuildInfo)
 
 	for serviceName, service := range cf.Services {
-		if service.Build == nil {
+		buildRaw, hasBuild := service["build"]
+		if !hasBuild {
 			continue
 		}
 
-		context := service.Build.Context
+		bc := &BuildConfig{}
+
+		switch v := buildRaw.(type) {
+		case string:
+			bc.Context = v
+			bc.Dockerfile = "Dockerfile"
+		case map[string]interface{}:
+			if ctx, ok := v["context"].(string); ok {
+				bc.Context = ctx
+			}
+			if df, ok := v["dockerfile"].(string); ok {
+				bc.Dockerfile = df
+			}
+			if target, ok := v["target"].(string); ok {
+				bc.Target = target
+			}
+			if args, ok := v["args"].(map[string]interface{}); ok {
+				bc.Args = make(map[string]string)
+				for k, val := range args {
+					bc.Args[k] = buildArgValue(val)
+				}
+			} else if argsList, ok := v["args"].([]interface{}); ok {
+				bc.Args = make(map[string]string)
+				for _, item := range argsList {
+					if s, ok := item.(string); ok {
+						if idx := strings.Index(s, "="); idx >= 0 {
+							bc.Args[s[:idx]] = s[idx+1:]
+						}
+					}
+				}
+			}
+		}
+
+		context := bc.Context
 		if context == "" {
 			context = "."
 		}
@@ -147,13 +201,13 @@ func (e *Engine) GetBuildInfo(input []byte) (map[string]*BuildInfo, error) {
 			context = filepath.Join(e.WorkingDirectory, context)
 		}
 
-		dockerfile := service.Build.Dockerfile
+		dockerfile := bc.Dockerfile
 		if dockerfile == "" {
 			dockerfile = "Dockerfile"
 		}
 
 		args := []string{}
-		for k, v := range service.Build.Args {
+		for k, v := range bc.Args {
 			args = append(args, fmt.Sprintf("%s=%s", k, v))
 		}
 
@@ -161,7 +215,7 @@ func (e *Engine) GetBuildInfo(input []byte) (map[string]*BuildInfo, error) {
 			Context:    context,
 			Dockerfile: dockerfile,
 			Args:       args,
-			Target:     service.Build.Target,
+			Target:     bc.Target,
 			Service:    serviceName,
 		}
 	}

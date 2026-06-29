@@ -216,6 +216,29 @@ Quadlet configurations are copied into paths dictated by your execution context:
 
 `comquad` accepts standard Docker Compose v3 files supporting `services`, `networks`, and `volumes`.
 
+The following fields accept both map (`KEY: value`) and list (`- KEY=value`) formats:
+
+* `environment` — service environment variables
+* `labels` — service, network, and volume labels
+* `build.args` — build arguments
+
+The following compose service fields are **handled by comquad** (explicitly processed or auto-injected):
+
+* `container_name` — auto-generated if missing (`<project>-<service>`)
+* `image` — normalized to full registry path (`docker.io/library/`)
+* `build` — local build context (string or map)
+* `ports` — published host ports (offset in rootless mode)
+* `volumes` — bind mounts and named volumes (relative paths resolved)
+* `networks` — network attachments (auto-attached to `cq-default` if none defined)
+* `entrypoint` — container entrypoint
+* `command` — container command
+* `expose` — ports exposed to linked services
+* `deploy` — deploy-time configuration
+* `environment` — environment variables (map or list format)
+* `labels` — service, network, and volume labels (map or list format)
+
+The following compose service fields are **not yet handled** by comquad but are **passed through unchanged** to `podlet`: `depends_on`, `restart`, `working_dir`, `user`, `healthcheck`, `cap_add`/`cap_drop`, `tmpfs`, `read_only`, `extra_hosts`, `dns`, `hostname`, `privileged`, `mem_limit`, `cpus`, `volumes_from`, `links`, `tty`, `stdin_open`, `security_opt`, `shm_size`. Unknown top-level keys (e.g. `version`, `x-` extensions, `secrets`, `configs`) are also preserved.
+
 ### Automatic Behaviors & Opinionated Transforms
 
 To ensure the transition to Quadlets is frictionless, the internal engine enforces several rules:
@@ -243,9 +266,10 @@ services:
       context: ./apps/web          # Build context directory (default: .)
       dockerfile: Dockerfile.prod  # Custom Dockerfile name (default: Dockerfile)
       target: production           # Build target stage
-      args:                        # Build arguments
+      args:                        # Build arguments (map or list format)
         VERSION: "1.0"
-
+      # args:                        # Also supported:
+      #   - VERSION=1.0
 ```
 
 ### Quadlet Feature Injections
@@ -258,7 +282,8 @@ services:
     image: nginx
     labels:
       comquad-no-autoupdate: "true"
-
+    # labels:                        # Also supported (list format):
+    #   - comquad-no-autoupdate=true
 ```
 
 ## 🧪 Testing Architecture

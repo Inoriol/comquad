@@ -2,7 +2,11 @@
 
 ### Uncategorized
 
-* **Review of function names** for example now we have MatchContainer and MatchContainers functions. Probably one of them should be renamed to something more clear.
+* **Review of function names** The singular name is misleading: `MatchContainer` doesn't mean "match exactly one", it means "return one". A caller can't tell if other matches exist. Rename to `MatchFirstContainer` / `MatchAllContainers` or similar. (`internal/orchestrator/resolve.go`). Review all code functions name for clear distinguish
+
+* **Network name resolution** - for internal networks, to keep container able to resolve each other names, `NetworkAlias=` field may be nessesary
+
+* **Exposed ports are not part of PS command** - we need to add exposed ports to ps command to mimir docker compose ps behavior
 
 ### Difficulty: Hard
 
@@ -17,9 +21,27 @@
 * **`handleImages` and `printDryRun` non-deterministic** — Both iterate over `buildInfo` map without sorting, causing non-deterministic output order between runs. Sort service names before iterating. (`internal/orchestrator/orchestrator.go:360, 454`)
 * **SELinux detection data race** — `IsSELinuxEnabled()` and `SELinuxMode()` use package-level vars (`selinuxEnabled`, `selinuxMode`) without synchronization. Concurrent calls during initialization could cause a data race. Add `sync.Once` or mutex. (`internal/preprocess/selinux.go:40`)
 
+### Missing Compose Fields (not yet handled by comquad, passed through to podlet)
+
+* **`depends_on`** — service dependency declarations
+* **`restart`** — restart policy (always, unless-stopped, no, on-failure)
+* **`working_dir`** — container working directory
+* **`user`** — container user/UID
+* **`healthcheck`** — container health check configuration
+* **`cap_add` / `cap_drop`** — Linux capabilities
+* **`tmpfs` / `read_only`** — filesystem mounts
+* **`extra_hosts` / `dns` / `hostname`** — networking overrides
+* **`privileged`** — privileged container mode
+* **`mem_limit` / `cpus`** — resource limits
+* **`volumes_from` / `links`** — legacy cross-service references
+* **`tty` / `stdin_open`** — TTY and stdin configuration
+* **`security_opt` / `shm_size`** — security and shared memory options
+
 ### Resolved
 
 * **`down` doesn't stop network/volume units** — `Down()` only stopped `.container` units, leaving systemd believing `.network` and `.volume` units were still active. Subsequent `up` would fail because systemd returned "skipped" for already-active network units. Fixed by stopping network and volume units before removing quadlet files. (`internal/orchestrator/orchestrator.go`)
+* **Compose `environment`/`labels`/`args` only accept map format** — Docker Compose supports both `KEY: value` (map) and `- KEY=value` (list) formats, but the `map[string]string` Go types rejected list inputs. Fixed by introducing a `StringMap` type with custom `UnmarshalYAML`/`MarshalYAML` that normalizes both formats to `map[string]string` internally and always marshals as list format for podlet compatibility. (`internal/preprocess/models.go`)
+* **Full compose schema not required** — Replaced strict Go struct models (`Service`, `Network`, `Volume`) with `map[string]interface{}` for services and volumes. Unknown fields (e.g. `depends_on`, `restart`, `healthcheck`, `x-` extensions) now flow through the unmarshal/marshal cycle unchanged, passed to `podlet` intact. No data loss for fields comquad doesn't explicitly handle. (`internal/preprocess/models.go`, `internal/preprocess/engine.go`)
 
 ### Code Smells
 
@@ -38,4 +60,3 @@
 
 * **Extract `ensureProjectDeployed()` helper** — 7+ methods (`View`, `Edit`, `Exec`, `Logs`, `Ps`, `FollowLogs`, `Regenerate`) repeat the pattern: create state manager → `GetProject` → fail if not exists. Extract into a single helper.
 * **Add `--dry-run` to `down`, `start`, `stop`, `restart`** — `regenerate` already supports it. Adding dry-run to lifecycle commands would improve safety for users.
-* **Rename `MatchContainer` / `MatchContainers`** — The singular name is misleading: `MatchContainer` doesn't mean "match exactly one", it means "return one". A caller can't tell if other matches exist. Rename to `MatchFirstContainer` / `MatchAllContainers` or similar. (`internal/orchestrator/resolve.go:37, 46`)

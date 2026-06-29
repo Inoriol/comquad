@@ -141,6 +141,75 @@ func TestCook_RewritesVolumeReferences(t *testing.T) {
 	}
 }
 
+func TestCook_NoDoublePrefixOnNetworkReference(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// Create a network file with the cq- prefix already added
+	if err := os.WriteFile(filepath.Join(tempDir, "dbnet.network"), []byte("[Network]\nName=dbnet"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a container file that already references the prefixed network name
+	// This simulates the case where podlet or a previous pass already added the prefix
+	containerContent := "[Container]\nImage=nginx\nNetwork=cq-myproject-dbnet.network"
+	if err := os.WriteFile(filepath.Join(tempDir, "db.container"), []byte(containerContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-db.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	if strings.Contains(string(content), "cq-myproject-cq-myproject-") {
+		t.Errorf("double prefix detected in Network=:\n%s", string(content))
+	}
+	if !strings.Contains(string(content), "Network=cq-myproject-dbnet.network") {
+		t.Errorf("expected Network=cq-myproject-dbnet.network, got:\n%s", string(content))
+	}
+}
+
+func TestCook_NoDoublePrefixOnVolumeReference(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// Create a volume file without prefix
+	if err := os.WriteFile(filepath.Join(tempDir, "db_data.volume"), []byte("[Volume]\nName=db_data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a container file that already references the prefixed volume name
+	containerContent := "[Container]\nImage=nginx\nVolume=cq-myproject-db_data.volume:/var/lib/mysql"
+	if err := os.WriteFile(filepath.Join(tempDir, "db.container"), []byte(containerContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-db.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	if strings.Contains(string(content), "cq-myproject-cq-myproject-") {
+		t.Errorf("double prefix detected in Volume=:\n%s", string(content))
+	}
+	if !strings.Contains(string(content), "Volume=cq-myproject-db_data.volume:/var/lib/mysql") {
+		t.Errorf("expected Volume=cq-myproject-db_data.volume:/var/lib/mysql, got:\n%s", string(content))
+	}
+}
+
 func TestCook_AddsInstallSectionToContainer(t *testing.T) {
 	tempDir := t.TempDir()
 	targetDir := t.TempDir()

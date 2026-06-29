@@ -199,6 +199,10 @@ func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
 			return line
 		}
 		if strings.Contains(parts[0], oldRef) {
+			// Skip if the new reference is already present (prevents double-prefixing)
+			if strings.Contains(parts[0], newRef) {
+				return line
+			}
 			replaced := strings.Replace(parts[0], oldRef, newRef, 1)
 			if len(parts) == 2 {
 				return directive + "=" + replaced + ":" + parts[1]
@@ -207,6 +211,10 @@ func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
 		}
 		return line
 	default:
+		// Skip if the new reference is already present (prevents double-prefixing)
+		if strings.Contains(value, newRef) {
+			return line
+		}
 		return directive + "=" + strings.Replace(value, oldRef, newRef, 1)
 	}
 }

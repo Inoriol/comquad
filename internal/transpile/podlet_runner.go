@@ -29,7 +29,7 @@ func NewPodletRunner(tempDir string) (*PodletRunner, error) {
 // Transpile takes the processed YAML and runs podlet against it
 func (r *PodletRunner) Transpile(input []byte) error {
 	// We use -f to specify the output directory for quadlet files
-	cmd := exec.Command(r.PodletPath, "-f", r.TempDir, "compose")
+	cmd := exec.Command(r.PodletPath, "-f", r.TempDir, "--skip-services-check", "compose")
 
 	// Create a buffer to pipe stdin
 	stdin, err := cmd.StdinPipe()
