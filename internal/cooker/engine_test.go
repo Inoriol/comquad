@@ -210,6 +210,144 @@ func TestCook_NoDoublePrefixOnVolumeReference(t *testing.T) {
 	}
 }
 
+func TestCook_RewritesUnitSectionAfter(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// Create a container file that will be renamed (web -> cq-myproject-web)
+	webContent := "[Container]\nImage=nginx"
+	if err := os.WriteFile(filepath.Join(tempDir, "web.container"), []byte(webContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a container file that references web in [Unit] section with .service suffix
+	apiContent := "[Unit]\nAfter=web.service\nRequires=web.service\n\n[Container]\nImage=node"
+	if err := os.WriteFile(filepath.Join(tempDir, "api.container"), []byte(apiContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-api.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	if !strings.Contains(string(content), "After=cq-myproject-web.service") {
+		t.Errorf("expected After=cq-myproject-web.service, got:\n%s", string(content))
+	}
+	if !strings.Contains(string(content), "Requires=cq-myproject-web.service") {
+		t.Errorf("expected Requires=cq-myproject-web.service, got:\n%s", string(content))
+	}
+}
+
+func TestCook_RewritesUnitSectionMultipleRefs(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// Create two container files that will be renamed
+	for _, name := range []string{"web", "db"} {
+		content := "[Container]\nImage=nginx"
+		if err := os.WriteFile(filepath.Join(tempDir, name+".container"), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create a container file that references both in [Unit] section
+	cacheContent := "[Unit]\nAfter=web.service db.service\n\n[Container]\nImage=redis"
+	if err := os.WriteFile(filepath.Join(tempDir, "cache.container"), []byte(cacheContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-cache.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	if !strings.Contains(string(content), "After=cq-myproject-web.service cq-myproject-db.service") {
+		t.Errorf("expected both references rewritten, got:\n%s", string(content))
+	}
+}
+
+func TestCook_NoDoublePrefixOnUnitReference(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// Create a container file without prefix
+	if err := os.WriteFile(filepath.Join(tempDir, "db.container"), []byte("[Container]\nImage=postgres"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a container file that already references the prefixed name
+	containerContent := "[Unit]\nAfter=cq-myproject-db.service\n\n[Container]\nImage=nginx"
+	if err := os.WriteFile(filepath.Join(tempDir, "web.container"), []byte(containerContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-web.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	if strings.Contains(string(content), "cq-myproject-cq-myproject-") {
+		t.Errorf("double prefix detected in After=:\n%s", string(content))
+	}
+	if !strings.Contains(string(content), "After=cq-myproject-db.service") {
+		t.Errorf("expected After=cq-myproject-db.service, got:\n%s", string(content))
+	}
+}
+
+func TestCook_RewritesUnitSectionWithCqPrefix(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// Create a container file with cq- prefix (podlet behavior)
+	webContent := "[Container]\nImage=nginx"
+	if err := os.WriteFile(filepath.Join(tempDir, "cq-web.container"), []byte(webContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a container file that references cq-web in [Unit] section
+	apiContent := "[Unit]\nAfter=cq-web.service\nRequires=cq-web.service\n\n[Container]\nImage=node"
+	if err := os.WriteFile(filepath.Join(tempDir, "cq-api.container"), []byte(apiContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
+	if err := c.Cook(); err != nil {
+		t.Fatalf("Cook failed: %v", err)
+	}
+
+	dst := filepath.Join(targetDir, "cq-myproject-api.container")
+	content, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	if !strings.Contains(string(content), "After=cq-myproject-web.service") {
+		t.Errorf("expected After=cq-myproject-web.service, got:\n%s", string(content))
+	}
+	if !strings.Contains(string(content), "Requires=cq-myproject-web.service") {
+		t.Errorf("expected Requires=cq-myproject-web.service, got:\n%s", string(content))
+	}
+}
+
 func TestCook_AddsInstallSectionToContainer(t *testing.T) {
 	tempDir := t.TempDir()
 	targetDir := t.TempDir()
@@ -404,6 +542,24 @@ func TestIsReferenceDirective_Description(t *testing.T) {
 	}
 }
 
+func TestIsReferenceDirective_After(t *testing.T) {
+	if !isReferenceDirective("After=foo") {
+		t.Error("expected After= to be a reference directive")
+	}
+}
+
+func TestIsReferenceDirective_Requires(t *testing.T) {
+	if !isReferenceDirective("Requires=foo") {
+		t.Error("expected Requires= to be a reference directive")
+	}
+}
+
+func TestIsReferenceDirective_Conflicts(t *testing.T) {
+	if !isReferenceDirective("Conflicts=foo") {
+		t.Error("expected Conflicts= to be a reference directive")
+	}
+}
+
 func TestStripQuadletExtension(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -416,6 +572,7 @@ func TestStripQuadletExtension(t *testing.T) {
 		{"foo.kube", "foo"},
 		{"foo.image", "foo"},
 		{"foo.build", "foo"},
+		{"foo.service", "foo"},
 		{"foo.txt", "foo.txt"},
 		{"foo", "foo"},
 	}
@@ -721,5 +878,62 @@ func TestAddSELinuxLabels_BindMountRo(t *testing.T) {
 
 	if !strings.Contains(result, "Volume=/host/path:/container/path:ro,z") {
 		t.Errorf("expected :ro,z appended to bind mount, got:\n%s", result)
+	}
+}
+
+func TestInjectNetworkAliases_SingleAlias(t *testing.T) {
+	content := "[Container]\nImage=nginx"
+	c := &Cooker{ProjectName: "myproject"}
+	result := c.injectNetworkAliases(content, "cq-myproject-web.container")
+
+	if !strings.Contains(result, "NetworkAlias=web") {
+		t.Errorf("expected NetworkAlias=web, got:\n%s", result)
+	}
+}
+
+func TestInjectNetworkAliases_WithContainerName(t *testing.T) {
+	content := "[Container]\nImage=nginx\nContainerName=my-custom-name"
+	c := &Cooker{ProjectName: "myproject"}
+	result := c.injectNetworkAliases(content, "cq-myproject-web.container")
+
+	if !strings.Contains(result, "NetworkAlias=web") {
+		t.Errorf("expected NetworkAlias=web, got:\n%s", result)
+	}
+	if !strings.Contains(result, "NetworkAlias=my-custom-name") {
+		t.Errorf("expected NetworkAlias=my-custom-name, got:\n%s", result)
+	}
+}
+
+func TestInjectNetworkAliases_Idempotent(t *testing.T) {
+	content := "[Container]\nImage=nginx\nNetworkAlias=existing"
+	c := &Cooker{ProjectName: "myproject"}
+	result := c.injectNetworkAliases(content, "cq-myproject-web.container")
+
+	count := strings.Count(result, "NetworkAlias=")
+	if count != 1 {
+		t.Errorf("expected exactly 1 NetworkAlias (idempotent), got %d:\n%s", count, result)
+	}
+}
+
+func TestInjectNetworkAliases_NoContainerSection(t *testing.T) {
+	content := "[Image]\nName=nginx"
+	c := &Cooker{ProjectName: "myproject"}
+	result := c.injectNetworkAliases(content, "cq-myproject-web.container")
+
+	if result != content {
+		t.Errorf("expected no modification without [Container] section, got:\n%s", result)
+	}
+}
+
+func TestInjectNetworkAliases_WithExistingLabels(t *testing.T) {
+	content := "[Container]\nImage=nginx\nLabel=com.comquad.managed=true"
+	c := &Cooker{ProjectName: "myproject"}
+	result := c.injectNetworkAliases(content, "cq-myproject-web.container")
+
+	if !strings.Contains(result, "NetworkAlias=web") {
+		t.Errorf("expected NetworkAlias=web, got:\n%s", result)
+	}
+	if !strings.Contains(result, "Label=com.comquad.managed=true") {
+		t.Errorf("expected existing labels preserved, got:\n%s", result)
 	}
 }

@@ -74,6 +74,7 @@ comquad: Renamed web.container → cq-myapp-web.container
 comquad: Rewrote cross-unit references in cq-myapp-web.container
 comquad: Added AutoUpdate=registry to cq-myapp-web.container
 comquad: Added [Install] section to cq-myapp-web.container
+comquad: Added NetworkAlias=web to cq-myapp-web.container
 comquad: Added labels: Label=com.comquad.project=myapp, Label=com.comquad.managed=true
 comquad: Offset port: PublishPort=80:80 → PublishPort=2080:80
 comquad: Built image: myapp-web:latest
@@ -193,6 +194,7 @@ For a deep dive into how `comquad` processes your compose files, manages state, 
 * When SELinux is enabled on the host, all `Volume=` directives in generated `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present.
 * A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
+* `NetworkAlias=` is injected into every `.container` file so services can resolve each other by service name and `ContainerName=` value within compose networks.
 * In rootless mode, privileged ports (< 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000).
 
 ## 📄 License

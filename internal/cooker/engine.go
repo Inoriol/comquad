@@ -90,6 +90,11 @@ func (c *Cooker) Cook() error {
 			}
 		}
 
+		// Add NetworkAlias= for DNS resolution within compose networks
+		if strings.HasSuffix(newName, ".container") {
+			updatedContent = c.injectNetworkAliases(updatedContent, newName)
+		}
+
 		// Add labels to all file types
 		updatedContent = c.addProjectLabels(updatedContent, newName)
 		logger.Info(fmt.Sprintf("Added labels to %s", newName))
@@ -158,6 +163,15 @@ func isReferenceDirective(line string) bool {
 		"Network=",
 		"Volume=",
 		"Pod=",
+		"Wants=",
+		"Requires=",
+		"Requisite=",
+		"BindsTo=",
+		"PartOf=",
+		"Upholds=",
+		"Conflicts=",
+		"Before=",
+		"After=",
 	}
 	for _, d := range directives {
 		if strings.HasPrefix(line, d) {
@@ -169,7 +183,7 @@ func isReferenceDirective(line string) bool {
 
 // stripQuadletExtension removes known quadlet extensions from a filename.
 func stripQuadletExtension(name string) string {
-	for _, ext := range []string{".container", ".network", ".volume", ".pod", ".kube", ".image", ".build"} {
+	for _, ext := range []string{".container", ".service", ".network", ".volume", ".pod", ".kube", ".image", ".build"} {
 		if strings.HasSuffix(name, ext) {
 			return strings.TrimSuffix(name, ext)
 		}
@@ -181,7 +195,9 @@ func stripQuadletExtension(name string) string {
 // respecting the semantics of each directive type. For Volume= only the volume
 // name (first colon-delimited component) is replaced; container paths are left
 // untouched. For Network= and Pod= the entire value is replaced since they hold
-// only a unit name.
+// only a unit name. For [Unit] dependency directives (After=, Requires=, etc.)
+// the value is split by spaces and each token is replaced individually, preserving
+// its suffix (.container, .service, etc.).
 func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
 	colonIdx := strings.Index(line, "=")
 	if colonIdx < 0 {
@@ -189,6 +205,23 @@ func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
 	}
 	directive := line[:colonIdx]
 	value := line[colonIdx+1:]
+
+	// [Unit] dependency directives can have multiple space-separated unit references.
+	unitDirectives := map[string]bool{
+		"Wants":     true,
+		"Requires":  true,
+		"Requisite": true,
+		"BindsTo":   true,
+		"PartOf":    true,
+		"Upholds":   true,
+		"Conflicts": true,
+		"Before":    true,
+		"After":     true,
+	}
+
+	if unitDirectives[directive] {
+		return c.replaceUnitDirectives(line, directive, value, oldRef, newRef)
+	}
 
 	switch directive {
 	case "Volume":
@@ -217,6 +250,46 @@ func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
 		}
 		return directive + "=" + strings.Replace(value, oldRef, newRef, 1)
 	}
+}
+
+// replaceUnitDirectives handles [Unit] section directives with multiple space-separated unit references.
+// It replaces oldRef with newRef in each token while preserving the token's suffix (.container, .service, etc.).
+func (c *Cooker) replaceUnitDirectives(line, directive, value, oldRef, newRef string) string {
+	if oldRef == newRef {
+		return line
+	}
+
+	tokens := strings.Fields(value)
+	if len(tokens) == 0 {
+		return line
+	}
+
+	changed := false
+	for i, token := range tokens {
+		// Strip extension from the token for exact matching
+		tokenName := stripQuadletExtension(token)
+		if tokenName == oldRef {
+			// Skip if the new reference is already present in this token
+			if strings.Contains(token, newRef) {
+				continue
+			}
+			// Preserve the original suffix
+			ext := ""
+			if strings.HasSuffix(token, ".service") {
+				ext = ".service"
+			} else if strings.HasSuffix(token, ".container") {
+				ext = ".container"
+			}
+			tokens[i] = newRef + ext
+			changed = true
+		}
+	}
+
+	if !changed {
+		return line
+	}
+
+	return directive + "=" + strings.Join(tokens, " ")
 }
 
 // splitCombinedLabels splits combined Label= lines into separate Label= lines.
@@ -552,6 +625,87 @@ func (c *Cooker) addSELinuxToVolume(value string) string {
 	}
 
 	return value
+}
+
+// injectNetworkAliases adds NetworkAlias= directives to a container file
+// so that the service can be resolved by name within compose networks.
+// It always adds an alias for the service name, and a second one for
+// ContainerName if present (matching docker compose DNS behavior).
+func (c *Cooker) injectNetworkAliases(content string, fileName string) string {
+	// Extract service name from filename: cq-<project>-<service>.container
+	serviceName := strings.TrimPrefix(fileName, "cq-"+c.ProjectName+"-")
+	serviceName = strings.TrimSuffix(serviceName, ".container")
+
+	lines := strings.Split(content, "\n")
+
+	// Find [Container] section
+	sectionIdx := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "[Container]" {
+			sectionIdx = i
+			break
+		}
+	}
+
+	if sectionIdx < 0 {
+		return content
+	}
+
+	// Check if NetworkAlias already exists (idempotent)
+	hasNetworkAlias := false
+	for i := sectionIdx; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "[") && i > sectionIdx {
+			break
+		}
+		if strings.HasPrefix(trimmed, "NetworkAlias=") {
+			hasNetworkAlias = true
+			break
+		}
+	}
+
+	if hasNetworkAlias {
+		return content
+	}
+
+	// Find ContainerName= for second alias
+	containerName := ""
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "ContainerName=") {
+			containerName = strings.TrimPrefix(trimmed, "ContainerName=")
+			break
+		}
+	}
+
+	// Collect aliases to inject
+	var aliases []string
+	aliases = append(aliases, "NetworkAlias="+serviceName)
+	if containerName != "" {
+		aliases = append(aliases, "NetworkAlias="+containerName)
+	}
+
+	if len(aliases) == 0 {
+		return content
+	}
+
+	// Find last NetworkAlias= or last line of [Container] section
+	insertAt := sectionIdx
+	for i := sectionIdx; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "[") && i > sectionIdx {
+			break
+		}
+		if strings.HasPrefix(trimmed, "NetworkAlias=") {
+			insertAt = i
+		}
+	}
+
+	logger.Info(fmt.Sprintf("Added NetworkAlias=%s to %s", strings.Join(aliases, ","), fileName))
+
+	lines = append(lines[:insertAt+1], append(aliases, lines[insertAt+1:]...)...)
+
+	return strings.Join(lines, "\n")
 }
 
 

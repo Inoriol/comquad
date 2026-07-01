@@ -8,7 +8,7 @@ When you run `comquad up`, the engine moves your configuration through a five-st
 
 1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels).
 2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, and `.volume` quadlet files.
-3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed.
+3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed.
 4. **Build** — Handles local images via `podman build` if `build:` contexts are defined, validates existing local images, or pulls missing ones from the registry.
 5. **Deploy** — Relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus.
 
@@ -224,7 +224,7 @@ The following fields accept both map (`KEY: value`) and list (`- KEY=value`) for
 
 The following compose service fields are **handled by comquad** (explicitly processed or auto-injected):
 
-* `container_name` — auto-generated if missing (`<project>-<service>`)
+* `container_name` — auto-generated if missing (`<project>-<service>`); also registered as a second `NetworkAlias=` for DNS resolution
 * `image` — normalized to full registry path (`docker.io/library/`)
 * `build` — local build context (string or map)
 * `ports` — published host ports (offset in rootless mode)
@@ -247,6 +247,7 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 * When SELinux is detected (via `/sys/fs/selinux/enforce`), all `Volume=` directives in generated `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present.
 * A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Services without an explicit `networks:` key are auto-attached to `cq-default` only when that network was injected — preventing dangling network references when user-defined networks exist.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
+* `NetworkAlias=` is injected into every `.container` file so services can resolve each other by service name and `ContainerName=` value within compose networks.
 * An identifying label (`com.comquad.project`) is attached to all generated units.
 * A `com.comquad.managed` label is attached to all files to indicate comquad management.
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
@@ -343,9 +344,10 @@ When `-v` / `--verbose` is enabled, comquad additionally logs every transformati
 
 **Cook stage** logs:
 - `Renamed <old> → <new>` — file renaming with `cq-<project>-` prefix
-- `Rewrote cross-unit references in <file>` — reference rewriting for Network=/Volume=/Pod= directives
+- `Rewrote cross-unit references in <file>` — reference rewriting for Network=/Volume=/Pod= and [Unit] section (After=, Requires=, etc.) directives
 - `Added AutoUpdate=registry to <file>` — systemd auto-update optimization
 - `Added [Install] section to <file>` — systemd install section injection
+- `Added NetworkAlias=<name> to <file>` — DNS resolution for compose networks
 - `Added labels: Label=com.comquad.project=<name>, Label=com.comquad.managed=true` — label injection
 - `Offset port: PublishPort=<original> → PublishPort=<offset>` — rootless port offsetting
 
