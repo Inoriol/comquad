@@ -45,7 +45,7 @@ The `ps` command shows container runtime status in `docker compose ps` style. It
 
 **Data sources:**
 
-1. **Podman** — Runs `podman ps --filter "label=com.comquad.managed=true" --filter "label=com.comquad.project=<name>" --format json` (or `-a` flag for exited containers). Parses JSON to extract container name, image, command, state, status, ports, networks, mounts, exit code, and timestamps.
+1. **Podman** — Runs `podman ps --filter "label=com.comquad.managed=true" --filter "label=com.comquad.project=<name>" --format json` (or `-a` flag for exited containers). Parses JSON to extract container name, image, command, state, status, ports, networks, mounts, exit code, and timestamps. Runs `podman inspect <container>` for each container to extract `Config.ExposedPorts`.
 2. **D-Bus** — Queries `ListAllUnits()` and builds a map keyed by unit name. Merges `ActiveState` and `SubState` into each container record.
 
 **Output format:**
@@ -57,7 +57,7 @@ my_nginx             docker.io/library/nginx:alpine nginx -g daemon off;      ng
 2nginx               docker.io/library/nginx:alpine nginx -g daemon off;      nginx2       2 minutes ago        Up 2 minutes         0.0.0.0:2081->80/tcp
 ```
 
-Columns are auto-width based on content. Exited containers show `Exited (<code>) <time>` in the status column. Dead containers show `Dead`. Ports are formatted as `host_ip:host_port->container_port/protocol`. Created time uses relative format (`just now`, `5m ago`, `2d ago`, or `Jan 02 2006` for older entries).
+Columns are auto-width based on content. Exited containers show `Exited (<code>) <time>` in the status column. Dead containers show `Dead`. Ports are formatted as `host_ip:host_port->container_port/protocol` for published ports, and `port/protocol` for exposed ports (container-only, no host binding). Exposed ports are listed first, followed by published ports. Created time uses relative format (`just now`, `5m ago`, `2d ago`, or `Jan 02 2006` for older entries).
 
 **Flags:**
 

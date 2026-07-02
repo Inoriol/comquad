@@ -86,7 +86,7 @@ func printPsTable(containers []ContainerInfo) {
 		if len(c.Status) > statusW {
 			statusW = len(c.Status)
 		}
-		portStr := formatPorts(c.Ports)
+		portStr := formatPorts(c.Ports, c.ExposedPorts)
 		if len(portStr) > portsW {
 			portsW = len(portStr)
 		}
@@ -112,7 +112,7 @@ func printPsTable(containers []ContainerInfo) {
 		}
 
 		created := formatCreated(c.CreatedAt, c.ExitedAt, c.State)
-		portStr := formatPorts(c.Ports)
+		portStr := formatPorts(c.Ports, c.ExposedPorts)
 
 		row := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 			nameW, truncate(c.Name, nameW),
@@ -126,11 +126,11 @@ func printPsTable(containers []ContainerInfo) {
 	}
 }
 
-func formatPorts(ports []PortInfo) string {
-	if len(ports) == 0 {
-		return ""
-	}
+func formatPorts(ports []PortInfo, exposedPorts []string) string {
 	var parts []string
+	for _, ep := range exposedPorts {
+		parts = append(parts, ep)
+	}
 	for _, p := range ports {
 		ip := p.HostIP
 		if ip == "" {

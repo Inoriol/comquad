@@ -3,7 +3,9 @@ package orchestrator
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 )
@@ -27,9 +29,15 @@ func listContainersFromPodman(projectName string, all bool) ([]ContainerInfo, er
 	var containers []ContainerInfo
 	for _, raw := range rawContainers {
 		c := parseContainer(raw)
-		if c != nil {
-			containers = append(containers, *c)
+		if c == nil {
+			continue
 		}
+		exposed, err := getExposedPorts(c.Name)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "comquad: warning: failed to get exposed ports for %s: %v\n", c.Name, err)
+		}
+		c.ExposedPorts = exposed
+		containers = append(containers, *c)
 	}
 	return containers, nil
 }
@@ -146,4 +154,31 @@ func parseStringSlice(raw interface{}) []string {
 		}
 	}
 	return result
+}
+
+func getExposedPorts(containerName string) ([]string, error) {
+	cmd := exec.Command("podman", "inspect", containerName)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect container %s: %w", containerName, err)
+	}
+
+	var inspectResults []struct {
+		Config struct {
+			ExposedPorts map[string]interface{} `json:"ExposedPorts"`
+		} `json:"Config"`
+	}
+	if err := json.Unmarshal(output, &inspectResults); err != nil {
+		return nil, fmt.Errorf("failed to parse inspect output: %w", err)
+	}
+	if len(inspectResults) == 0 || inspectResults[0].Config.ExposedPorts == nil {
+		return nil, nil
+	}
+
+	var exposed []string
+	for portKey := range inspectResults[0].Config.ExposedPorts {
+		exposed = append(exposed, portKey)
+	}
+	sort.Strings(exposed)
+	return exposed, nil
 }
