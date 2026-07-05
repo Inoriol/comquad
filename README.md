@@ -139,10 +139,10 @@ comquad logs web              # single service
 comquad logs -n myapp web db  # specific project/services
 comquad logs --tail 50        # last 50 lines
 comquad logs --since 10m      # logs from the last 10 minutes
-comquad logs --output short   # use a different output format
+comquad logs -t              # show timestamps in RFC3339Nano format
 ```
 
-For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown. When querying multiple units, each log line is prefixed with `[<unit-name>]` to identify its source. Logs default to `cat` output format to strip raw systemd metadata.
+For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown. When querying multiple units, logs are collected, sorted by `__REALTIME_TIMESTAMP`, and rendered in chronological order with `[<unit-name>]` prefixes.
 
 ### View
 

@@ -79,7 +79,7 @@ var pullStrategy string
 var noReload bool
 var logTail string
 var logSince string
-var logOutput string
+var logTime bool
 
 var logsCmd = &cobra.Command{
 	Use:   "logs [service ...]",
@@ -90,7 +90,7 @@ var logsCmd = &cobra.Command{
 			return err
 		}
 		follow, _ := cmd.Flags().GetBool("follow")
-		return o.Logs(args, follow, logTail, logSince, logOutput)
+		return o.Logs(args, follow, logTail, logSince, logTime)
 	},
 }
 
@@ -309,7 +309,7 @@ func init() {
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")
 	logsCmd.Flags().StringVar(&logTail, "tail", "", "Number of lines to show from the end of logs (default: all)")
 	logsCmd.Flags().StringVar(&logSince, "since", "", "Show logs since a specific time (e.g. '10m', '2024-01-01 12:00:00')")
-	logsCmd.Flags().StringVar(&logOutput, "output", "", "Output format (default: 'short-iso' to strip systemd metadata)")
+	logsCmd.Flags().BoolVarP(&logTime, "time", "t", false, "Display timestamps in RFC3339Nano format")
 	psCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	psCmd.Flags().BoolVarP(&psAll, "all", "a", false, "Show all containers including exited ones")
 	viewCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")

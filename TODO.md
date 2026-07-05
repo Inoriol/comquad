@@ -6,7 +6,7 @@
 
 * **Cleanup of "myapp" that pops up during test** - after go testing, container and network of "myapp" keep persisting in system
 
-* **Deeper dive in logs** - making sure logs from several containers now just appended to each other, but properly weaved into each other. Maybe need to rework behavior to strip output information for multiple containers real-time instead of relaying on '--output=cat'
+* **Logs now use JSON output** - logs from multiple containers are sorted chronologically by `__REALTIME_TIMESTAMP`, eliminating the need for `--output=cat` hack
 
 * **Better check** - let's make sure that podman 4.4 (version where quadlets appeared) required for running (comquad check)
 

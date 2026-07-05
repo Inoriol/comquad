@@ -2,19 +2,125 @@ package orchestrator
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
+// journalEntry represents a parsed journalctl JSON log entry.
+type journalEntry struct {
+	timestamp int64
+	unit      string
+	message   string
+	priority  int
+}
+
+// priorityText maps syslog priority to human-readable text.
+func priorityText(prio int) string {
+	switch prio {
+	case 0:
+		return "EMERG"
+	case 1:
+		return "ALERT"
+	case 2:
+		return "CRIT"
+	case 3:
+		return "ERR"
+	case 4:
+		return "WARNING"
+	case 5:
+		return "NOTICE"
+	case 6:
+		return "INFO"
+	case 7:
+		return "DEBUG"
+	default:
+		return fmt.Sprintf("P%d", prio)
+	}
+}
+
+// parseJournalEntry extracts fields from a journalctl JSON line.
+func parseJournalEntry(line string) (journalEntry, bool) {
+	var raw map[string]interface{}
+	if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		return journalEntry{}, false
+	}
+
+	entry := journalEntry{}
+
+	if tsRaw, ok := raw["__REALTIME_TIMESTAMP"]; ok {
+		switch v := tsRaw.(type) {
+		case string:
+			if ts, err := strconv.ParseInt(v, 10, 64); err == nil {
+				entry.timestamp = ts
+			}
+		case float64:
+			entry.timestamp = int64(v)
+		}
+	}
+
+	if unit, ok := raw["SYSTEMD_UNIT"]; ok {
+		entry.unit = unit.(string)
+	} else if unit, ok := raw["_SYSTEMD_USER_UNIT"]; ok {
+		entry.unit = unit.(string)
+	}
+
+	if msg, ok := raw["MESSAGE"]; ok {
+		if s, ok := msg.(string); ok {
+			entry.message = strings.ReplaceAll(s, "\n", " ")
+		}
+	}
+
+	if prioRaw, ok := raw["PRIORITY"]; ok {
+		switch v := prioRaw.(type) {
+		case float64:
+			entry.priority = int(v)
+		case string:
+			if p, err := strconv.Atoi(v); err == nil {
+				entry.priority = p
+			}
+		}
+	}
+
+	return entry, true
+}
+
+// renderEntry formats a journal entry for output.
+func renderEntry(entry journalEntry, showTime bool) string {
+	var parts []string
+	if showTime {
+		sec := entry.timestamp / 1e6
+		nsec := (entry.timestamp % 1e6) * 1e6
+		t := time.Unix(sec, nsec).UTC().Format(time.RFC3339Nano)
+		parts = append(parts, t)
+	}
+	unitStr := entry.unit
+	if unitStr == "" {
+		unitStr = "?"
+	}
+	parts = append(parts, "["+unitStr+"]")
+	parts = append(parts, priorityText(entry.priority)+": "+entry.message)
+	return strings.Join(parts, "  ")
+}
+
+// flushEntries sorts entries by timestamp and renders them.
+func flushEntries(entries []journalEntry, showTime bool) {
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].timestamp < entries[j].timestamp
+	})
+	for _, e := range entries {
+		fmt.Println(renderEntry(e, showTime))
+	}
+}
+
 // Logs prints logs for a deployed project's services via journalctl.
-// For running units, filters logs to the current invocation ID.
-// For non-running units, shows full historical logs.
-// If follow is true, streams logs continuously.
-// If services is empty, logs from all services are shown.
-// tail, since, and output are journalctl flags.
-func (o *Orchestrator) Logs(services []string, follow bool, tail string, since string, output string) error {
+func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, showTime bool) error {
 	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
@@ -25,7 +131,6 @@ func (o *Orchestrator) Logs(services []string, follow bool, tail string, since s
 		return fmt.Errorf("project %s is not deployed", o.projectName)
 	}
 
-	// Filter to .container files, optionally by service name
 	var unitNames []string
 	seen := make(map[string]bool)
 	for _, s := range services {
@@ -63,7 +168,6 @@ func (o *Orchestrator) Logs(services []string, follow bool, tail string, since s
 	}
 	defer dbusMgr.Close()
 
-	// Group units by invocation ID (only running units have one)
 	invocationGroups := make(map[string][]string)
 	var nonRunningUnits []string
 
@@ -92,65 +196,54 @@ func (o *Orchestrator) Logs(services []string, follow bool, tail string, since s
 		}
 	}
 
-	multiUnit := len(unitNames) > 1
+	// --- Follow mode: process each group separately (can't sort live stream) ---
+	if follow {
+		for invocationID, units := range invocationGroups {
+			if err := o.runJournalctlJSONFollowForGroup(units, invocationID, tail, since, showTime); err != nil {
+				return err
+			}
+		}
+		if len(nonRunningUnits) > 0 {
+			if err := o.runJournalctlJSONFollowForGroup(nonRunningUnits, "", tail, since, showTime); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
-	// Run journalctl for each invocation group
+	// --- Batch mode: collect ALL entries, sort together, render once ---
+	var allEntries []journalEntry
+
 	for invocationID, units := range invocationGroups {
-		if err := o.runJournalctl(units, invocationID, follow, tail, since, output, multiUnit); err != nil {
+		entries, err := o.collectJournalEntries(units, invocationID, tail, since)
+		if err != nil {
 			return err
 		}
+		allEntries = append(allEntries, entries...)
 	}
 
-	// Run journalctl for non-running units (full history)
 	if len(nonRunningUnits) > 0 {
-		if err := o.runJournalctl(nonRunningUnits, "", follow, tail, since, output, multiUnit); err != nil {
+		entries, err := o.collectJournalEntries(nonRunningUnits, "", tail, since)
+		if err != nil {
 			return err
 		}
+		allEntries = append(allEntries, entries...)
 	}
 
+	flushEntries(allEntries, showTime)
 	return nil
 }
 
 var execCommand = exec.Command
 
-func writeFilteredLines(cmd *exec.Cmd) error {
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start journalctl: %w", err)
-	}
-
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line != "" {
-			fmt.Println(line)
-		}
-	}
-
-	return cmd.Wait()
-}
-
-func (o *Orchestrator) runJournalctl(unitNames []string, invocationID string, follow bool, tail, since, output string, prefix bool) error {
-	args := []string{"--no-pager"}
-
-	// Default output format to short-iso to strip systemd metadata
-	if output == "" {
-		args = append(args, "--output=cat")
-	} else {
-		args = append(args, "--output="+output)
-	}
+// collectJournalEntries runs journalctl and returns parsed entries (no sorting).
+func (o *Orchestrator) collectJournalEntries(unitNames []string, invocationID, tail, since string) ([]journalEntry, error) {
+	args := []string{"--no-pager", "--output=json"}
 
 	if os.Getuid() == 0 {
 		args = append(args, "--system")
 	} else {
 		args = append(args, "--user")
-	}
-	if follow {
-		args = append(args, "-f")
 	}
 	if tail != "" {
 		args = append(args, "-n", tail)
@@ -165,32 +258,64 @@ func (o *Orchestrator) runJournalctl(unitNames []string, invocationID string, fo
 		args = append(args, "--invocation="+invocationID)
 	}
 
-	if prefix {
-		return o.runJournalctlWithPrefix(unitNames, args, follow)
+	cmd := execCommand("journalctl", args...)
+	cmd.Stderr = os.Stderr
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start journalctl: %w", err)
+	}
+
+	var entries []journalEntry
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		if entry, ok := parseJournalEntry(line); ok {
+			entries = append(entries, entry)
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("journalctl failed: %w", err)
+	}
+
+	return entries, nil
+}
+
+// runJournalctlJSONFollowForGroup runs journalctl for a single group in follow mode.
+func (o *Orchestrator) runJournalctlJSONFollowForGroup(unitNames []string, invocationID, tail, since string, showTime bool) error {
+	args := []string{"--no-pager", "--since=" + since, "-f", "--output=json"}
+
+	if os.Getuid() == 0 {
+		args = append(args, "--system")
+	} else {
+		args = append(args, "--user")
+	}
+	if tail != "" {
+		args = append(args, "-n", tail)
+	}
+	for _, unit := range unitNames {
+		args = append(args, "-u", unit)
+	}
+	if invocationID != "" {
+		args = append(args, "--invocation="+invocationID)
 	}
 
 	cmd := execCommand("journalctl", args...)
 	cmd.Stderr = os.Stderr
 
-	return writeFilteredLines(cmd)
+	return o.runJournalctlJSONFollow(cmd, showTime)
 }
 
-func (o *Orchestrator) runJournalctlWithPrefix(unitNames []string, args []string, follow bool) error {
-	// Run journalctl without -u flags (we'll filter by unit ourselves)
-	filteredArgs := make([]string, 0, len(args))
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-u ") {
-			continue
-		}
-		if strings.HasPrefix(arg, "-u=") {
-			continue
-		}
-		filteredArgs = append(filteredArgs, arg)
-	}
-
-	cmd := execCommand("journalctl", filteredArgs...)
-	cmd.Stderr = os.Stderr
-
+// runJournalctlJSONFollow streams JSON output, buffers entries, and flushes them in timestamp order.
+func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) error {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("failed to create stdout pipe: %w", err)
@@ -200,28 +325,51 @@ func (o *Orchestrator) runJournalctlWithPrefix(unitNames []string, args []string
 		return fmt.Errorf("failed to start journalctl: %w", err)
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
+	var mu sync.Mutex
+	var entries []journalEntry
+	done := make(chan struct{})
+
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" {
+				continue
+			}
+			if entry, ok := parseJournalEntry(line); ok {
+				mu.Lock()
+				entries = append(entries, entry)
+				mu.Unlock()
+			}
 		}
-		if len(unitNames) == 0 {
-			fmt.Println(line)
-			continue
-		}
-		prefix := "[" + unitNames[0] + "] "
-		if !strings.HasPrefix(line, prefix) && !strings.HasPrefix(line, "--") {
-			fmt.Println(prefix + line)
+		close(done)
+	}()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-done:
+			mu.Lock()
+			flushEntries(entries, showTime)
+			mu.Unlock()
+			return cmd.Wait()
+		case <-ticker.C:
+			mu.Lock()
+			if len(entries) > 0 {
+				flushEntries(entries, showTime)
+				entries = nil
+			}
+			mu.Unlock()
 		}
 	}
-
-	return cmd.Wait()
 }
 
 // FollowLogs streams all journalctl logs for every unit in the project
 // from the given timestamp onward.
-func (o *Orchestrator) FollowLogs(since string, tail, output string) error {
+func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
@@ -252,14 +400,7 @@ func (o *Orchestrator) FollowLogs(since string, tail, output string) error {
 		return fmt.Errorf("no units found for project %s", o.projectName)
 	}
 
-	args := []string{"--no-pager", "--since=" + since, "-f"}
-
-	// Default output format to short-iso to strip systemd metadata
-	if output == "" {
-		args = append(args, "--output=cat")
-	} else {
-		args = append(args, "--output="+output)
-	}
+	args := []string{"--no-pager", "--since=" + since, "-f", "--output=json"}
 
 	if os.Getuid() == 0 {
 		args = append(args, "--system")
@@ -276,5 +417,5 @@ func (o *Orchestrator) FollowLogs(since string, tail, output string) error {
 	cmd := execCommand("journalctl", args...)
 	cmd.Stderr = os.Stderr
 
-	return writeFilteredLines(cmd)
+	return o.runJournalctlJSONFollow(cmd, showTime)
 }

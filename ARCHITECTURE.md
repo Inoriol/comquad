@@ -101,9 +101,9 @@ Service name matching uses the same multi-pattern logic as `view` and `edit`: ex
 
 - `--tail <N>` — Limit output to the last N lines
 - `--since <time>` — Show logs since a specific time (e.g. `10m`, `2024-01-01 12:00:00`)
-- `--output <format>` — Override journalctl output format (default: `cat` to strip raw systemd metadata like boot ID and machine ID)
+- `-t, --time` — Display timestamps in RFC3339Nano format (docker compose compatible)
 
-When querying multiple units, each log line is prefixed with `[<unit-name>]` to identify its source. Lines already starting with `--` (journalctl's timestamp separators) are passed through unmodified. All empty lines (journalctl's `--output cat` entry separators) are stripped in every code path.
+Logs from multiple units are collected via `journalctl --output=json`, parsed, sorted by `__REALTIME_TIMESTAMP`, and rendered in chronological order. Each line is prefixed with `[<unit-name>]` to identify its source.
 
 ## 🔄 Lifecycle Commands (Start, Stop, Restart)
 
@@ -312,7 +312,7 @@ When `comquad up -f` is used, after successfully deploying all units the CLI cap
 
 The deployment timestamp is captured after image handling completes but before `daemon-reload` and unit starts, ensuring no startup logs are missed.
 
-The follow mode uses the same `cat` default output format and supports the `-n/--tail` and `--output` flags via the `FollowLogs()` function.
+The follow mode uses JSON output with a buffered flush (500ms interval) to maintain chronological order and supports the `-n/--tail` and `-t/--time` flags via the `FollowLogs()` function.
 
 ## 📊 Output Levels
 

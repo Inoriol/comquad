@@ -170,7 +170,7 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 
 	if follow {
 		fmt.Println("Following logs for project:", o.projectName)
-		return o.FollowLogs(deployTime, "", "")
+		return o.FollowLogs(deployTime, "", false)
 	}
 
 	return nil

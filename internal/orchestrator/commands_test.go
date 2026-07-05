@@ -308,7 +308,7 @@ func TestLogs_ProjectNotDeployed(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", t.TempDir(), state, newMockSystemdClient())
 
-	err := o.Logs(nil, false, "", "", "")
+	err := o.Logs(nil, false, "", "", false)
 	if err == nil || !strings.Contains(err.Error(), "not deployed") {
 		t.Errorf("expected 'not deployed' error, got %v", err)
 	}
@@ -323,7 +323,7 @@ func TestLogs_NoContainerUnitsInProject(t *testing.T) {
 	})
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	err := o.Logs(nil, false, "", "", "")
+	err := o.Logs(nil, false, "", "", false)
 	if err == nil || !strings.Contains(err.Error(), "no container units found") {
 		t.Errorf("expected 'no container units found' error, got %v", err)
 	}
@@ -338,7 +338,7 @@ func TestLogs_ServiceNotFound(t *testing.T) {
 	})
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	err := o.Logs([]string{"nonexistent"}, false, "", "", "")
+	err := o.Logs([]string{"nonexistent"}, false, "", "", false)
 	if err == nil || !strings.Contains(err.Error(), "no service matching") {
 		t.Errorf("expected 'no service matching' error, got %v", err)
 	}
