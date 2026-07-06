@@ -1,18 +1,16 @@
 ## 🗺️ Roadmap & Next Steps
 
+This file contains short term goals that can be achieved within short timeframe. For long term goals reffer to [Roadmap](./ROADMAP.md) guide.
+
 ### Uncategorized
 
 * **Review of function names** The singular name is misleading: `MatchContainer` doesn't mean "match exactly one", it means "return one". A caller can't tell if other matches exist. Rename to `MatchFirstContainer` / `MatchAllContainers` or similar. (`internal/orchestrator/resolve.go`). Review all code functions name for clear distinguish
 
 * **Cleanup of "myapp" that pops up during test** - after go testing, container and network of "myapp" keep persisting in system
 
-* **Logs now use JSON output** - logs from multiple containers are sorted chronologically by `__REALTIME_TIMESTAMP`, eliminating the need for `--output=cat` hack
-
 * **Better check** - let's make sure that podman 4.4 (version where quadlets appeared) required for running (comquad check)
 
 * **Verbosity improvements** - some key stuff from verbosity needs to be done by default (like port remapping)
-
-* **Build deep dive** - deep dive into how we are handling builds and why podlet doesn't like it (why it's even going into cooker in the first place?)
 
 ### Difficulty: Hard
 

@@ -1,206 +1,156 @@
-# comquad
+# comquad (Compose + Quadlet 🍊)
 
-ComQuad (Compose + Quadlet 🍊) is a Docker-compose-like CLI for Podman Quadlets, backed by systemd.
+`comquad` is a Docker-compose-like CLI for Podman Quadlets, backed by systemd.
 
-`comquad` lets you define your services in a `compose` yaml file and deploy them as individual systemd units using Podman's Quadlet technology. Instead of running its own orchestrator, comquad prepares the quadlet files and delegates lifecycle management entirely to systemd.
+It lets you define your services in a standard `compose.yaml` file and deploy them as individual systemd units using Podman's Quadlet technology. Instead of running its own orchestrator, `comquad` prepares the quadlet files and delegates lifecycle management entirely to systemd.
+
+---
 
 ## 🚧 Project Status: Infra-Built Utility
 
 I am an infrastructure engineer, not a full-time software developer. I built **Comquad** to solve a specific problem for my own workflow.
 
-- **Contributions:** I am currently not accepting complex feature pull requests because I do not have the bandwidth or Go expertise to maintain them.
-- **Bugs:** Feel free to open issues if a specific Docker Compose file breaks, but fixes will happen on a "best effort" timeline.
-- **Philosophy:** This tool is intentionally small, simple, and transparent. It is not trying to become Kubernetes.
+* **Philosophy:** This tool is intentionally small, simple, and transparent. It is not trying to become Kubernetes.
+* **Contributions:** I am currently not accepting complex feature pull requests because I do not have the bandwidth or Go expertise to maintain them.
+* **Bugs:** Feel free to open issues if a specific Docker Compose file breaks, but fixes will happen on a "best effort" timeline.
 
-## 🛠️ Requirements
+---
 
-- **Podman** (for `podman pull`)
-- **podlet** (for transpiling `compose` yaml into quadlet files)
-- **systemd** with quadlet support
-- Go 1.23+ (to build from source)
+## 🛠️ Requirements & Installation
 
-## 🚀 Installation
+### Requirements
 
-Build from source:
+* **Podman** (for `podman pull`)
+* **podlet** (for transpiling `compose` yaml into quadlet files)
+* **systemd** with quadlet support
+* Go 1.23+ (if building from source)
+
+### Installation
+
 ```bash
+# Build from source
 go build -o comquad ./cmd/comquad/
 sudo cp comquad /usr/local/bin/
 
-```
-
-Or install directly via Go:
-
-```bash
+# Or install directly via Go
 go install comquad/cmd/comquad@latest
 
 ```
 
-## ⚙️ Usage
+---
 
-### Deploy a project
+## ⚙️ Core Usage Workflow
 
-From a directory containing `compose` yaml:
+### 1. Deploying a Project (`up`)
+
+From a directory containing your `compose.yaml`:
 
 ```bash
 comquad up
 
 ```
 
-* **Override project name:** `comquad up -n my-service`
-* **Force rebuild all images:** `comquad up --build`
-* **Control image pulls:** `comquad up --pull [always|missing|never]` *(default: missing)*
-* **Verbose output:** `comquad up -v` shows all transformations (port offsets, label additions, path normalizations, etc.)
-* **Rootless port offset:** Set `ROOTLESS_PORT_OFFSET` env variable (default 2000) to shift privileged ports (< 1024) for rootless mode
-* **Follow logs after deploy:** `comquad up -f` streams journal logs from the deployment timestamp until interrupted
-* **Dry run:** `comquad up --dry-run` previews what would be deployed without writing any files or starting units
-* **Quiet mode:** `comquad -q <command>` suppresses all non-error output (useful in scripts)
+* **Follow logs:** `comquad up -f` streams journal logs from the deployment timestamp.
+* **Force rebuild:** `comquad up --build` forces an image rebuild.
+* **Image Pull Control:** `comquad up --pull [always|missing|never]` *(default: missing)*.
+* **Override name:** `comquad up -n my-service` overrides the default project name.
 
-### Verbose Output
-
-Use `-v` / `--verbose` with `up` to see every transformation comquad applies during deployment. Output uses ANSI colors (green=success, cyan=info, yellow=warning, blue=action) and respects `NO_COLOR`.
+### 2. Monitoring & Lifecycle (`ps`, `start`, `stop`, `logs`)
 
 ```bash
-comquad up -v
+# View container status (Docker Compose style)
+comquad ps
+comquad ps -a  # Includes exited containers
+
+# Control services
+comquad start [service ...]
+comquad stop [service ...]
+comquad restart [service ...]
+
+# Stream logs (auto-sorted chronologically across units)
+comquad logs                 # All services (one-shot)
+comquad logs -f              # All services (follow)
+comquad logs web             # Single service
+comquad logs --tail 50       # Last 50 lines
+comquad logs --since 10m     # Last 10 minutes
+
 ```
 
-Typical verbose output:
-
-```
-comquad: Injected container_name: myapp-web
-comquad: Normalized image: nginx → docker.io/library/nginx
-comquad: Normalized volume path: ./data → /home/user/project/data
-comquad: Created default network: cq-default
-comquad: Renamed web.container → cq-myapp-web.container
-comquad: Rewrote cross-unit references in cq-myapp-web.container
-comquad: Added AutoUpdate=registry to cq-myapp-web.container
-comquad: Added [Install] section to cq-myapp-web.container
-comquad: Added NetworkAlias=web to cq-myapp-web.container
-comquad: Added labels: Label=com.comquad.project=myapp, Label=com.comquad.managed=true
-comquad: Offset port: PublishPort=80:80 → PublishPort=2080:80
-comquad: Built image: myapp-web:latest
-comquad: Successfully deployed project: myapp
-```
-
-### Dry Run
-
-Use `--dry-run` to preview exactly what `comquad up` would generate and deploy, without touching the systemd directory or starting anything:
+### 3. Interacting & Tearing Down (`exec`, `down`)
 
 ```bash
+# Run commands inside containers
+comquad exec web ls /app
+comquad exec web sh                  # Interactive TTY shell
+comquad exec -u root web bash        # Run as root
+
+# Tear down the project
+comquad down
+comquad down -d                      # Also removes Podman volumes
+
+```
+
+---
+
+## 🔍 Advanced Features & Inspecting State
+
+### Dry Run & Verbose Preview
+
+Before committing changes to systemd, you can preview exactly what `comquad` will do:
+
+```bash
+# Preview generated files without writing them
 comquad up --dry-run
+
+# Show every transformation (port offsets, path normalizations, etc.)
+comquad up -v
+
 ```
 
-Typical output:
+### Direct Unit Editing & Viewing
 
-```
-Dry run — project: myapp
-Target directory: /home/user/.config/containers/systemd
-
-[image] web          myapp-web:latest  (would build from /home/user/project)
-[image] db           docker.io/library/postgres  (already exists locally, would skip pull)
-
-2 quadlet file(s) would be written:
-
-────────────────────────────────────────────────────────────
-  /home/user/.config/containers/systemd/cq-myapp-web.container
-────────────────────────────────────────────────────────────
-[Container]
-Image=myapp-web:latest
-Network=cq-myapp-default.network
-...
-
-Dry run complete — nothing was written, no units started.
-```
-
-### Manage & Monitor
-
-* **Start a project:** `comquad start [service ...]`
-* **Stop a project:** `comquad stop [service ...]`
-* **Restart a project:** `comquad restart [service ...]`
-* **Remove a project:** `comquad down`
-* **Remove with volumes:** `comquad down -d` (also removes Podman volumes)
-* **List deployed projects:** `comquad list`
-* **Regenerate state from labels:** `comquad regenerate --force`
-* **Show container status:** `comquad ps` (docker compose ps style), `comquad ps -a` (include exited)
-* **View unit file:** `comquad view [project] [service]`
-* **Edit unit file:** `comquad edit [project] [service] [--no-reload]`
-* **Check prerequisites:** `comquad check`
-
-### Self-Healing
-
-* **Regenerate state from Podman labels:** `comquad regenerate --force` (scans containers, networks, and volumes for `com.comquad.managed` label and reconstructs the state file)
-* **Preview without writing:** `comquad regenerate --force --dry-run` (shows what would be regenerated without modifying the state file)
-
-### Stream logs
+You can view or edit the underlying systemd quadlet files on the fly:
 
 ```bash
-comquad logs                  # all services (one-shot)
-comquad logs -f               # all services (follow)
-comquad logs web              # single service
-comquad logs -n myapp web db  # specific project/services
-comquad logs --tail 50        # last 50 lines
-comquad logs --since 10m      # logs from the last 10 minutes
-comquad logs -t              # show timestamps in RFC3339Nano format
+# View/Cat the unit files
+comquad view myapp web       # Cat the cq-myapp-web.container file
+comquad view                 # View all units for the current project
+
+# Edit unit files directly (automatically triggers systemd daemon-reload)
+comquad edit myapp web
+comquad edit --no-reload     # Open files without auto-reloading systemd
+
 ```
 
-For running units, logs are filtered to the current invocation. For stopped or failed units, full historical logs are shown. When querying multiple units, logs are collected, sorted by `__REALTIME_TIMESTAMP`, and rendered in chronological order with `[<unit-name>]` prefixes.
+### Self-Healing & Repair
 
-### View
+If your local state gets out of sync, `comquad` can rebuild its tracking from Podman labels:
 
 ```bash
-comquad view                  # view all units for a project
-comquad view myapp            # view all units for a specific project
-comquad view myapp web        # cat the cq-myapp-web.container file
-comquad view -n myapp web     # override project name
+comquad regenerate --force           # Reconstruct state file from live labels
+comquad regenerate --force --dry-run # Preview what would be reconstructed
+comquad check                        # Run a quick prerequisites sanity check
+
 ```
 
-### Edit
+---
 
-```bash
-comquad edit                  # edit all units for a project
-comquad edit myapp            # edit all units for a specific project
-comquad edit myapp web        # edit the cq-myapp-web.container file
-comquad edit -n myapp web     # override project name
-comquad edit --no-reload      # open files without auto-reloading systemd
-```
+## 🏗️ Architecture & Automatic Behaviors
 
-### Start, Stop & Restart
+`comquad` uses a schema-less YAML model to preserve all compose file fields through its preprocessing pipeline. Any field not explicitly handled (like `depends_on`, `healthcheck`, or `x-` extensions) is passed through completely unchanged to `podlet`.
 
-```bash
-comquad start                 # start all units for a project
-comquad start web             # start a specific service
-comquad stop                  # stop all units for a project
-comquad stop web db           # stop specific services
-comquad restart               # restart all units for a project
-comquad restart web           # restart a specific service
-comquad -n myapp start        # override project name
-```
+For a deep dive into how `comquad` processes compose files, manages state, and maps directories, check out the [Architecture Guide](https://www.google.com/search?q=./ARCHITECTURE.md).
 
-### Exec
+### Behind-the-Scenes Automations:
 
-```bash
-comquad exec web ls /app              # run command in web service
-comquad exec web sh                   # interactive shell (TTY allocated by default)
-comquad exec -u root web bash         # run as root inside the container
-comquad exec web -- cat /etc/hostname # pass through to podman
-```
+* **Path Fixing:** Relative volume host paths are automatically fully qualified to absolute paths.
+* **SELinux Smart Patching:** When SELinux is active on the host, all `Volume=` directives automatically get `,z` or `:z` flags appended safely and idempotently.
+* **Implicit Networks:** A default bridge network (`cq-default`) is injected if your compose file defines no networks.
+* **Service Discovery:** `NetworkAlias=` and unique `<project>-<service>` blueprints are injected into every `.container` file so systemd services can resolve each other.
+* **Rootless Port Offsetting:** In rootless mode, privileged ports (< 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
 
-## 🏗️ System Architecture & Internal Mechanics
-
-For a deep dive into how `comquad` processes your compose files, manages state, and maps directories, please see dedicated [Architecture Guide](./ARCHITECTURE.md) guide.
-
-### Automatic Behaviors
-
-* Relative volume host paths are automatically fully-qualified to absolute paths.
-* When SELinux is enabled on the host, all `Volume=` directives in generated `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present.
-* A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all.
-* Generated containers follow a strict naming blueprint: `<project>-<service>`.
-* `NetworkAlias=` is injected into every `.container` file so services can resolve each other by service name and `ContainerName=` value within compose networks.
-* In rootless mode, privileged ports (< 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000).
+---
 
 ## 📄 License
 
 MIT
-
-## 📝 Compose Compatibility
-
-`comquad` uses a schema-less YAML model to preserve all compose file fields through the preprocessing pipeline. Any field not explicitly handled (e.g. `depends_on`, `restart`, `healthcheck`, `x-` extensions) is passed through unchanged to `podlet`. This means compose files with newer or custom Docker Compose fields will not silently drop data — they flow through to quadlet generation intact.

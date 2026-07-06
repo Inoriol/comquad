@@ -133,13 +133,36 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 4. Marshal back to YAML
+	// 4. Replace build blocks with image directives so podlet never sees them.
+	replaced := replaceBuildWithImage(&cf, e.ProjectName)
+	if len(replaced) > 0 {
+		logger.Info("Replaced build blocks with image directives for: " + strings.Join(replaced, ", "))
+	}
+
+	// 5. Marshal back to YAML
 	output, err := yaml.Marshal(&cf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal processed compose file: %w", err)
 	}
 
 	return output, nil
+}
+
+// replaceBuildWithImage mutates cf in-place: for every service that has a
+// build: block it sets image to <project>-<service>:latest and deletes the
+// build key. It returns the list of service names that were replaced.
+func replaceBuildWithImage(cf *ComposeFile, projectName string) []string {
+	var replaced []string
+	for name := range cf.Services {
+		if _, hasBuild := cf.Services[name]["build"]; !hasBuild {
+			continue
+		}
+		tag := fmt.Sprintf("%s-%s:latest", projectName, name)
+		cf.Services[name]["image"] = tag
+		delete(cf.Services[name], "build")
+		replaced = append(replaced, name)
+	}
+	return replaced
 }
 
 // GetBuildInfo returns build configuration for services that have it

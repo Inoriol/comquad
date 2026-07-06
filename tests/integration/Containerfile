@@ -1,0 +1,30 @@
+FROM fedora:43
+
+# Core dependencies — baked in, never pulled at test time
+RUN dnf install -y \
+    golang \
+    podman \
+    systemd \
+    podlet \
+    sudo \
+    shadow-utils \
+    passwd \
+    dbus-daemon \
+    slirp4netns \
+    fuse-overlayfs \
+    iptables \
+    && dnf clean all
+
+# Create a non-root test user for rootless scenarios
+RUN useradd -m -s /bin/bash testuser \
+    && echo "testuser:100000:65536" >> /etc/subuid \
+    && echo "testuser:100000:65536" >> /etc/subgid \
+    && echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Enable linger so the user systemd instance starts at boot
+RUN loginctl enable-linger testuser || true
+
+# Systemd as PID 1
+STOPSIGNAL SIGRTMIN+3
+VOLUME ["/sys/fs/cgroup"]
+CMD ["/sbin/init"]

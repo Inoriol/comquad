@@ -6,10 +6,10 @@ This document details the internal design, component mapping, and execution life
 
 When you run `comquad up`, the engine moves your configuration through a five-step pipeline:
 
-1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels).
+1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels, replaces `build:` blocks with `image:` directives).
 2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, and `.volume` quadlet files.
 3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed.
-4. **Build** — Handles local images via `podman build` if `build:` contexts are defined, validates existing local images, or pulls missing ones from the registry.
+4. **Build** — Builds local images via `podman build` using build context extracted from the original compose file during preprocessing, validates existing local images, or pulls missing ones from the registry.
 5. **Deploy** — Relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus.
 
 ### Dry Run Mode (`--dry-run`)
@@ -226,7 +226,7 @@ The following compose service fields are **handled by comquad** (explicitly proc
 
 * `container_name` — auto-generated if missing (`<project>-<service>`); also registered as a second `NetworkAlias=` for DNS resolution
 * `image` — normalized to full registry path (`docker.io/library/`)
-* `build` — local build context (string or map)
+* `build` — local build context (string or map); replaced with `image:` directive during preprocessing so podlet never sees it
 * `ports` — published host ports (offset in rootless mode)
 * `volumes` — bind mounts and named volumes (relative paths resolved)
 * `networks` — network attachments (auto-attached to `cq-default` if none defined)
@@ -251,12 +251,11 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 * An identifying label (`com.comquad.project`) is attached to all generated units.
 * A `com.comquad.managed` label is attached to all files to indicate comquad management.
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
-* Services marked with local `build:` blocks bypass image registry name validation.
 * In rootless mode, privileged ports (< 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
 
 ### Local Build Rules
 
-When a service contains a `build:` block, `comquad` builds it on-the-fly and tags it as `<project>-<service>:latest` before creating the Quadlet units.
+When a service contains a `build:` block, `comquad` extracts the build configuration during preprocessing (context, dockerfile, target, args), replaces the `build:` block with `image: <project>-<service>:latest`, and passes the modified YAML to `podlet`. After quadlet files are generated, `podman build` is invoked using the extracted build context.
 
 Standard shorthand formats and extended structural contexts are both supported:
 
@@ -341,6 +340,7 @@ When `-v` / `--verbose` is enabled, comquad additionally logs every transformati
 - `Normalized volume path: <relative> → <absolute>` — relative volume path resolution
 - `Created default network: cq-default` — when a default bridge network was injected
 - `Auto-attached '<service>' to network 'cq-default'` — services auto-attached to default network
+- `Replaced build: with image: <tag>` — build blocks replaced with image directives for podlet compatibility
 
 **Cook stage** logs:
 - `Renamed <old> → <new>` — file renaming with `cq-<project>-` prefix
@@ -365,3 +365,47 @@ Network and volume removal errors are always printed to stderr regardless of ver
 
 **Error output:** `logger.Error(...)` always writes to stderr regardless of the verbose setting. Only informational, success, warning, and action messages are gated behind `-v`.
 
+## 🧪 Integration Testing
+
+Integration tests verify the full end-to-end lifecycle of comquad against a real
+systemd instance, real Podman daemon, and real podlet binary. They complement the
+unit tests (which mock D-Bus and state via interfaces) by exercising the complete
+pipeline from `compose` → quadlet files → running containers.
+
+### Test Environment
+
+Tests run inside a privileged Podman container with systemd as PID 1. This gives
+each test run a fully isolated, reproducible environment with a real D-Bus session,
+real cgroup hierarchy, and real systemd unit activation — without touching the host.
+
+The test image is defined in `tests/integration/Containerfile` and baked ahead of
+time (never installed at test runtime) with all required dependencies:
+
+- `golang` — to compile comquad inside the container
+- `podman` — container runtime
+- `systemd` — PID 1, D-Bus, unit management
+- `podlet` — quadlet transpiler (Fedora package)
+- `sudo`, `shadow-utils`, `slirp4netns`, `fuse-overlayfs` — rootless support
+
+A non-root user (`testuser`) is pre-created with `/etc/subuid` and `/etc/subgid`
+entries and `loginctl enable-linger` applied, so the systemd user instance starts
+correctly for rootless test scenarios.
+
+### Test Structure
+
+```text
+tests/
+  integration/
+    helpers/
+      binary.go        # Invoke comquad binary, capture stdout/stderr/exit code
+      compose.go       # Write temp compose files, reusable compose templates
+      podman.go        # Inspect Podman containers, networks, volumes
+      systemd.go       # Poll and assert systemd unit states via systemctl
+      state.go         # Read and assert projects.json state file contents
+    testdata/          # Static compose files and Dockerfiles for complex scenarios
+    up_down_test.go    # Core up/down lifecycle, idempotency, volume retention
+    dry_run_test.go    # Dry-run isolation: no files written, no state registered
+    lifecycle_test.go  # start/stop/restart command flows
+    regenerate_test.go # State self-healing after corruption or deletion
+    logs_test.go       # Log retrieval for running and stopped units
+```
