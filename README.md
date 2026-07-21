@@ -139,7 +139,7 @@ comquad check                        # Run a quick prerequisites sanity check
 
 `comquad` uses a schema-less YAML model to preserve all compose file fields through its preprocessing pipeline. Any field not explicitly handled (like `depends_on`, `healthcheck`, or `x-` extensions) is passed through completely unchanged to `podlet`.
 
-For a deep dive into how `comquad` processes compose files, manages state, and maps directories, check out the [Architecture Guide](https://www.google.com/search?q=./ARCHITECTURE.md).
+For a deep dive into how `comquad` processes compose files, manages state, and maps directories, check out the [Architecture Guide](./ARCHITECTURE.md).
 
 ### Behind-the-Scenes Automations:
 

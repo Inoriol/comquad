@@ -259,8 +259,8 @@ func normalizeImage(image string) string {
 		if first == "docker.io" {
 			return image
 		}
-		// Looks like a registry (contains . or : in the first segment)
-		if strings.Contains(first, ".") || strings.Contains(first, ":") {
+		// Looks like a registry (contains . or :port in the first segment)
+		if strings.Contains(first, ".") || isRegistryWithPort(first) {
 			return image
 		}
 		// e.g. "library/nginx" — no registry, treat as docker hub
@@ -269,4 +269,22 @@ func normalizeImage(image string) string {
 
 	// No slash at all — bare image name, default to docker hub
 	return "docker.io/library/" + image
+}
+
+// isRegistryWithPort checks if s looks like a registry hostname with a port number.
+// A registry with port has the form "hostname:port" where port is all digits.
+// This distinguishes "localhost:5000" (registry) from "myapp:v1" (image with tag).
+func isRegistryWithPort(s string) bool {
+	if idx := strings.LastIndex(s, ":"); idx >= 0 {
+		port := s[idx+1:]
+		if len(port) > 0 && len(port) <= 5 {
+			for _, c := range port {
+				if c < '0' || c > '9' {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
 }

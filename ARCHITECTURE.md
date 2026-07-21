@@ -303,6 +303,14 @@ listContainers func(projectName string, all bool) ([]ContainerInfo, error)
 
 `NewOrchestrator` wires in the real implementations. Tests override these fields with in-memory fakes (`mockStateStore`, `mockSystemdClient`) that record calls and return canned responses, enabling full unit-test coverage without a live D-Bus or Podman daemon.
 
+### Project Deployment Helper
+
+The `ensureProjectDeployed()` helper encapsulates the common pattern of creating a state manager, fetching the project, and failing if it does not exist. It returns `(StateStore, ProjectState, error)` to support both state access and operations like `UnregisterProject`. Eight methods use this helper: `Ps`, `Down`, `View`, `Edit`, `Exec`, `Logs`, `FollowLogs`, and `resolveUnits`.
+
+### Image Normalization
+
+The `normalizeImage()` function in `internal/preprocess/` ensures images have full registry paths. It distinguishes registry hostnames (containing `.` or `:port` where port is all digits) from image names with tags (e.g., `myapp:v1`). The `isRegistryWithPort()` helper checks if `:` is followed by only digits to avoid false positives with tagged image names.
+
 The `transpile` package is tested via a fake `podlet` shell script placed on a temp PATH entry, exercising the stdin pipe, argument passing, and error paths without requiring the real binary.
 
 ## 📋 Follow Logs on Deploy
@@ -400,12 +408,28 @@ tests/
       binary.go        # Invoke comquad binary, capture stdout/stderr/exit code
       compose.go       # Write temp compose files, reusable compose templates
       podman.go        # Inspect Podman containers, networks, volumes
-      systemd.go       # Poll and assert systemd unit states via systemctl
+      selinux.go       # SELinux detection helpers for conditional test skipping
       state.go         # Read and assert projects.json state file contents
+      systemd.go       # Poll and assert systemd unit states via systemctl
     testdata/          # Static compose files and Dockerfiles for complex scenarios
     up_down_test.go    # Core up/down lifecycle, idempotency, volume retention
     dry_run_test.go    # Dry-run isolation: no files written, no state registered
     lifecycle_test.go  # start/stop/restart command flows
-    regenerate_test.go # State self-healing after corruption or deletion
     logs_test.go       # Log retrieval for running and stopped units
+    exec_test.go       # podman exec command tests
+    rootless_test.go   # Rootless mode: port offsetting, target directory, user instance
+    selinux_test.go    # SELinux :z label injection (quadlet files and runtime mounts)
+    view_edit_test.go  # view/edit command tests
 ```
+
+### Test Design Decisions
+
+All tests use `--name <project>` with `comquad up` to explicitly specify the project name,
+decoupling test behavior from the directory name. The `WriteCompose` helper returns the
+project name parsed from the compose `name:` field, ensuring tests always use the correct
+name for both `up` and `down` calls. This prevents fragile dependencies on `t.TempDir()`
+naming conventions.
+
+SELinux tests use `helpers.SELinuxPresent(t)` for skip conditions to detect SELinux
+mount availability, not enforcement mode, since comquad's `:z` injection triggers on
+presence detection via `/sys/fs/selinux/enforce` file content.

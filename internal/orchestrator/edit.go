@@ -13,14 +13,9 @@ import (
 // Edit opens project units or a specific unit file in the editor.
 // If noReload is false, systemd is reloaded and units are restarted after changes.
 func (o *Orchestrator) Edit(projectArg string, noReload bool) error {
-	stateMgr, err := o.newState()
+	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
-		return fmt.Errorf("failed to initialize state manager: %w", err)
-	}
-
-	state, exists := stateMgr.GetProject(o.projectName)
-	if !exists {
-		return fmt.Errorf("project %s is not deployed", o.projectName)
+		return err
 	}
 
 	if projectArg == "" {
@@ -143,7 +138,7 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	var restartCount int
 	for _, f := range changedFiles {
 		if strings.HasSuffix(f, ".container") {
-			unitName := containerFileToUnitName(f)
+			unitName := ContainerFileToUnitName(f)
 			fmt.Printf("Restarting unit: %s\n", unitName)
 			if err := dbusMgr.RestartUnit(unitName); err != nil {
 				fmt.Printf("Warning: failed to restart unit %s: %v\n", unitName, err)

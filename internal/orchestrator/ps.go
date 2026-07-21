@@ -10,13 +10,8 @@ import (
 
 // Ps shows the current state of containers for the project.
 func (o *Orchestrator) Ps(all bool) error {
-	stateMgr, err := o.newState()
-	if err != nil {
-		return fmt.Errorf("failed to initialize state manager: %w", err)
-	}
-
-	if _, exists := stateMgr.GetProject(o.projectName); !exists {
-		return fmt.Errorf("project %s is not deployed", o.projectName)
+	if _, _, err := o.ensureProjectDeployed(); err != nil {
+		return err
 	}
 
 	containers, err := o.listContainers(o.projectName, all)
@@ -62,13 +57,13 @@ func (o *Orchestrator) Ps(all bool) error {
 }
 
 func printPsTable(containers []ContainerInfo) {
-	nameW := 20
-	imageW := 30
-	commandW := 25
-	serviceW := 12
-	createdW := 20
-	statusW := 20
-	portsW := 30
+	nameW := max(len("NAME"), 20)
+	imageW := max(len("IMAGE"), 30)
+	commandW := max(len("COMMAND"), 25)
+	serviceW := max(len("SERVICE"), 12)
+	createdW := max(len("CREATED"), 20)
+	statusW := max(len("STATUS"), 20)
+	portsW := max(len("PORTS"), 30)
 
 	for _, c := range containers {
 		if len(c.Name) > nameW {

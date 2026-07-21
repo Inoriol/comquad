@@ -7,25 +7,25 @@ import (
  "strings"
  "testing"
 
- "tests/integration/helpers"
+ "comquad/tests/integration/helpers"
 )
 
 func TestExec_RunsCommandInContainer(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
 
  // Run a simple command inside the container
  result := helpers.MustSucceed(t, dir, "exec",
-  "--project", project,
+  "--name", project,
   "--tty=false",
   "web",
   "--", "echo", "hello-from-container",
@@ -38,20 +38,20 @@ func TestExec_RunsCommandInContainer(t *testing.T) {
 
 func TestExec_WithUser(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
 
  // Run whoami as root inside the container
  result := helpers.MustSucceed(t, dir, "exec",
-  "--project", project,
+  "--name", project,
   "--tty=false",
   "--user", "root",
   "web",
@@ -63,21 +63,18 @@ func TestExec_WithUser(t *testing.T) {
  }
 }
 
-func TestExec_AmbiguousService_Errors(t *testing.T) {
- // This test requires a compose where two services could match the same
- // short name — not possible with distinct names, so we verify the error
- // path by passing a name that matches nothing instead.
+func TestExec_NonexistentService_Errors(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  helpers.MustFail(t, dir, "exec",
-  "--project", project,
+  "--name", project,
   "--tty=false",
   "nonexistent-service",
   "--", "echo", "hi",
@@ -86,21 +83,21 @@ func TestExec_AmbiguousService_Errors(t *testing.T) {
 
 func TestExec_RequiresRunningContainer(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
- helpers.MustSucceed(t, dir, "stop", "--project", project)
+ helpers.MustSucceed(t, dir, "up", "--name", project)
+ helpers.MustSucceed(t, dir, "stop", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitInactive(t, unitName, false)
 
  // exec into a stopped container should fail
  helpers.MustFail(t, dir, "exec",
-  "--project", project,
+  "--name", project,
   "--tty=false",
   "web",
   "--", "echo", "hi",

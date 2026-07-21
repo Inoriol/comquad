@@ -5,20 +5,36 @@ package helpers
 import (
     "os"
     "path/filepath"
+    "strings"
     "testing"
 )
 
 // WriteCompose writes a compose.yaml to a temp directory and returns
-// the directory path. The directory is automatically removed when the
-// test ends.
-func WriteCompose(t *testing.T, content string) string {
+// the directory path and the project name declared in the compose file.
+// The directory is automatically removed when the test ends.
+func WriteCompose(t *testing.T, content string) (string, string) {
     t.Helper()
     dir := t.TempDir()
     path := filepath.Join(dir, "compose.yaml")
     if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
         t.Fatalf("failed to write compose.yaml: %v", err)
     }
-    return dir
+    return dir, extractProjectName(content)
+}
+
+// extractProjectName parses the project name from a compose file string.
+// It reads the top-level "name:" field, falling back to "unknown" if absent.
+func extractProjectName(content string) string {
+    for _, line := range strings.Split(content, "\n") {
+        trimmed := strings.TrimSpace(line)
+        if strings.HasPrefix(trimmed, "name:") {
+            name := strings.TrimSpace(strings.TrimPrefix(trimmed, "name:"))
+            if name != "" {
+                return name
+            }
+        }
+    }
+    return "unknown"
 }
 
 // WriteFile writes an arbitrary file into an existing directory.

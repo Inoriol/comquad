@@ -32,10 +32,33 @@ func SELinuxPresent(t *testing.T) bool {
 
 // SkipIfSELinuxAbsent skips the test if SELinux is not present on the system.
 func SkipIfSELinuxAbsent(t *testing.T) {
- t.Helper()
- if !SELinuxPresent(t) {
-  t.Skip("SELinux not present on this system — skipping SELinux test")
- }
+	t.Helper()
+	if !SELinuxPresent(t) {
+		t.Skip("SELinux not present on this system — skipping SELinux test")
+	}
+}
+
+// SkipIfSELinuxNotEnabled skips the test if SELinux is not enabled (enforcing or
+// permissive). This matches the exact detection logic comquad uses for SELinux
+// label injection — presence alone is not enough; the enforcement file must
+// contain "0" or "1".
+func SkipIfSELinuxNotEnabled(t *testing.T) {
+	t.Helper()
+	SkipIfSELinuxAbsent(t)
+	if !SELinuxEnabled(t) {
+		t.Skip("SELinux present but not enabled — skipping SELinux test")
+	}
+}
+
+// SELinuxEnabled returns true if SELinux is enabled (enforcing or permissive).
+// Mirrors the exact detection logic comquad uses internally.
+func SELinuxEnabled(t *testing.T) bool {
+	t.Helper()
+	data, err := os.ReadFile("/sys/fs/selinux/enforce")
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(data)) == "0" || strings.TrimSpace(string(data)) == "1"
 }
 
 // SkipIfSELinuxNotEnforcing skips the test if SELinux is present but not

@@ -8,18 +8,18 @@ import (
  "testing"
  "time"
 
- "tests/integration/helpers"
+ "comquad/tests/integration/helpers"
 )
 
 func TestLogs_RunningUnit(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
@@ -27,7 +27,7 @@ func TestLogs_RunningUnit(t *testing.T) {
  // Give the container a moment to emit startup logs
  time.Sleep(3 * time.Second)
 
- result := helpers.MustSucceed(t, dir, "logs", "--project", project)
+ result := helpers.MustSucceed(t, dir, "logs", "--name", project)
 
  // Logs command must succeed and return some output for a running unit
  if result.Stdout == "" && result.Stderr == "" {
@@ -37,19 +37,19 @@ func TestLogs_RunningUnit(t *testing.T) {
 
 func TestLogs_TailFlag(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
  time.Sleep(3 * time.Second)
 
- result := helpers.MustSucceed(t, dir, "logs", "--project", project, "--tail", "5")
+ result := helpers.MustSucceed(t, dir, "logs", "--name", project, "--tail", "5")
 
  lines := nonEmptyLines(result.Stdout)
  if len(lines) > 5 {
@@ -59,36 +59,36 @@ func TestLogs_TailFlag(t *testing.T) {
 
 func TestLogs_StoppedUnit(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
  time.Sleep(2 * time.Second)
 
  // Stop the unit — logs should still be retrievable from history
- helpers.MustSucceed(t, dir, "stop", "--project", project)
+ helpers.MustSucceed(t, dir, "stop", "--name", project)
  helpers.AssertUnitInactive(t, unitName, false)
 
- result := helpers.MustSucceed(t, dir, "logs", "--project", project)
+ result := helpers.MustSucceed(t, dir, "logs", "--name", project)
  // Should not error even for a stopped unit
  _ = result
 }
 
 func TestLogs_SpecificService(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  for _, svc := range []string{"web", "api"} {
   unit := fmt.Sprintf("cq-%s-%s.service", project, svc)
@@ -97,19 +97,19 @@ func TestLogs_SpecificService(t *testing.T) {
  time.Sleep(3 * time.Second)
 
  // Request logs for web only
- result := helpers.MustSucceed(t, dir, "logs", "--project", project, "web")
+ result := helpers.MustSucceed(t, dir, "logs", "--name", project, "web")
  _ = result
 }
 
 func TestLogs_MultiService_LinesPrefixed(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  for _, svc := range []string{"web", "api"} {
   unit := fmt.Sprintf("cq-%s-%s.service", project, svc)
@@ -117,7 +117,7 @@ func TestLogs_MultiService_LinesPrefixed(t *testing.T) {
  }
  time.Sleep(3 * time.Second)
 
- result := helpers.MustSucceed(t, dir, "logs", "--project", project)
+ result := helpers.MustSucceed(t, dir, "logs", "--name", project)
 
  // When querying multiple units each non-separator line must be prefixed
  // with [<unit-name>]
@@ -135,19 +135,19 @@ func TestLogs_MultiService_LinesPrefixed(t *testing.T) {
 
 func TestLogs_NoEmptyLines(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
  time.Sleep(3 * time.Second)
 
- result := helpers.MustSucceed(t, dir, "logs", "--project", project)
+ result := helpers.MustSucceed(t, dir, "logs", "--name", project)
 
  // Per architecture: all empty lines are stripped in every code path
  for i, line := range strings.Split(result.Stdout, "\n") {
@@ -158,7 +158,7 @@ func TestLogs_NoEmptyLines(t *testing.T) {
 }
 
 func TestLogs_RequiresExistingProject(t *testing.T) {
- helpers.MustFail(t, "", "logs", "--project", "cqt-nonexistent-project")
+ helpers.MustFail(t, "", "logs", "--name", "cqt-nonexistent-project")
 }
 
 // nonEmptyLines splits output into lines, filtering out empty ones.

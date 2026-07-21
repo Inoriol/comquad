@@ -7,23 +7,23 @@ import (
  "strings"
  "testing"
 
- "tests/integration/helpers"
+ "comquad/tests/integration/helpers"
 )
 
 func TestView_ProjectSummary(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
 
- result := helpers.MustSucceed(t, dir, "view", "--project", project)
+ result := helpers.MustSucceed(t, dir, "view", "--name", project)
 
  // Project view must show unit name, active state, and healthy status
  for _, expected := range []string{
@@ -39,13 +39,13 @@ func TestView_ProjectSummary(t *testing.T) {
 
 func TestView_ProjectStatus_Degraded(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  webUnit := fmt.Sprintf("cq-%s-web.service", project)
  apiUnit := fmt.Sprintf("cq-%s-api.service", project)
@@ -53,10 +53,10 @@ func TestView_ProjectStatus_Degraded(t *testing.T) {
  helpers.AssertUnitActive(t, apiUnit, false)
 
  // Stop only one service to trigger degraded state
- helpers.MustSucceed(t, dir, "stop", "--project", project, "web")
+ helpers.MustSucceed(t, dir, "stop", "--name", project, "web")
  helpers.AssertUnitInactive(t, webUnit, false)
 
- result := helpers.MustSucceed(t, dir, "view", "--project", project)
+ result := helpers.MustSucceed(t, dir, "view", "--name", project)
 
  if !strings.Contains(result.Stdout, "degraded") {
   t.Fatalf("expected degraded status when only some units active:\n%s", result.Stdout)
@@ -65,19 +65,19 @@ func TestView_ProjectStatus_Degraded(t *testing.T) {
 
 func TestView_ProjectStatus_Down(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
- helpers.MustSucceed(t, dir, "stop", "--project", project)
+ helpers.MustSucceed(t, dir, "up", "--name", project)
+ helpers.MustSucceed(t, dir, "stop", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitInactive(t, unitName, false)
 
- result := helpers.MustSucceed(t, dir, "view", "--project", project)
+ result := helpers.MustSucceed(t, dir, "view", "--name", project)
 
  if !strings.Contains(result.Stdout, "down") {
   t.Fatalf("expected down status when no units active:\n%s", result.Stdout)
@@ -89,13 +89,13 @@ func TestView_ProjectStatus_Down(t *testing.T) {
 // with .service suffix, with .container suffix, and internal podman name.
 func TestView_UnitFile_MatchingPatterns(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
@@ -110,7 +110,7 @@ func TestView_UnitFile_MatchingPatterns(t *testing.T) {
 
  for _, pattern := range patterns {
   t.Run(pattern, func(t *testing.T) {
-   result := helpers.MustSucceed(t, dir, "view", "--project", project, pattern)
+   result := helpers.MustSucceed(t, dir, "view", "--name", project, pattern)
    // Unit file view must print the quadlet file contents
    if !strings.Contains(result.Stdout, "[Container]") {
     t.Fatalf("view with pattern %q missing [Container] section:\n%s",
@@ -121,18 +121,18 @@ func TestView_UnitFile_MatchingPatterns(t *testing.T) {
 }
 
 func TestView_RequiresExistingProject(t *testing.T) {
- helpers.MustFail(t, "", "view", "--project", "cqt-nonexistent-project")
+ helpers.MustFail(t, "", "view", "--name", "cqt-nonexistent-project")
 }
 
 func TestEdit_NoReload_OpensWithoutRestart(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
@@ -140,7 +140,7 @@ func TestEdit_NoReload_OpensWithoutRestart(t *testing.T) {
  // Use EDITOR=true so the editor exits immediately without modifying files.
  // --no-reload ensures no daemon-reload or restart is triggered.
  result := helpers.Comquad(t, dir, "edit",
-  "--project", project,
+  "--name", project,
   "--no-reload",
  )
 

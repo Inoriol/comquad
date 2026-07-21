@@ -66,7 +66,14 @@ func Print(msg string) {
 }
 
 func colorize(colorCode, msg string) string {
-	if noColor {
+	mu.Lock()
+	n := noColor
+	mu.Unlock()
+	if n {
+		return msg
+	}
+	// Check NO_COLOR dynamically in case it was set after init()
+	if _, dynamic := os.LookupEnv("NO_COLOR"); dynamic {
 		return msg
 	}
 	return fmt.Sprintf("%s%s%s", colorCode, msg, reset)

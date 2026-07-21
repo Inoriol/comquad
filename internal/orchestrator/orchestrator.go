@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -179,14 +180,9 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 // Down stops all units, removes quadlet files, removes networks, and unregisters the project.
 // If removeVolumes is true, also removes Podman volumes.
 func (o *Orchestrator) Down(removeVolumes bool) error {
-	stateMgr, err := o.newState()
+	stateMgr, state, err := o.ensureProjectDeployed()
 	if err != nil {
-		return fmt.Errorf("failed to initialize state manager: %w", err)
-	}
-
-	state, exists := stateMgr.GetProject(o.projectName)
-	if !exists {
-		return fmt.Errorf("project %s is not deployed", o.projectName)
+		return err
 	}
 
 	// Open a single D-Bus connection for the entire down sequence.
@@ -255,6 +251,23 @@ func (o *Orchestrator) Down(removeVolumes bool) error {
 
 	logger.Success("Successfully removed project: " + o.projectName)
 	return nil
+}
+
+// ensureProjectDeployed returns the state store and project state, or an error
+// if the project is not deployed. It encapsulates the common pattern of
+// creating a state manager, fetching the project, and failing if it does not exist.
+func (o *Orchestrator) ensureProjectDeployed() (deploy.StateStore, deploy.ProjectState, error) {
+	stateMgr, err := o.newState()
+	if err != nil {
+		return nil, deploy.ProjectState{}, fmt.Errorf("failed to initialize state manager: %w", err)
+	}
+
+	state, exists := stateMgr.GetProject(o.projectName)
+	if !exists {
+		return nil, deploy.ProjectState{}, fmt.Errorf("project %s is not deployed", o.projectName)
+	}
+
+	return stateMgr, state, nil
 }
 
 // --- private helpers ---
@@ -360,7 +373,7 @@ func (o *Orchestrator) startUnits(projectFiles []string) error {
 
 	for _, f := range projectFiles {
 		if strings.HasSuffix(f, ".container") {
-			unitName := containerFileToUnitName(f)
+			unitName := ContainerFileToUnitName(f)
 			logger.Action("Starting unit: " + unitName)
 
 			if err := dbusMgr.WaitForUnit(unitName, 10*time.Second); err != nil {
@@ -378,8 +391,15 @@ func (o *Orchestrator) startUnits(projectFiles []string) error {
 
 // handleImages builds or pulls images based on the compose file and strategy
 func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]*preprocess.BuildInfo, forceBuild bool, pullStrategy string) error {
-	// First handle build services
-	for serviceName, info := range buildInfo {
+	// First handle build services (sorted for deterministic output)
+	sortedServiceNames := make([]string, 0, len(buildInfo))
+	for name := range buildInfo {
+		sortedServiceNames = append(sortedServiceNames, name)
+	}
+	sort.Strings(sortedServiceNames)
+
+	for _, serviceName := range sortedServiceNames {
+		info := buildInfo[serviceName]
 		imageTag := build.GenerateBuildTag(o.projectName, serviceName)
 
 		// Check if we need to build
@@ -472,8 +492,15 @@ func (o *Orchestrator) printDryRun(
 		return err
 	}
 
-	// Build services
-	for serviceName, info := range buildInfo {
+	// Build services (sorted for deterministic output)
+	sortedNames := make([]string, 0, len(buildInfo))
+	for name := range buildInfo {
+		sortedNames = append(sortedNames, name)
+	}
+	sort.Strings(sortedNames)
+
+	for _, serviceName := range sortedNames {
+		info := buildInfo[serviceName]
 		imageTag := build.GenerateBuildTag(o.projectName, serviceName)
 		engine := &build.Engine{}
 		if engine.ImageExists(imageTag) {
@@ -554,7 +581,7 @@ func (o *Orchestrator) printDryRun(
 func (o *Orchestrator) stopUnits(dbusMgr deploy.SystemdClient, projectFiles []string) error {
 	for _, f := range projectFiles {
 		if strings.HasSuffix(f, ".container") {
-			unitName := containerFileToUnitName(f)
+			unitName := ContainerFileToUnitName(f)
 			logger.Print("Stopping unit: " + unitName)
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				return fmt.Errorf("failed to stop unit %s: %w", unitName, err)
@@ -571,7 +598,7 @@ func (o *Orchestrator) verifyUnitsStopped(dbusMgr deploy.SystemdClient, projectF
 		if !strings.HasSuffix(f, ".container") {
 			continue
 		}
-		unitName := containerFileToUnitName(f)
+		unitName := ContainerFileToUnitName(f)
 		units, err := dbusMgr.ListUnitsByNames([]string{unitName})
 		if err != nil {
 			continue
@@ -593,11 +620,6 @@ func (o *Orchestrator) verifyUnitsStopped(dbusMgr deploy.SystemdClient, projectF
 func ContainerFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	return strings.TrimSuffix(base, ".container") + ".service"
-}
-
-// containerFileToUnitName is an unexported alias kept for internal call sites.
-func containerFileToUnitName(filePath string) string {
-	return ContainerFileToUnitName(filePath)
 }
 
 // NetworkFileToUnitName derives the systemd unit name from a network quadlet file path.
@@ -625,7 +647,8 @@ func findComposeFile(dir string) string {
 	}
 	for _, name := range candidates {
 		path := filepath.Join(dir, name)
-		if _, err := os.Stat(path); err == nil {
+		info, err := os.Stat(path)
+		if err == nil && info.Mode().IsRegular() {
 			return path
 		}
 	}

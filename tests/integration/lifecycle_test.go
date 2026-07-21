@@ -7,24 +7,24 @@ import (
  "testing"
  "time"
 
- "tests/integration/helpers"
+ "comquad/tests/integration/helpers"
 )
 
 func TestLifecycle_StopStart(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
 
  // stop
- helpers.MustSucceed(t, dir, "stop", "--project", project)
+ helpers.MustSucceed(t, dir, "stop", "--name", project)
  helpers.AssertUnitInactive(t, unitName, false)
 
  // quadlet files must still exist — stop does not remove them
@@ -36,24 +36,24 @@ func TestLifecycle_StopStart(t *testing.T) {
  helpers.AssertProjectRegistered(t, project)
 
  // start again
- helpers.MustSucceed(t, dir, "start", "--project", project)
+ helpers.MustSucceed(t, dir, "start", "--name", project)
  helpers.AssertUnitActive(t, unitName, false)
 }
 
 func TestLifecycle_Restart(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.SimpleCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
 
- helpers.MustSucceed(t, dir, "restart", "--project", project)
+ helpers.MustSucceed(t, dir, "restart", "--name", project)
 
  // Give systemd time to cycle the unit
  time.Sleep(2 * time.Second)
@@ -62,13 +62,13 @@ func TestLifecycle_Restart(t *testing.T) {
 
 func TestLifecycle_StopSpecificService(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  webUnit := fmt.Sprintf("cq-%s-web.service", project)
  apiUnit := fmt.Sprintf("cq-%s-api.service", project)
@@ -77,7 +77,7 @@ func TestLifecycle_StopSpecificService(t *testing.T) {
  helpers.AssertUnitActive(t, apiUnit, false)
 
  // Stop only the web service
- helpers.MustSucceed(t, dir, "stop", "--project", project, "web")
+ helpers.MustSucceed(t, dir, "stop", "--name", project, "web")
  helpers.AssertUnitInactive(t, webUnit, false)
 
  // api must still be running
@@ -86,24 +86,24 @@ func TestLifecycle_StopSpecificService(t *testing.T) {
 
 func TestLifecycle_StartSpecificService(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  webUnit := fmt.Sprintf("cq-%s-web.service", project)
  apiUnit := fmt.Sprintf("cq-%s-api.service", project)
 
  // Stop both
- helpers.MustSucceed(t, dir, "stop", "--project", project)
+ helpers.MustSucceed(t, dir, "stop", "--name", project)
  helpers.AssertUnitInactive(t, webUnit, false)
  helpers.AssertUnitInactive(t, apiUnit, false)
 
  // Start only api
- helpers.MustSucceed(t, dir, "start", "--project", project, "api")
+ helpers.MustSucceed(t, dir, "start", "--name", project, "api")
  helpers.AssertUnitActive(t, apiUnit, false)
 
  // web must still be inactive
@@ -114,13 +114,13 @@ func TestLifecycle_StartSpecificService(t *testing.T) {
 
 func TestLifecycle_RestartSpecificService(t *testing.T) {
  project := helpers.ProjectName(t)
- dir := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
+ dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  webUnit := fmt.Sprintf("cq-%s-web.service", project)
  apiUnit := fmt.Sprintf("cq-%s-api.service", project)
@@ -129,7 +129,7 @@ func TestLifecycle_RestartSpecificService(t *testing.T) {
  helpers.AssertUnitActive(t, apiUnit, false)
 
  // Restart only web
- helpers.MustSucceed(t, dir, "restart", "--project", project, "web")
+ helpers.MustSucceed(t, dir, "restart", "--name", project, "web")
  time.Sleep(2 * time.Second)
 
  helpers.AssertUnitActive(t, webUnit, false)
@@ -139,13 +139,13 @@ func TestLifecycle_RestartSpecificService(t *testing.T) {
 
 func TestLifecycle_StopRequiresExistingProject(t *testing.T) {
  // Stopping a project that was never deployed should fail cleanly
- helpers.MustFail(t, "", "stop", "--project", "cqt-nonexistent-project")
+ helpers.MustFail(t, "", "stop", "--name", "cqt-nonexistent-project")
 }
 
 func TestLifecycle_StartRequiresExistingProject(t *testing.T) {
- helpers.MustFail(t, "", "start", "--project", "cqt-nonexistent-project")
+ helpers.MustFail(t, "", "start", "--name", "cqt-nonexistent-project")
 }
 
 func TestLifecycle_RestartRequiresExistingProject(t *testing.T) {
- helpers.MustFail(t, "", "restart", "--project", "cqt-nonexistent-project")
+ helpers.MustFail(t, "", "restart", "--name", "cqt-nonexistent-project")
 }

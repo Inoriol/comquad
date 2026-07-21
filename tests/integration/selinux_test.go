@@ -7,7 +7,7 @@ import (
  "strings"
  "testing"
 
- "github.com/yourorg/comquad/tests/integration/helpers"
+ "comquad/tests/integration/helpers"
 )
 
 // composeWithBindMount returns a compose file with a bind-mounted host path,
@@ -43,19 +43,19 @@ services:
 `
 }
 
-// --- Quadlet file content tests (no SELinux required) ---
+// --- Quadlet file content tests ---
 // These verify the Cook stage injects ,z into the quadlet file itself,
-// which happens whenever SELinux is detected — regardless of enforcement.
+// which happens when SELinux is enabled (enforcing or permissive).
 
 func TestSELinux_QuadletFile_ZInjected_WhenSELinuxPresent(t *testing.T) {
- helpers.SkipIfSELinuxAbsent(t)
+	helpers.SkipIfSELinuxNotEnabled(t)
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
  // Use dry-run so we can inspect the quadlet file content without deploying
- result := helpers.MustSucceed(t, dir, "up", "--dry-run")
+ result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
  // All three bind mount variants must have ,z appended
  for _, expected := range []string{
@@ -70,15 +70,19 @@ func TestSELinux_QuadletFile_ZInjected_WhenSELinuxPresent(t *testing.T) {
 }
 
 func TestSELinux_QuadletFile_ZNotInjected_WhenSELinuxAbsent(t *testing.T) {
- if helpers.SELinuxPresent(t) {
-  t.Skip("SELinux is present on this system — skipping absence test")
- }
+	if helpers.SELinuxEnabled(t) {
+		t.Skip("SELinux is enabled on this system — skipping absence test")
+	}
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
- result := helpers.MustSucceed(t, dir, "up", "--dry-run")
+ t.Cleanup(func() {
+  helpers.Comquad(t, dir, "down", "--name", project)
+ })
+
+ result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
  // Without SELinux, no ,z should be injected
  for _, unexpected := range []string{":z", ":ro,z", ":rw,z"} {
@@ -94,9 +98,9 @@ func TestSELinux_QuadletFile_ZIdempotent(t *testing.T) {
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithZAlreadyPresent(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithZAlreadyPresent(project, hostPath))
 
- result := helpers.MustSucceed(t, dir, "up", "--dry-run")
+ result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
  // :z already present — must not become :z,z or :Z,z
  for _, bad := range []string{":z,z", ":Z,z", ":z,Z"} {
@@ -117,13 +121,13 @@ func TestSELinux_QuadletFile_ZIdempotent(t *testing.T) {
 }
 
 func TestSELinux_QuadletFile_NamedVolume_NoZInjection(t *testing.T) {
- helpers.SkipIfSELinuxAbsent(t)
+	helpers.SkipIfSELinuxNotEnabled(t)
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
- result := helpers.MustSucceed(t, dir, "up", "--dry-run")
+ result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
  // Named volumes (appdata:/named) must NOT get :z — only bind mounts do
  // The named volume line in the quadlet will reference the volume unit,
@@ -145,13 +149,13 @@ func TestSELinux_Runtime_MountHasZLabel(t *testing.T) {
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  containerName := fmt.Sprintf("%s-app", project)
  unitName := fmt.Sprintf("cq-%s-app.service", project)
@@ -166,13 +170,13 @@ func TestSELinux_Runtime_ReadOnlyMountHasZLabel(t *testing.T) {
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  containerName := fmt.Sprintf("%s-app", project)
  unitName := fmt.Sprintf("cq-%s-app.service", project)
@@ -190,13 +194,13 @@ func TestSELinux_Runtime_NoZLabel_WhenSELinuxAbsent(t *testing.T) {
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
  t.Cleanup(func() {
-  helpers.Comquad(t, dir, "down", "--project", project)
+  helpers.Comquad(t, dir, "down", "--name", project)
  })
 
- helpers.MustSucceed(t, dir, "up", "-d")
+ helpers.MustSucceed(t, dir, "up", "--name", project)
 
  containerName := fmt.Sprintf("%s-app", project)
  unitName := fmt.Sprintf("cq-%s-app.service", project)
@@ -212,13 +216,13 @@ func TestSELinux_Runtime_NoZLabel_WhenSELinuxAbsent(t *testing.T) {
 // Verify the Cook stage logs the SELinux injection when -v is passed.
 
 func TestSELinux_VerboseOutput_LogsInjection(t *testing.T) {
- helpers.SkipIfSELinuxAbsent(t)
+	helpers.SkipIfSELinuxNotEnabled(t)
 
  project := helpers.ProjectName(t)
  hostPath := t.TempDir()
- dir := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+ dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
- result := helpers.MustSucceed(t, dir, "up", "--dry-run", "-v")
+ result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run", "-v")
 
  // The Cook stage must log the SELinux z injection per the architecture
  if !strings.Contains(result.Stdout, ":z") {

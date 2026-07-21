@@ -14,6 +14,10 @@ This document outlines the planned evolution of Comquad. Because I believe in th
 - [ ] **Bypass Engine Layer:** Implement in-memory state tracking to safely strip, hold, and inject configuration blocks that upstream tools don't natively map yet.
 - [ ] **Native Secrets Management:** Intercept Compose `secrets:` and inject them cleanly as Podman `Secret=` systemd keys.
 
+## 🌎 Super long in future (possibly never)
+- **Have a swarm compatability** Implement support for Docker Swarm compose syntex, utilizing `Eclipse BlueChi`.
+
+
 ## Regarding current Build Stage
 
 ### Current Implementation (The Temporary Bridge)

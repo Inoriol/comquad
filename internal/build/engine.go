@@ -23,7 +23,6 @@ const (
 
 // Engine handles image building and pulling
 type Engine struct {
-	ForceBuild   bool
 	PullStrategy PullStrategy
 }
 
@@ -112,12 +111,6 @@ func (e *Engine) HandleImage(service, image string) error {
 	}
 }
 
-// HandleBuild handles build service image building
-func (e *Engine) HandleBuild(service string, buildInfo interface{}, tag string) error {
-	// buildInfo should be *BuildInfo from preprocess package
-	// We'll handle this via the orchestrator which has access to both packages
-	return nil
-}
 
 // GetBuildArgs returns podman build-arg flags from a map
 func GetBuildArgs(args map[string]string) []string {

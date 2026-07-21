@@ -121,14 +121,9 @@ func flushEntries(entries []journalEntry, showTime bool) {
 
 // Logs prints logs for a deployed project's services via journalctl.
 func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, showTime bool) error {
-	stateMgr, err := o.newState()
+	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
-		return fmt.Errorf("failed to initialize state manager: %w", err)
-	}
-
-	state, exists := stateMgr.GetProject(o.projectName)
-	if !exists {
-		return fmt.Errorf("project %s is not deployed", o.projectName)
+		return err
 	}
 
 	var unitNames []string
@@ -370,14 +365,9 @@ func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) err
 // FollowLogs streams all journalctl logs for every unit in the project
 // from the given timestamp onward.
 func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
-	stateMgr, err := o.newState()
+	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
-		return fmt.Errorf("failed to initialize state manager: %w", err)
-	}
-
-	state, exists := stateMgr.GetProject(o.projectName)
-	if !exists {
-		return fmt.Errorf("project %s is not deployed", o.projectName)
+		return err
 	}
 
 	var unitNames []string

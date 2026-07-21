@@ -12,21 +12,16 @@ import (
 // If services is empty, all container units are returned.
 // If services is non-empty, only matching container units are returned.
 func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
-	stateMgr, err := o.newState()
+	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize state manager: %w", err)
-	}
-
-	state, exists := stateMgr.GetProject(o.projectName)
-	if !exists {
-		return nil, fmt.Errorf("project %s is not deployed", o.projectName)
+		return nil, err
 	}
 
 	if len(services) == 0 {
 		var units []string
 		for _, f := range state.Files {
 			if strings.HasSuffix(f, ".container") {
-				units = append(units, containerFileToUnitName(f))
+				units = append(units, ContainerFileToUnitName(f))
 			}
 		}
 		return units, nil
@@ -40,7 +35,7 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 			return nil, fmt.Errorf("no units found matching service '%s' for project '%s'", svc, o.projectName)
 		}
 		for _, f := range matches {
-			unitName := containerFileToUnitName(f)
+			unitName := ContainerFileToUnitName(f)
 			if _, exists := seen[unitName]; !exists {
 				seen[unitName] = struct{}{}
 				units = append(units, unitName)

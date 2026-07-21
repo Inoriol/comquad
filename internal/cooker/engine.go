@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"comquad/internal/logger"
@@ -146,7 +147,16 @@ func (c *Cooker) rewriteReferences(content string, renameMap map[string]string) 
 			continue
 		}
 
-		for oldName, newName := range renameMap {
+		// Sort keys longest-first to avoid partial prefix matches
+		sortedKeys := make([]string, 0, len(renameMap))
+		for k := range renameMap {
+			sortedKeys = append(sortedKeys, k)
+		}
+		sort.Slice(sortedKeys, func(i, j int) bool {
+			return len(sortedKeys[i]) > len(sortedKeys[j])
+		})
+		for _, oldName := range sortedKeys {
+			newName := renameMap[oldName]
 			oldRef := stripQuadletExtension(oldName)
 			newRef := stripQuadletExtension(newName)
 			if oldRef != newRef {
@@ -407,6 +417,9 @@ func (c *Cooker) offsetPorts() error {
 			// Internal conflict — resolve by incrementing
 			for {
 				finalPort++
+				if finalPort > 65535 {
+					return fmt.Errorf("no available port above %d (all ports in range are claimed)", p.hostPort)
+				}
 				if _, exists := claimedPorts[finalPort]; !exists {
 					break
 				}
@@ -612,16 +625,25 @@ func (c *Cooker) addSELinuxLabels(content string) string {
 func (c *Cooker) addSELinuxToVolume(value string) string {
 	parts := strings.SplitN(value, ":", 3)
 
+	// No colon at all (e.g., "appvol") — add :z
+	if len(parts) == 1 {
+		return value + ":z"
+	}
+
 	// No options present — add :z
 	if len(parts) == 2 {
 		return value + ":z"
 	}
 
-	// Options present — check if already has z or Z
+	// Options present — check if already has z or Z as a comma-delimited token
 	if len(parts) == 3 {
-		if !strings.Contains(parts[2], "z") && !strings.Contains(parts[2], "Z") {
-			return parts[0] + ":" + parts[1] + ":" + parts[2] + ",z"
+		options := strings.Split(parts[2], ",")
+		for _, opt := range options {
+			if opt == "z" || opt == "Z" {
+				return value
+			}
 		}
+		return parts[0] + ":" + parts[1] + ":" + parts[2] + ",z"
 	}
 
 	return value

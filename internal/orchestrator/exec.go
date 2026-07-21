@@ -14,14 +14,9 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 		return fmt.Errorf("exec requires a command to run")
 	}
 
-	stateMgr, err := o.newState()
+	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
-		return fmt.Errorf("failed to initialize state manager: %w", err)
-	}
-
-	state, exists := stateMgr.GetProject(o.projectName)
-	if !exists {
-		return fmt.Errorf("project %s is not deployed", o.projectName)
+		return err
 	}
 
 	// Resolve service to container quadlet files
