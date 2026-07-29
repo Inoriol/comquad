@@ -11,7 +11,8 @@ import (
 )
 
 func TestExec_RunsCommandInContainer(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -37,7 +38,8 @@ func TestExec_RunsCommandInContainer(t *testing.T) {
 }
 
 func TestExec_WithUser(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -64,7 +66,8 @@ func TestExec_WithUser(t *testing.T) {
 }
 
 func TestExec_NonexistentService_Errors(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -82,7 +85,8 @@ func TestExec_NonexistentService_Errors(t *testing.T) {
 }
 
 func TestExec_RequiresRunningContainer(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {

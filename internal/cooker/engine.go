@@ -607,6 +607,7 @@ func (c *Cooker) addSELinuxLabels(content string) string {
 		return content
 	}
 
+	changed := false
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -614,7 +615,15 @@ func (c *Cooker) addSELinuxLabels(content string) string {
 			continue
 		}
 		value := strings.TrimPrefix(trimmed, "Volume=")
-		lines[i] = "Volume=" + c.addSELinuxToVolume(value)
+		newValue := c.addSELinuxToVolume(value)
+		if newValue != value {
+			lines[i] = "Volume=" + newValue
+			changed = true
+		}
+	}
+
+	if changed {
+		logger.Info(fmt.Sprintf("Added SELinux :z labels to Volume= directives"))
 	}
 
 	return strings.Join(lines, "\n")

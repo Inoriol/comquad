@@ -12,7 +12,8 @@ import (
 )
 
 func TestLogs_RunningUnit(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -36,6 +37,7 @@ func TestLogs_RunningUnit(t *testing.T) {
 }
 
 func TestLogs_TailFlag(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
@@ -58,6 +60,7 @@ func TestLogs_TailFlag(t *testing.T) {
 }
 
 func TestLogs_StoppedUnit(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
@@ -81,6 +84,7 @@ func TestLogs_StoppedUnit(t *testing.T) {
 }
 
 func TestLogs_SpecificService(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
@@ -102,6 +106,7 @@ func TestLogs_SpecificService(t *testing.T) {
 }
 
 func TestLogs_MultiService_LinesPrefixed(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
@@ -134,6 +139,7 @@ func TestLogs_MultiService_LinesPrefixed(t *testing.T) {
 }
 
 func TestLogs_NoEmptyLines(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 

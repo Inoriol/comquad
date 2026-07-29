@@ -11,7 +11,8 @@ import (
 )
 
 func TestView_ProjectSummary(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -38,7 +39,8 @@ func TestView_ProjectSummary(t *testing.T) {
 }
 
 func TestView_ProjectStatus_Degraded(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
  t.Cleanup(func() {
@@ -64,7 +66,8 @@ func TestView_ProjectStatus_Degraded(t *testing.T) {
 }
 
 func TestView_ProjectStatus_Down(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -88,7 +91,8 @@ func TestView_ProjectStatus_Down(t *testing.T) {
 // described in the architecture: short name, full name without extension,
 // with .service suffix, with .container suffix, and internal podman name.
 func TestView_UnitFile_MatchingPatterns(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -125,7 +129,8 @@ func TestView_RequiresExistingProject(t *testing.T) {
 }
 
 func TestEdit_NoReload_OpensWithoutRestart(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {

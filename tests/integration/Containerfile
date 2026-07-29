@@ -8,6 +8,7 @@ RUN dnf install -y \
     podlet \
     sudo \
     shadow-utils \
+    util-linux \
     passwd \
     dbus-daemon \
     slirp4netns \
@@ -24,7 +25,13 @@ RUN useradd -m -s /bin/bash testuser \
 # Enable linger so the user systemd instance starts at boot
 RUN loginctl enable-linger testuser || true
 
-# Systemd as PID 1
+# Helper script: starts systemd, builds comquad, runs tests.
+# Usage:
+#   podman run ... comquad-test:latest /entrypoint.sh            # root tests
+#   podman run -e CQ_ROOTLESS=1 ... comquad-test:latest /entrypoint.sh  # rootless
+COPY tests/integration/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 STOPSIGNAL SIGRTMIN+3
 VOLUME ["/sys/fs/cgroup"]
 CMD ["/sbin/init"]

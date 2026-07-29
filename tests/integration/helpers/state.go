@@ -21,6 +21,7 @@ type ProjectState struct {
 }
 
 // ReadStateFile parses projects.json and returns all project entries.
+// Returns an empty map if the state file does not exist yet (e.g. before first deploy).
 func ReadStateFile(t *testing.T) map[string]ProjectState {
     t.Helper()
 
@@ -36,6 +37,9 @@ func ReadStateFile(t *testing.T) map[string]ProjectState {
     path := filepath.Join(stateDir, "comquad", "projects.json")
     data, err := os.ReadFile(path)
     if err != nil {
+        if os.IsNotExist(err) {
+            return make(map[string]ProjectState)
+        }
         t.Fatalf("failed to read state file at %s: %v", path, err)
     }
 

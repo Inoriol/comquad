@@ -25,11 +25,11 @@ func TestDryRun_NoFilesWritten(t *testing.T) {
   t.Fatalf("dry-run output missing project prefix, got:\n%s", result.Stdout)
  }
 
- // No unit files should exist in systemd target dir
- unitName := fmt.Sprintf("cq-%s-web.container", project)
- if helpers.UnitExists(t, unitName, false) {
-  t.Fatal("dry-run must not create systemd unit files")
- }
+	// No quadlet files should exist in systemd target dir
+	fileName := fmt.Sprintf("cq-%s-web.container", project)
+	if helpers.QuadletFileExists(t, fileName) {
+		t.Fatal("dry-run must not create systemd unit files")
+	}
 
  // No state entry should be registered
  projects := helpers.ReadStateFile(t)
@@ -78,13 +78,13 @@ func TestDryRun_MultiService_NoSideEffects(t *testing.T) {
 
  helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
- // Neither service unit should exist
- for _, svc := range []string{"web", "api"} {
-  unit := fmt.Sprintf("cq-%s-%s.container", project, svc)
-  if helpers.UnitExists(t, unit, false) {
-   t.Fatalf("dry-run must not create unit file for service %q", svc)
-  }
- }
+	// Neither service unit file should exist on disk
+	for _, svc := range []string{"web", "api"} {
+		fileName := fmt.Sprintf("cq-%s-%s.container", project, svc)
+		if helpers.QuadletFileExists(t, fileName) {
+			t.Fatalf("dry-run must not create unit file for service %q", svc)
+		}
+	}
 
  // State must be clean
  projects := helpers.ReadStateFile(t)

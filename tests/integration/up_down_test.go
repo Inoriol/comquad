@@ -12,6 +12,7 @@ import (
 )
 
 func TestUpDown_SimpleService(t *testing.T) {
+    helpers.SkipIfSystemdUnavailable(t)
     project := helpers.ProjectName(t)
     dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
@@ -32,8 +33,8 @@ func TestUpDown_SimpleService(t *testing.T) {
         t.Fatal("expected state.Files to be non-empty after up")
     }
 
-    // --- DOWN ---
-    helpers.MustSucceed(t, dir, "down")
+	// --- DOWN ---
+	helpers.MustSucceed(t, dir, "down", "--name", project)
 
     helpers.AssertUnitInactive(t, unitName, false)
     helpers.AssertContainerGone(t, fmt.Sprintf("%s-web", project))
@@ -44,6 +45,7 @@ func TestUpDown_SimpleService(t *testing.T) {
 }
 
 func TestUpDown_MultiService(t *testing.T) {
+    helpers.SkipIfSystemdUnavailable(t)
     project := helpers.ProjectName(t)
     dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
@@ -59,15 +61,16 @@ func TestUpDown_MultiService(t *testing.T) {
         helpers.AssertContainerRunning(t, fmt.Sprintf("%s-%s", project, svc))
     }
 
-    helpers.MustSucceed(t, dir, "down")
+	helpers.MustSucceed(t, dir, "down", "--name", project)
 
-    for _, svc := range []string{"web", "api"} {
+	for _, svc := range []string{"web", "api"} {
         unit := fmt.Sprintf("cq-%s-%s.service", project, svc)
         helpers.AssertUnitInactive(t, unit, false)
     }
 }
 
 func TestDown_WithVolumes(t *testing.T) {
+    helpers.SkipIfSystemdUnavailable(t)
     project := helpers.ProjectName(t)
     dir, _ := helpers.WriteCompose(t, helpers.WithVolumeCompose(project))
 
@@ -82,21 +85,22 @@ func TestDown_WithVolumes(t *testing.T) {
         t.Fatalf("expected volume %q to exist after up", volumeName)
     }
 
-    // down WITHOUT -d should leave volume intact
-    helpers.MustSucceed(t, dir, "down")
-    if !helpers.VolumeExists(t, volumeName) {
-        t.Fatal("volume should survive down without -d flag")
-    }
+	// down WITHOUT -d should leave volume intact
+	helpers.MustSucceed(t, dir, "down", "--name", project)
+	if !helpers.VolumeExists(t, volumeName) {
+		t.Fatal("volume should survive down without -d flag")
+	}
 
-    // now bring up again and down WITH -d
-    helpers.MustSucceed(t, dir, "up")
-    helpers.MustSucceed(t, dir, "down")
-    if helpers.VolumeExists(t, volumeName) {
-        t.Fatal("volume should be removed after down -d")
-    }
+	// now bring up again and down WITH -d
+	helpers.MustSucceed(t, dir, "up", "--name", project)
+	helpers.MustSucceed(t, dir, "down", "--name", project, "-d")
+	if helpers.VolumeExists(t, volumeName) {
+		t.Fatal("volume should be removed after down -d")
+	}
 }
 
 func TestUp_Idempotent(t *testing.T) {
+    helpers.SkipIfSystemdUnavailable(t)
     project := helpers.ProjectName(t)
     dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
@@ -141,14 +145,15 @@ func TestUp_DryRun_NoSideEffects(t *testing.T) {
         t.Fatal("dry-run must not register project in state file")
     }
 
-    // No unit files should exist
-    unitName := fmt.Sprintf("cq-%s-web.container", project)
-    if helpers.UnitExists(t, unitName, false) {
-        t.Fatal("dry-run must not create systemd unit files")
-    }
+	// No unit files should exist on disk
+	fileName := fmt.Sprintf("cq-%s-web.container", project)
+	if helpers.QuadletFileExists(t, fileName) {
+		t.Fatal("dry-run must not create systemd unit files")
+	}
 }
 
 func TestLifecycle_StartStopRestart(t *testing.T) {
+    helpers.SkipIfSystemdUnavailable(t)
     project := helpers.ProjectName(t)
     dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 

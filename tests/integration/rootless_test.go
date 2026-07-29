@@ -30,9 +30,10 @@ func skipIfNotRoot(t *testing.T) {
 }
 
 func TestRootless_TargetDirectory(t *testing.T) {
- skipIfRoot(t)
+	skipIfRoot(t)
+	helpers.SkipIfSystemdUnavailable(t)
 
- project := helpers.ProjectName(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -111,9 +112,10 @@ services:
 }
 
 func TestRootless_SystemdUserInstance(t *testing.T) {
- skipIfRoot(t)
+	skipIfRoot(t)
+	helpers.SkipIfSystemdUnavailable(t)
 
- project := helpers.ProjectName(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -135,9 +137,10 @@ func TestRootless_SystemdUserInstance(t *testing.T) {
 }
 
 func TestRoot_TargetDirectory(t *testing.T) {
- skipIfNotRoot(t)
+	skipIfNotRoot(t)
+	helpers.SkipIfSystemdUnavailable(t)
 
- project := helpers.ProjectName(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {

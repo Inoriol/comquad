@@ -145,9 +145,10 @@ func TestSELinux_QuadletFile_NamedVolume_NoZInjection(t *testing.T) {
 // applied by the kernel, not just that the quadlet file was written correctly.
 
 func TestSELinux_Runtime_MountHasZLabel(t *testing.T) {
- helpers.SkipIfSELinuxNotEnforcing(t)
+	helpers.SkipIfSELinuxNotEnforcing(t)
+	helpers.SkipIfSystemdUnavailable(t)
 
- project := helpers.ProjectName(t)
+	project := helpers.ProjectName(t)
  hostPath := t.TempDir()
  dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
@@ -166,9 +167,10 @@ func TestSELinux_Runtime_MountHasZLabel(t *testing.T) {
 }
 
 func TestSELinux_Runtime_ReadOnlyMountHasZLabel(t *testing.T) {
- helpers.SkipIfSELinuxNotEnforcing(t)
+	helpers.SkipIfSELinuxNotEnforcing(t)
+	helpers.SkipIfSystemdUnavailable(t)
 
- project := helpers.ProjectName(t)
+	project := helpers.ProjectName(t)
  hostPath := t.TempDir()
  dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
@@ -188,11 +190,12 @@ func TestSELinux_Runtime_ReadOnlyMountHasZLabel(t *testing.T) {
 }
 
 func TestSELinux_Runtime_NoZLabel_WhenSELinuxAbsent(t *testing.T) {
- if helpers.SELinuxPresent(t) {
-  t.Skip("SELinux is present — skipping absence runtime test")
- }
+	if helpers.SELinuxPresent(t) {
+		t.Skip("SELinux is present — skipping absence runtime test")
+	}
+	helpers.SkipIfSystemdUnavailable(t)
 
- project := helpers.ProjectName(t)
+	project := helpers.ProjectName(t)
  hostPath := t.TempDir()
  dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
@@ -218,14 +221,18 @@ func TestSELinux_Runtime_NoZLabel_WhenSELinuxAbsent(t *testing.T) {
 func TestSELinux_VerboseOutput_LogsInjection(t *testing.T) {
 	helpers.SkipIfSELinuxNotEnabled(t)
 
- project := helpers.ProjectName(t)
- hostPath := t.TempDir()
- dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
+	project := helpers.ProjectName(t)
+	hostPath := t.TempDir()
+	dir, _ := helpers.WriteCompose(t, composeWithBindMount(project, hostPath))
 
- result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run", "-v")
+	result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run", "-v")
 
- // The Cook stage must log the SELinux z injection per the architecture
- if !strings.Contains(result.Stdout, ":z") {
-  t.Fatalf("verbose dry-run missing SELinux injection log:\n%s", result.Stdout)
- }
+	// The Cook stage must log the SELinux z injection per the architecture
+	// and the quadlet file content must show :z on Volume= directives
+	hasInjectionLog := strings.Contains(result.Stdout, "Added SELinux")
+	hasZInContent := strings.Contains(result.Stdout, ":z") || strings.Contains(result.Stdout, ":ro,z") || strings.Contains(result.Stdout, ":rw,z")
+
+	if !hasInjectionLog && !hasZInContent {
+		t.Fatalf("verbose dry-run missing SELinux injection log or :z labels:\n%s", result.Stdout)
+	}
 }

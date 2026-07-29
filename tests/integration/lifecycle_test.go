@@ -11,7 +11,8 @@ import (
 )
 
 func TestLifecycle_StopStart(t *testing.T) {
- project := helpers.ProjectName(t)
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
  t.Cleanup(func() {
@@ -41,6 +42,7 @@ func TestLifecycle_StopStart(t *testing.T) {
 }
 
 func TestLifecycle_Restart(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.SimpleCompose(project))
 
@@ -61,6 +63,7 @@ func TestLifecycle_Restart(t *testing.T) {
 }
 
 func TestLifecycle_StopSpecificService(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
@@ -85,6 +88,7 @@ func TestLifecycle_StopSpecificService(t *testing.T) {
 }
 
 func TestLifecycle_StartSpecificService(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 
@@ -113,6 +117,7 @@ func TestLifecycle_StartSpecificService(t *testing.T) {
 }
 
 func TestLifecycle_RestartSpecificService(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
  project := helpers.ProjectName(t)
  dir, _ := helpers.WriteCompose(t, helpers.MultiServiceCompose(project))
 

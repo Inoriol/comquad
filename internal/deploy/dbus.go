@@ -27,8 +27,6 @@ func NewSystemdManager() (*SystemdManager, error) {
 	var conn *dbus.Conn
 	var err error
 
-	// Use Background context — connection is long-lived,
-	// timeout contexts are only for individual operations
 	if IsRootless() {
 		conn, err = dbus.NewUserConnectionContext(context.Background())
 	} else {
