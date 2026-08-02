@@ -38,7 +38,7 @@ func TestUp_NoComposeFileReturnsError(t *testing.T) {
 
 func TestUp_InvalidYamlReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "compose.yaml"), ":::invalid yaml:::")
+	writeFile(t, filepath.Join(dir, "compose.yaml"), "{invalid")
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
@@ -54,12 +54,8 @@ func TestUp_StateRegistrationError(t *testing.T) {
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
 
-	// We can't run podlet in unit tests, so instead we verify that a state
-	// registration error (injected via saveErr on the mock) causes Up to fail
-	// with a descriptive error. We need podlet in PATH for the transpile step,
-	// so skip if it's not available.
-	if _, err := os.LookupEnv("SKIP_PODLET_TESTS"); err {
-		t.Skip("skipping test that requires podlet")
+	if _, ok := os.LookupEnv("SKIP_PODLET_TESTS"); ok {
+		t.Skip("skipping test that interacts with podlet")
 	}
 
 	// Use the helper that injects a state error
@@ -76,6 +72,10 @@ func TestUp_StateRegistrationError(t *testing.T) {
 }
 
 func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
+	if _, ok := os.LookupEnv("SKIP_PODLET_TESTS"); ok {
+		t.Skip("skipping test that interacts with podlet")
+	}
+
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
 

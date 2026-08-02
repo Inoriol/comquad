@@ -92,7 +92,7 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 			"driver": "bridge",
 		}
 		defaultNetworkInjected = true
-		logger.Info("Created default network: cq-default")
+		logger.Action("Created default network: cq-default")
 	}
 
 	// Ensure all services are attached to at least one network.

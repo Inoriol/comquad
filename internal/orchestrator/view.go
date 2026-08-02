@@ -101,7 +101,7 @@ func (o *Orchestrator) viewUnit(state deploy.ProjectState, arg string) error {
 }
 
 func (o *Orchestrator) matchContainer(state deploy.ProjectState, arg string) string {
-	return MatchContainer(o.projectName, state, arg)
+	return MatchFirstContainer(o.projectName, state, arg)
 }
 
 func (o *Orchestrator) matchNetworkOrVolume(state deploy.ProjectState, arg string) string {

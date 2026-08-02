@@ -3,18 +3,14 @@ package preprocess
 import (
 	"os"
 	"strings"
+	"sync"
 )
 
-// selinuxEnabled is a package-level variable that controls SELinux detection.
-// It defaults to nil (use filesystem detection) and can be overridden in tests.
+var selinuxMu sync.Mutex
 var selinuxEnabled *bool
-
-// selinuxMode is a package-level variable that stores the detected SELinux mode.
-// It defaults to "" (use filesystem detection) and can be overridden in tests.
 var selinuxMode string
 
 // checkSELinux checks whether SELinux is enabled and returns its mode.
-// It checks for the existence of /sys/fs/selinux and reads the enforcement mode.
 func checkSELinux() (enabled bool, mode string) {
 	if _, err := os.Stat("/sys/fs/selinux"); os.IsNotExist(err) {
 		return false, "Disabled"
@@ -36,8 +32,9 @@ func checkSELinux() (enabled bool, mode string) {
 }
 
 // IsSELinuxEnabled returns true if SELinux is detected as enabled on the host.
-// It caches the result so subsequent calls avoid repeated filesystem access.
 func IsSELinuxEnabled() bool {
+	selinuxMu.Lock()
+	defer selinuxMu.Unlock()
 	if selinuxEnabled != nil {
 		return *selinuxEnabled
 	}
@@ -50,6 +47,8 @@ func IsSELinuxEnabled() bool {
 // SELinuxMode returns the detected SELinux mode string.
 // Possible values: "Enforcing", "Permissive", "Disabled", "Unknown".
 func SELinuxMode() string {
+	selinuxMu.Lock()
+	defer selinuxMu.Unlock()
 	if selinuxMode != "" {
 		return selinuxMode
 	}
@@ -62,6 +61,8 @@ func SELinuxMode() string {
 // SetSELinuxOverrides overrides the SELinux detection result for testing.
 // Pass nil for enabled to restore filesystem-based detection.
 func SetSELinuxOverrides(enabled *bool, mode string) {
+	selinuxMu.Lock()
+	defer selinuxMu.Unlock()
 	selinuxEnabled = enabled
 	selinuxMode = mode
 }

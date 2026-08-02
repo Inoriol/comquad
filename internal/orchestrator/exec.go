@@ -22,7 +22,7 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 	// Resolve service to container quadlet files
 	var matches []string
 	if service != "" {
-		matches = MatchContainers(o.projectName, state, service)
+		matches = MatchAllContainers(o.projectName, state, service)
 		if len(matches) == 0 {
 			if MatchNetworkOrVolume(o.projectName, state, service) != "" {
 				return fmt.Errorf("cannot exec into network or volume '%s'", service)
@@ -71,6 +71,10 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 	cmd.Stderr = os.Stderr
 
 	fmt.Printf("Executing in container '%s': podman exec %s\n", containerName, strings.Join(cmdArgs[2:], " "))
+
+	if _, err := exec.LookPath("podman"); err != nil {
+		return fmt.Errorf("podman not found in PATH: %w", err)
+	}
 
 	return cmd.Run()
 }

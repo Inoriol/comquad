@@ -77,79 +77,79 @@ func TestFindComposeFile_ReturnsEmptyWhenNotFound(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// MatchContainer
+// MatchFirstContainer
 // ---------------------------------------------------------------------------
 
-func TestMatchContainer_ByExactBaseName(t *testing.T) {
+func TestMatchFirstContainer_ByExactBaseName(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "cq-myapp-web.container")
+	got := MatchFirstContainer("myapp", state, "cq-myapp-web.container")
 	if got != filepath.Join(dir, "cq-myapp-web.container") {
 		t.Errorf("unexpected match: %q", got)
 	}
 }
 
-func TestMatchContainer_ByNameWithoutExtension(t *testing.T) {
+func TestMatchFirstContainer_ByNameWithoutExtension(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "cq-myapp-web")
+	got := MatchFirstContainer("myapp", state, "cq-myapp-web")
 	if got == "" {
 		t.Error("expected match by name-without-extension")
 	}
 }
 
-func TestMatchContainer_ByServiceSuffix(t *testing.T) {
+func TestMatchFirstContainer_ByServiceSuffix(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "cq-myapp-web.service")
+	got := MatchFirstContainer("myapp", state, "cq-myapp-web.service")
 	if got == "" {
 		t.Error("expected match by .service suffix")
 	}
 }
 
-func TestMatchContainer_ByShortName(t *testing.T) {
+func TestMatchFirstContainer_ByShortName(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "web")
+	got := MatchFirstContainer("myapp", state, "web")
 	if got == "" {
 		t.Error("expected match by short name (strip cq-myapp- prefix)")
 	}
 }
 
-func TestMatchContainer_ByCqPrefix(t *testing.T) {
+func TestMatchFirstContainer_ByCqPrefix(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "myapp-web")
+	got := MatchFirstContainer("myapp", state, "myapp-web")
 	if got == "" {
 		t.Error("expected match by stripping cq- prefix")
 	}
 }
 
-func TestMatchContainer_NoMatch(t *testing.T) {
+func TestMatchFirstContainer_NoMatch(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "nonexistent")
+	got := MatchFirstContainer("myapp", state, "nonexistent")
 	if got != "" {
 		t.Errorf("expected no match, got %q", got)
 	}
 }
 
-func TestMatchContainer_SkipsNetworkFiles(t *testing.T) {
+func TestMatchFirstContainer_SkipsNetworkFiles(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-default.network")
-	got := MatchContainer("myapp", state, "cq-myapp-default.network")
+	got := MatchFirstContainer("myapp", state, "cq-myapp-default.network")
 	if got != "" {
 		t.Errorf("MatchContainer should not match .network files, got %q", got)
 	}
 }
 
-func TestMatchContainer_ByContainerName(t *testing.T) {
+func TestMatchFirstContainer_ByContainerName(t *testing.T) {
 	dir := t.TempDir()
 	containerFile := filepath.Join(dir, "cq-myapp-web.container")
 	writeFile(t, containerFile, "[Container]\nImage=nginx\nContainerName=myapp-web-custom\n")
 
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "myapp-web-custom")
+	got := MatchFirstContainer("myapp", state, "myapp-web-custom")
 	if got == "" {
 		t.Error("expected match by ContainerName= directive")
 	}
@@ -158,13 +158,13 @@ func TestMatchContainer_ByContainerName(t *testing.T) {
 	}
 }
 
-func TestMatchContainer_ByContainerNameNoMatch(t *testing.T) {
+func TestMatchFirstContainer_ByContainerNameNoMatch(t *testing.T) {
 	dir := t.TempDir()
 	containerFile := filepath.Join(dir, "cq-myapp-web.container")
 	writeFile(t, containerFile, "[Container]\nImage=nginx\nContainerName=myapp-web-custom\n")
 
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainer("myapp", state, "nonexistent")
+	got := MatchFirstContainer("myapp", state, "nonexistent")
 	if got != "" {
 		t.Errorf("expected no match, got %q", got)
 	}
@@ -200,42 +200,42 @@ func TestReadContainerName_MissingFile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// MatchContainers
+// MatchFirstContainers
 // ---------------------------------------------------------------------------
 
-func TestMatchContainers_ReturnsAllMatches(t *testing.T) {
+func TestMatchAllContainers_ReturnsAllMatches(t *testing.T) {
 	dir := t.TempDir()
 	// Two services both named "web" from different pattern perspectives — not
 	// realistic but tests the "return all" behaviour.
 	state := stateWithFiles(dir, "cq-myapp-web.container", "cq-myapp-db.container")
 
-	got := MatchContainers("myapp", state, "web")
+	got := MatchAllContainers("myapp", state, "web")
 	if len(got) != 1 {
 		t.Errorf("expected 1 match for 'web', got %d: %v", len(got), got)
 	}
 
-	got = MatchContainers("myapp", state, "db")
+	got = MatchAllContainers("myapp", state, "db")
 	if len(got) != 1 {
 		t.Errorf("expected 1 match for 'db', got %d: %v", len(got), got)
 	}
 }
 
-func TestMatchContainers_EmptyOnNoMatch(t *testing.T) {
+func TestMatchAllContainers_EmptyOnNoMatch(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchContainers("myapp", state, "missing")
+	got := MatchAllContainers("myapp", state, "missing")
 	if len(got) != 0 {
 		t.Errorf("expected no matches, got %v", got)
 	}
 }
 
-func TestMatchContainers_ConsistentWithMatchContainer(t *testing.T) {
+func TestMatchAllContainers_ConsistentWithMatchFirstContainer(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container", "cq-myapp-db.container")
 
 	for _, arg := range []string{"web", "db", "cq-myapp-web", "cq-myapp-web.container"} {
-		single := MatchContainer("myapp", state, arg)
-		multi := MatchContainers("myapp", state, arg)
+		single := MatchFirstContainer("myapp", state, arg)
+		multi := MatchAllContainers("myapp", state, arg)
 
 		if single == "" && len(multi) > 0 {
 			t.Errorf("arg=%q: MatchContainer found nothing but MatchContainers found %v", arg, multi)

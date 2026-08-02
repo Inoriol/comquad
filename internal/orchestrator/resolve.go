@@ -56,8 +56,8 @@ func matchAllContainers(projectName string, state deploy.ProjectState, arg strin
 	return matches
 }
 
-// MatchContainer finds the first container quadlet file matching the given arg.
-func MatchContainer(projectName string, state deploy.ProjectState, arg string) string {
+// MatchFirstContainer finds the first container quadlet file matching the given arg.
+func MatchFirstContainer(projectName string, state deploy.ProjectState, arg string) string {
 	matches := matchAllContainers(projectName, state, arg)
 	if len(matches) == 0 {
 		return ""
@@ -65,8 +65,8 @@ func MatchContainer(projectName string, state deploy.ProjectState, arg string) s
 	return matches[0]
 }
 
-// MatchContainers finds all container quadlet files matching the given arg.
-func MatchContainers(projectName string, state deploy.ProjectState, arg string) []string {
+// MatchAllContainers finds all container quadlet files matching the given arg.
+func MatchAllContainers(projectName string, state deploy.ProjectState, arg string) []string {
 	return matchAllContainers(projectName, state, arg)
 }
 

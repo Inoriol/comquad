@@ -110,7 +110,7 @@ func (c *Cooker) Cook() error {
 		if err := c.offsetPorts(); err != nil {
 			return fmt.Errorf("failed to offset ports: %w", err)
 		}
-		logger.Info(fmt.Sprintf("Applied port offset %d for rootless mode", c.PortOffset))
+		logger.Action(fmt.Sprintf("Applied port offset %d for rootless mode", c.PortOffset))
 	}
 
 	return nil
@@ -304,21 +304,71 @@ func (c *Cooker) replaceUnitDirectives(line, directive, value, oldRef, newRef st
 
 // splitCombinedLabels splits combined Label= lines into separate Label= lines.
 // e.g. "Label=a=b c=d" → "Label=a=b\nLabel=c=d"
+// Handles quoted values: Label=author="John Doe" version=1.0
 func (c *Cooker) splitCombinedLabels(lines []string) []string {
 	var result []string
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "Label=") {
 			value := strings.TrimPrefix(trimmed, "Label=")
-			pairs := strings.Fields(value)
-			for _, pair := range pairs {
-				result = append(result, "Label="+pair)
+			pairs := labelFields(value)
+			if len(pairs) == 0 {
+				result = append(result, line)
+			} else {
+				for _, pair := range pairs {
+					result = append(result, "Label="+pair)
+				}
 			}
 		} else {
 			result = append(result, line)
 		}
 	}
 	return result
+}
+
+// labelFields splits a space-separated key=value string into individual tokens,
+// respecting single and double-quoted values.
+// e.g. `author="John Doe" version=1.0` → ["author=\"John Doe\"", "version=1.0"]
+func labelFields(s string) []string {
+	var fields []string
+	s = strings.TrimSpace(s)
+	i := 0
+	for i < len(s) {
+		for i < len(s) && s[i] == ' ' {
+			i++
+		}
+		if i >= len(s) {
+			break
+		}
+		start := i
+		for i < len(s) && s[i] != '=' {
+			i++
+		}
+		if i >= len(s) {
+			fields = append(fields, s[start:])
+			break
+		}
+		i++ // skip '='
+		if i < len(s) && (s[i] == '"' || s[i] == '\'') {
+			quote := s[i]
+			i++ // skip opening quote
+			for i < len(s) && s[i] != quote {
+				if s[i] == '\\' && i+1 < len(s) {
+					i++ // skip escaped char
+				}
+				i++
+			}
+			if i < len(s) {
+				i++ // skip closing quote
+			}
+		} else {
+			for i < len(s) && s[i] != ' ' {
+				i++
+			}
+		}
+		fields = append(fields, s[start:i])
+	}
+	return fields
 }
 
 // addSystemdOptimizations adds [Install] sections and AutoUpdate where appropriate.
@@ -360,7 +410,6 @@ func (c *Cooker) offsetPorts() error {
 		return fmt.Errorf("failed to read target directory: %w", err)
 	}
 
-	// Collect all host ports across all container files
 	type portEntry struct {
 		filename string
 		lineNum  int
@@ -368,8 +417,8 @@ func (c *Cooker) offsetPorts() error {
 	}
 
 	var allPorts []portEntry
-	// Tracks which host ports are claimed in this project (after offsetting)
-	claimedPorts := make(map[int]string) // port -> filename claiming it
+	fileLines := make(map[string][]string)
+	claimedPorts := make(map[int]string)
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".container") {
@@ -383,6 +432,7 @@ func (c *Cooker) offsetPorts() error {
 		}
 
 		lines := strings.Split(string(content), "\n")
+		fileLines[filename] = lines
 		for i, line := range lines {
 			trimmed := strings.TrimSpace(line)
 			if !strings.HasPrefix(trimmed, "PublishPort=") {
@@ -403,18 +453,14 @@ func (c *Cooker) offsetPorts() error {
 		}
 	}
 
-	// Process each port: offset privileged ones, resolve conflicts
 	for _, p := range allPorts {
 		finalPort := p.hostPort
 
-		// Only offset privileged ports (< 1024)
 		if p.hostPort < 1024 {
 			finalPort = p.hostPort + c.PortOffset
 		}
 
-		// Check for conflicts (internal to this project)
 		if _, ok := claimedPorts[finalPort]; ok {
-			// Internal conflict — resolve by incrementing
 			for {
 				finalPort++
 				if finalPort > 65535 {
@@ -426,25 +472,18 @@ func (c *Cooker) offsetPorts() error {
 			}
 		}
 
-		// Claim this port
 		claimedPorts[finalPort] = p.filename
 
-		// Update the PublishPort line if the port changed
 		if finalPort != p.hostPort {
-			content, err := os.ReadFile(filepath.Join(c.TargetDir, p.filename))
-			if err != nil {
-				return fmt.Errorf("failed to read %s: %w", p.filename, err)
-			}
-			lines := strings.Split(string(content), "\n")
+			lines := fileLines[p.filename]
 			portStr := strings.TrimPrefix(strings.TrimSpace(lines[p.lineNum]), "PublishPort=")
-			// Rebuild the port string with the new host port
 			newPortStr := c.rebuildPublishPort(portStr, finalPort)
 			lines[p.lineNum] = "PublishPort=" + newPortStr
 			dstPath := filepath.Join(c.TargetDir, p.filename)
 			if err := os.WriteFile(dstPath, []byte(strings.Join(lines, "\n")), 0644); err != nil {
 				return fmt.Errorf("failed to update port in %s: %w", p.filename, err)
 			}
-			logger.Info(fmt.Sprintf("Offset port in %s: %s → %s", p.filename, portStr, newPortStr))
+			logger.Action(fmt.Sprintf("Offset port in %s: %s → %s", p.filename, portStr, newPortStr))
 		}
 	}
 
@@ -567,10 +606,10 @@ func (c *Cooker) addProjectLabels(content string, fileName string) string {
 		if strings.HasPrefix(trimmed, "[") && i > sectionIdx {
 			break
 		}
-		if trimmed == "Label=com.comquad.project="+c.ProjectName {
+		if strings.HasPrefix(trimmed, "Label=com.comquad.project=") {
 			hasProjectLabel = true
 		}
-		if trimmed == "Label=com.comquad.managed=true" {
+		if strings.HasPrefix(trimmed, "Label=com.comquad.managed=") {
 			hasManagedLabel = true
 		}
 	}

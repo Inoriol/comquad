@@ -30,23 +30,28 @@ func (o *Orchestrator) Ps(all bool) error {
 	}
 	defer dbusMgr.Close()
 
-	units, err := dbusMgr.ListAllUnits()
-	if err != nil {
-		return fmt.Errorf("failed to list units: %w", err)
+	var unitNames []string
+	for _, c := range containers {
+		unitNames = append(unitNames, c.Name+".service")
 	}
 
-	// Build a map of unit states keyed by unit name (without .service suffix)
-	unitStateMap := make(map[string]dbus.UnitStatus)
-	for _, u := range units {
-		unitStateMap[u.Name] = u
-	}
+	if len(unitNames) > 0 {
+		units, err := dbusMgr.ListUnitsByNames(unitNames)
+		if err != nil {
+			return fmt.Errorf("failed to list units: %w", err)
+		}
 
-	// Merge D-Bus state into containers
-	for i := range containers {
-		unitName := containers[i].Name + ".service"
-		if u, ok := unitStateMap[unitName]; ok {
-			containers[i].DBusActive = u.ActiveState
-			containers[i].DBusSub = u.SubState
+		unitStateMap := make(map[string]dbus.UnitStatus)
+		for _, u := range units {
+			unitStateMap[u.Name] = u
+		}
+
+		for i := range containers {
+			unitName := containers[i].Name + ".service"
+			if u, ok := unitStateMap[unitName]; ok {
+				containers[i].DBusActive = u.ActiveState
+				containers[i].DBusSub = u.SubState
+			}
 		}
 	}
 
@@ -146,7 +151,7 @@ func formatCreated(createdAt, exitedAt time.Time, state string) string {
 func formatTimeAgo(t time.Time) string {
 	d := time.Since(t)
 	if d < 0 {
-		return "recently"
+		return t.Format("Jan 02 2006")
 	}
 	if d < time.Minute {
 		s := int(d.Seconds())
