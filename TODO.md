@@ -1,99 +1,149 @@
 ## 🗺️ Roadmap & Next Steps
 
-This file contains short term goals that can be achieved within short timeframe. For long term goals reffer to [Roadmap](./ROADMAP.md) guide.
+For long term goals refer to [Roadmap](./ROADMAP.md).
 
-### Uncategorized
+---
 
-* **Review of function names** The singular name is misleading: `MatchContainer` doesn't mean "match exactly one", it means "return one". A caller can't tell if other matches exist. Rename to `MatchFirstContainer` / `MatchAllContainers` or similar. (`internal/orchestrator/resolve.go`). Review all code functions name for clear distinguish
+## 🔴 Release Blockers (must fix before v0.1.0)
 
-* **Cleanup of "myapp" that pops up during test** - after go testing, container and network of "myapp" keep persisting in system
+These issues directly break core functionality or the release process:
 
-* **Better check** - let's make sure that podman 4.4 (version where quadlets appeared) required for running (comquad check)
+- [ ] **Bug: `handleImages` skips all tagged images, not just build-generated ones** — `orchestrator.go` checks `strings.Contains(image, ":")` which skips both build-tagged images AND user-specified tagged images (e.g. `postgres:15`, `nginx:alpine`). This means the most common compose image pattern never gets pulled or validated. The check should match only the build pattern (`<projectName>-<service>:latest`).
+- [ ] **Bug: `ImageExists` silently swallows all errors** — `build/engine.go` returns `false` for any `podman image inspect` error instead of only exit code 125. A broken podman install is indistinguishable from "image missing", causing silent build skips.
+- [ ] **Bug: `--verbose` flag only works with `up` command** — `SetVerbose` is only called from `upCmd`. Commands like `down`, `ps`, `start`, `restart`, `logs` cannot enable verbose output.
+- [ ] **Bug: `--quiet` flag is bypassed by direct `fmt.Println` usage** — `view`, `ps`, `list`, `regenerate`, and dry-run previews all use `fmt.Println` directly instead of the logger, so `--quiet` cannot suppress their output.
+- [ ] **`.goreleaser` has no extension** — goreleaser looks for `.goreleaser.yaml` or `.goreleaser.yml` by default. Rename to `.goreleaser.yml` or add `--config` flag to build scripts.
 
-* **Verbosity improvements** - some key stuff from verbosity needs to be done by default (like port remapping)
+---
 
-### Difficulty: Hard
+## 🐛 Bugs
 
-* **Lifecycle Integration Testing** *(Hard)* — End-to-end sandbox execution suite. Build a privileged OCI image containing podman, Go, podlet, and systemd. Run `comquad up` / `down` inside it via podman-in-podman. Validate that quadlet files are generated, units start, and state is correctly written and cleaned up. Requires significant CI infrastructure work.
+- [ ] **`MatchNetworkOrVolume` double-strips extensions** — `resolve.go:79-81` strips `.network` then strips `.volume` from the already-stripped string. Works by accident since only one extension is present, but is logically incorrect and fragile.
+- [ ] **`exec` podman PATH check is after building the command** — `exec.go` calls `exec.Command("podman", ...)` and logs before checking `LookPath("podman")`. User gets a confusing intermediate message if podman is missing.
+- [ ] **`StringMap` type mismatch for volume labels in `preprocess/engine.go`** — The map value type is `interface{}` but the case checks `StringMap` which never matches. Volume label injection falls through to the `default` case (works, but list-format label preservation logic is dead code).
+- [ ] **`logger.SetQuiet` does not suppress `fmt.Println` output** — See release blocker above. All direct `fmt.Println` calls should be routed through the logger.
 
-### Bugs & Robustness
+---
 
-* **`addSELinuxToVolume` missing single-part case** — ~~FIXED~~ When Volume= has only one part (e.g. `Volume=appvol` with no colon), `:z` was not appended. Now handles `len(parts) == 1`. Also replaced `strings.Contains` z/Z check with proper comma-delimited token matching to avoid false positives like `zoo`. (`internal/cooker/engine.go`)
+## 🛡️ Security
 
-* **`findComposeFile` doesn't verify regular file** — ~~FIXED~~ `os.Stat` returns nil for directories too. Added `info.Mode().IsRegular()` check. (`internal/orchestrator/orchestrator.go`)
+- [ ] **No project name sanitization** — Project names derived from directory names pass directly into file paths and systemd unit names. A directory named with special characters (`../../`, spaces) could cause issues.
+- [ ] **State file permissions** — `projects.json` at `~/.local/share/comquad/` is written with default permissions (0644). Should ensure restricted permissions on sensitive data.
+- [ ] **No validation of external podman JSON output** — `ps_podman.go` and `dbus.go` trust podman's JSON output with only basic type assertions. Malformed output could cause panics.
+- [ ] **User-controlled strings flow into `exec.Command`** — Project names, service names, and command arguments all flow into `exec.Command`. While Go's exec model prevents shell injection, arguments with special characters could behave unexpectedly.
 
-* **Port offsetting loop has no upper bound** — ~~FIXED~~ `offsetPorts()` now checks `finalPort > 65535` and returns an error if no available port found. (`internal/cooker/engine.go`)
+---
 
-* **`rewriteReferences` non-deterministic order** — ~~FIXED~~ Keys are now sorted longest-first before iterating to avoid partial prefix match issues. (`internal/cooker/engine.go`)
+## 🧩 Missing Features
 
-* **`handleImages` and `printDryRun` non-deterministic** — ~~FIXED~~ Both now sort service names before iterating `buildInfo`. (`internal/orchestrator/orchestrator.go`)
+- [ ] **No `--version` flag** on root command
+- [ ] **No shell completion generation** — Cobra supports `completion` subcommand for bash/zsh/fish but it's not wired up
+- [ ] **No standalone `comquad build` command** — only possible via `comquad up --build`
+- [ ] **No config file / global defaults** — no way to set project-level or user-level defaults
+- [ ] **No `comquad ls` alias for `comquad list`**
+- [ ] **No project-level health status summary** (beyond `view` table)
 
-* **SELinux detection data race** — `IsSELinuxEnabled()` and `SELinuxMode()` use package-level vars (`selinuxEnabled`, `selinuxMode`) without synchronization. Concurrent calls during initialization could cause a data race. Add `sync.Once` or mutex. (`internal/preprocess/selinux.go`)
+---
 
-* **`runJournalctlJSONFollow` goroutine leak on error** — If `cmd.Wait()` returns an error in the main goroutine, the scanner goroutine blocks on `scanner.Scan()` forever because `stdout` is never closed. Use `cmd.Wait()` in a separate goroutine or close stdout/stderr properly on error. (`internal/orchestrator/log.go:332-347`)
+## 🧹 Code Quality & Refactoring
 
-* **`collectJournalEntries` not checking `scanner.Err()`** — Scanner errors (e.g., broken pipe) are silently swallowed. Should check `scanner.Err()` after the loop. (`internal/orchestrator/log.go:274-283`)
+- [ ] **`cmd/comquad/main.go` is monolithic (369 lines)** — All commands in one file. Should split into per-command files (e.g. `commands/up.go`, `commands/down.go`, `commands/logs.go`).
+- [ ] **`internal/orchestrator/orchestrator.go` is too large (683 lines)** — Combine `Up`, `Down`, `handleImages`, `stopUnits`, `verifyUnitsStopped`, `printDryRun`. Should be split into focused files.
+- [ ] **`internal/cooker/engine.go` is too large (781 lines)** — Monolithic cooker handling rename, reference rewrite, SELinux, ports, labels, network aliases, and systemd optimizations.
+- [ ] **Mixed output approaches** — Some commands use `logger.Print/Action/Success`, others use `fmt.Println` directly. Standardize on the logger.
+- [ ] **`listContainersFromPodman` calls `podman inspect` per-container** — For N containers this makes N separate podman calls. Could batch into one `podman inspect <c1> <c2> ...`.
+- [ ] **`handleImages` re-reads container files from disk** — Files were already written and could be parsed in-memory from the cooker output. Unnecessary disk I/O.
+- [ ] **Hardcoded string `"unknown"` service name in `orchestrator.go:481`** — Meaningless service name in log output for non-build images.
+- [ ] **Magic numbers everywhere** — `15*time.Second` WaitForUnit timeout, `10*time.Second` startUnits wait, `30*time.Second` D-Bus context, `500*time.Millisecond` poll/flush intervals. None are configurable.
+- [ ] **`execCommand` package-level var in `log.go`** — Testing hook should use a real interface, not a mutable global.
+- [ ] **`renderEntry` has unreachable/confusing branch** — `log.go` sets unit to `"?"` when empty but the logic around it is unclear.
+- [ ] **`labelFields` tokenizer in `cooker/engine.go:332-372`** — Hand-written tokenizer for label parsing is complex and error-prone. Could use shell-style parsing library.
+- [ ] **No godoc on many exported functions** — `ContainerFileToUnitName`, `NetworkFileToUnitName`, `VolumeFileToUnitName`, `MatchFirstContainer`, `MatchAllContainers`, `MatchNetworkOrVolume` lack godoc comments.
 
-* **`splitCombinedLabels` missing quote handling** — Uses `strings.Fields()` which splits on all whitespace. If a label value contains spaces (even quoted), it would split incorrectly. Consider proper tokenizer. (`internal/cooker/engine.go`)
+---
 
-* **`discoverResources` container parsing is fragile** — Uses `|` as delimiter in `podman ps` output format. If a container name contains `|`, parsing breaks silently. No validation that project name is non-empty after parsing. (`internal/deploy/dbus.go:346-428`)
+## 🧪 Testing Gaps
 
-* **`removePodmanResources` silently swallows partial failures** — When removing multiple resources, some may fail and others succeed. Individual failures are not surfaced clearly, risking orphaned resources. (`internal/deploy/dbus.go:208-250`)
+### Missing Unit Tests
 
-* **`offsetPorts` re-reads files after modifying** — File is re-read just to update a single line even though content was already read in the first pass. Could be cached. (`internal/cooker/engine.go:419-435`)
+- [ ] **`handleImages`** — Complex image-building logic with pull strategies has zero direct test coverage
+- [ ] **`stopUnits` / `verifyUnitsStopped`** — Container/network/volume stopping logic
+- [ ] **`offsetPorts` in cooker** — Port offset resolution with conflict detection tested only indirectly
+- [ ] **`discoverResources` in dbus.go** — Podman JSON output parsing and resource grouping
+- [ ] **`removePodmanResources` in dbus.go** — Network/volume removal and error handling
+- [ ] **`runJournalctlJSONFollow`** — Complex goroutine + buffered output logic (4 select cases) has zero test coverage
+- [ ] **`Regenerate` orchestrator command** — Entire state reconstruction pipeline
+- [ ] **`Build()` in build package** — Only tag generation and pull strategy parsing tested
+- [ ] **`PullImage()`** — No tests for pull with different strategies
+- [ ] **`parseContainer` (podman JSON parsing)** — Only tested through full ps pipeline, not in isolation
+- [ ] **`formatTimeAgo`** — Only tested through ps output capture
+- [ ] **`StringMap.UnmarshalYAML` / `MarshalYAML`** — No direct tests for edge cases (empty list, mixed types, YAML null)
+- [ ] **Main `Execute()` orchestrator pipeline** — No unit test for full preprocess→transpile→cook→deploy flow
 
-* **`addSELinuxToVolume` z/Z check uses substring** — `strings.Contains(parts[2], "z")` matches false positives like `zoo`. Replaced with comma-delimited token check. (`internal/cooker/engine.go`)
+### Flaky / Skipped Tests
 
-### Code Smells
+- [ ] **~10 integration tests use `time.Sleep(2-3s)`** — Race-prone. Should use polling helpers instead of fixed sleeps
+- [ ] **3 unit tests require `SKIP_PODLET_TESTS` env var to skip** — Should use `testing.Short()` or a proper build tag
+- [ ] **`TestUp_InvalidYamlReturnsError`** accepts either podlet-missing or strategy-invalid error — ambiguous coverage
+- [ ] **Multiple log tests collect output but never assert on content** — `result := ...; _ = result` in several tests
 
-* **Remove `containerFileToUnitName` no-op alias** — ~~FIXED~~ Removed the alias and replaced all 5 call sites with `ContainerFileToUnitName` directly. (`internal/orchestrator/orchestrator.go`, `lifecycle.go`, `edit.go`)
+### Test Infrastructure
 
-* **Remove unused `Engine.ForceBuild` field** — ~~FIXED~~ Field on `build.Engine` struct was never read anywhere in the codebase. Removed. (`internal/build/engine.go:26`)
+- [ ] **No CI pipeline** — No `.github/workflows/` or any CI config. Makefile targets exist but nothing runs automatically
+- [ ] **Integration tests build binary inside container** — Adds ~30s per run and doesn't test the actual release binary
+- [ ] **Integration Containerfile uses `fedora:43`** — Bleeding-edge; should use a stable version
+- [ ] **`loginctl enable-linger` may silently fail** — `|| true` in Containerfile masks errors; rootless tests could pass incorrectly
+- [ ] **No `go test -short` support** — Can't run only fast tests
+- [ ] **No `go test -race` or `go test -cover` in Makefile** — No concurrency safety or coverage measurement
+- [ ] **`captureStdout` in unit tests** — Replaces `os.Stdout`, not goroutine-safe, blocks `t.Parallel()`
+- [ ] **No fuzzing tests** for YAML or quadlet parsers
+- [ ] **No benchmark tests** for any performance-sensitive paths
 
-* **Remove dead-code stub `Engine.HandleBuild`** — ~~FIXED~~ Returns `nil` unimplemented. The orchestrator calls `BuildService()` directly instead. Removed. (`internal/build/engine.go:116`)
+### Missing Integration Test Scenarios
 
-* ~~**`normalizeImage` incorrectly classifies registry names**~~ — **DONE**: Added `isRegistryWithPort()` helper that checks if `:` is followed by digits (port number) vs alphanumeric (image tag). Distinguishes `localhost:5000` (registry) from `myapp:v1` (image with tag). (`internal/preprocess/engine.go`)
+- [ ] `compose.yaml` with real `build:` blocks
+- [ ] `comquad ps` with real output verification
+- [ ] `comquad edit` with actual file modifications (only `--no-reload` tested)
+- [ ] `comquad exec` with interactive TTY
+- [ ] `comquad follow-logs` (`--follow` flag)
+- [ ] Concurrent `comquad up` on same project
+- [ ] Network isolation (services on different networks)
+- [ ] Upgrading a project (deploy, modify compose, redeploy)
+- [ ] `down` when systemd units are in `failed` state
+- [ ] Behavior with unresponsive podman
+- [ ] Large/complex compose files (10+ services)
 
-* **`addProjectLabels` uses string comparison for label detection** — Exact string match `trimmed == "Label=com.comquad.project="+c.ProjectName` is fragile. If label value contains trailing whitespace or different quoting, the check fails and a duplicate label is injected on re-deploy. (`internal/cooker/engine.go:557-563`)
+---
 
-* **`logs` / `FollowLogs` `--since` flag without validation** — The `since` string is passed directly to `journalctl` without validation. An invalid time format causes `journalctl` to fail at runtime with a confusing error. Should validate or catch the error. (`internal/orchestrator/log.go:251`, `internal/orchestrator/log.go:403`)
+## 📄 Documentation Gaps
 
-* **`ps` command uses `ListAllUnits()` for project filtering** — `ListAllUnits()` fetches ALL systemd units on the system and filters in Go. Inefficient compared to using a filtered query. Called on every `ps` invocation. (`internal/orchestrator/ps.go:38-56`)
+- [ ] **No `ROOTLESS_PORT_OFFSET` env var documentation** in README — only briefly mentioned in Architecture doc
+- [ ] **No `NO_COLOR` env var documentation**
+- [ ] **No example compose files** in the repository — `tests/integration/testdata/` is minimal
+- [ ] **No CONTRIBUTING.md** or development setup guide
+- [ ] **No man page** or extended help beyond cobra `--help`
+- [ ] **CHANGELOG.txt uses plain text format** — Manual `====` headings, not Markdown. Works but prevents nice GitHub rendering
+- [ ] **`projects.json` format has no version field** — No forward compatibility guarantee for state file schema evolution
 
-* **`exec` command does not validate `podman` exists** — Unlike `up` which checks for `podlet` upfront, the `exec` command does not verify `podman` is in PATH. (`internal/orchestrator/exec.go:73`)
+---
 
-* **`edit` command does not validate `$EDITOR` exists** — The editor binary is not validated to exist before launching. (`internal/orchestrator/edit.go:83-90`)
+## ✨ UX Improvements
 
-* **`StateStore` interface does not prevent concurrent map access** — The `Projects` map is shared without mutex protection. If two goroutines call `RegisterProject` concurrently, map access is unsynchronized. (`internal/deploy/interfaces.go`)
+- [ ] **No progress indication during `up`** — Pipeline is silent between stages unless `-v` is used. Add at least spinner or stage messages.
+- [ ] **No confirmation prompt before `comquad down`** — Destructive action runs immediately without asking
+- [ ] **`comquad edit` fallback `vi` may not exist** — Systems with only `vim`/`nano` get a confusing error. Should check PATH.
+- [ ] **`comquad view <project>` shows raw file content without context** — No header indicating which file is being shown
+- [ ] **No `comquad --help` examples section** — Complex flags like `--since` format deserve usage examples
+- [ ] **`comquad ps -a` sorting** — Exited containers mixed into the table could be sorted or grouped for clarity
+- [ ] **Error recovery UX** — When `startUnits` fails after files are written, user is told to manually `comquad down` to clean up
 
-* **`StateStore` interface missing `Delete` / `Remove` method** — The interface has `RegisterProject` and `UnregisterProject`, but `UnregisterProject` is only called from `Down()`. Minor design concern. (`internal/deploy/interfaces.go`)
+---
 
-* **`verifyUnitsStopped` swallows D-Bus errors** — If D-Bus returns an error for a unit, the unit is silently skipped. If all units return errors, `activeUnits` stays empty and the function returns `nil` (success), falsely indicating all units are stopped. (`internal/orchestrator/orchestrator.go:568-589`)
+## 🗺️ Long-Term Roadmap Goals
 
-* **`editProject` auto-restarts without verification** — Failed unit restarts are only printed to stdout. The unit remains in a potentially inconsistent state. Should return an error or log to stderr. (`internal/orchestrator/edit.go:143-154`)
+For reference, these are tracked in [ROADMAP.md](./ROADMAP.md):
 
-* **`discoverResources` swallows Podman errors** — If `podman ps -a` fails (e.g., daemon not running), the function returns an empty slice silently. The `regenerate` command will produce an empty state without warning the user. (`internal/deploy/dbus.go:361-365`)
-
-* **`splitCombinedLabels` drops empty label values** — If a `Label=` line has no value, `strings.Fields` returns an empty slice and nothing is appended. The label is silently dropped. (`internal/cooker/engine.go`)
-
-### Quick Wins
-
-* ~~**Extract `ensureProjectDeployed()` helper**~~ — **DONE**: Extracted `ensureProjectDeployed()` helper in `internal/orchestrator/orchestrator.go`. Updated 8 methods (`Ps`, `Down`, `View`, `Edit`, `Exec`, `Logs`, `FollowLogs`, `resolveUnits`) to use it. Returns `(StateStore, ProjectState, error)` to support both state access and operations like `UnregisterProject`.
-
-* **Add `--dry-run` to `down`, `start`, `stop`, `restart`** — `regenerate` already supports it. Adding dry-run to lifecycle commands would improve safety for users.
-
-* ~~**`printPsTable` column widths have hardcoded minimums**~~ — **DONE**: Column minimums now use `max(len("HEADER"), minimum)` to ensure headers are never truncated even if minimums are reduced in the future. (`internal/orchestrator/ps.go`)
-
-* **`ps` command `formatTimeAgo` can produce negative times** — If the container was created in the future (clock skew), `time.Since(t)` is negative and returns "recently". Minor UX issue. (`internal/orchestrator/ps.go:151-185`)
-
-* ~~**`logger.Error` does not respect dynamic `noColor`**~~ — **DONE**: `colorize()` now checks `NO_COLOR` environment variable dynamically on each call, in addition to the `noColor` variable set at init. (`internal/logger/logger.go`)
-
-### Integration Test Fixes
-
-* ~~**Tests rely on compose `name:` matching directory name**~~ — **FIXED**: Updated `WriteCompose` to return project name, added `--name <project>` to all `up` calls. Tests no longer depend on `t.TempDir()` naming conventions.
-
-* ~~**SELinux absence test missing `down` cleanup**~~ — **FIXED**: Added `t.Cleanup` with `down` call for uniformity. Note: `SELinuxPresent(t)` skip condition is correct — it detects SELinux mount availability, not enforcement mode. Comquad's `:z` injection triggers on presence detection via `/sys/fs/selinux/enforce` file content.
-
-* ~~**`TestExec_AmbiguousService_Errors` tests wrong scenario**~~ — **FIXED**: Renamed to `TestExec_NonexistentService_Errors` to accurately describe the tested scenario.
-
-* **Remaining**: Consider adding a test for true ambiguous service matching (two services with overlapping names). Currently untested.
+- [ ] Bypass engine layer for unsupported compose directives
+- [ ] Native secrets management
+- [ ] Docker Swarm / Eclipse BlueChi integration
+- [ ] Pure systemd-driven build workflow (deprecate host-side build interception)

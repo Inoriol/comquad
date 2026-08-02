@@ -46,7 +46,7 @@ The `ps` command shows container runtime status in `docker compose ps` style. It
 **Data sources:**
 
 1. **Podman** — Runs `podman ps --filter "label=com.comquad.managed=true" --filter "label=com.comquad.project=<name>" --format json` (or `-a` flag for exited containers). Parses JSON to extract container name, image, command, state, status, ports, networks, mounts, exit code, and timestamps. Runs `podman inspect <container>` for each container to extract `Config.ExposedPorts`.
-2. **D-Bus** — Queries `ListAllUnits()` and builds a map keyed by unit name. Merges `ActiveState` and `SubState` into each container record.
+2. **D-Bus** — Queries `ListUnitsByNames()` targeting only the project's container units. Merges `ActiveState` and `SubState` into each container record.
 
 **Output format:**
 
@@ -85,7 +85,7 @@ The `edit` command provides two modes of file editing:
 
 The `--no-reload` flag opens files without triggering a systemd daemon reload or unit restart.
 
-Unit resolution shares the same matching logic as `view`, using `MatchContainer` and `MatchNetworkOrVolume` helpers that iterate over `state.Files` from `projects.json`.
+Unit resolution shares the same matching logic as `view`, using `MatchFirstContainer` and `MatchNetworkOrVolume` helpers that iterate over `state.Files` from `projects.json`.
 
 ## 📋 Logs Command
 
@@ -95,7 +95,7 @@ The `logs` command queries systemd D-Bus to determine each unit's state and filt
 
 **Stopped / failed units**: no filter is applied, showing full historical logs.
 
-Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, short name (after stripping `cq-<project>-` prefix), internal Podman name (after stripping `cq-` prefix), or `ContainerName=` directive from the unit file. `MatchContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
+Service name matching uses the same multi-pattern logic as `view` and `edit`: exact file name, name without extension, name with `.service` suffix, short name (after stripping `cq-<project>-` prefix), internal Podman name (after stripping `cq-` prefix), or `ContainerName=` directive from the unit file. `MatchAllContainers` returns all matching files per argument, allowing a single arg like `web` to match multiple services.
 
 ### Flags
 
@@ -109,7 +109,7 @@ Logs from multiple units are collected via `journalctl --output=json`, parsed, s
 
 The `start`, `stop`, and `restart` commands manage the runtime state of deployed projects without touching quadlet files or triggering daemon-reload. They operate directly via D-Bus.
 
-**Service resolution:** All three commands accept optional `[service ...]` positional arguments. When provided, they use `MatchContainers` to resolve service names to unit names. When omitted, all `.container` files from the project's state are started/stopped/restarted.
+**Service resolution:** All three commands accept optional `[service ...]` positional arguments. When provided, they use `MatchAllContainers` to resolve service names to unit names. When omitted, all `.container` files from the project's state are started/stopped/restarted.
 
 **Start** — Iterates over resolved unit names and calls `StartUnit` via D-Bus. Reports per-unit status messages.
 
@@ -118,6 +118,8 @@ The `start`, `stop`, and `restart` commands manage the runtime state of deployed
 **Restart** — Iterates over resolved unit names and calls `RestartUnit` via D-Bus, which tears down and recreates the unit cleanly.
 
 All three commands require the project to exist in `projects.json` state. They share a `resolveUnits()` helper that looks up the project state, matches service names, and deduplicates results.
+
+**Flags:** All three commands accept `--dry-run` to preview which units would be affected without making changes.
 
 ## 🗑️ Down Command
 
@@ -135,13 +137,18 @@ The `down` command performs a complete teardown of a deployed project in six ste
 ```bash
 comquad down          # stops containers, removes networks, removes quadlet files
 comquad down -d       # also removes Podman volumes
+comquad down --dry-run # preview what would be removed without making changes
 ```
+
+**Flags:**
+* `-d, --delete-volumes` — Also remove Podman volumes
+* `--dry-run` — Show what would be removed without actually removing anything
 
 ## 🐳 Exec Command
 
 The `exec` command runs a command inside a running container via `podman exec`. It requires a single service argument and allocates a TTY by default (like `docker compose exec`).
 
-**Service resolution:** Uses `MatchContainers` to resolve the service name to a container quadlet file. The container name is derived from the base filename by stripping the `cq-` prefix and `.container` suffix (e.g. `cq-myapp-web.container` → `myapp-web`). If the service matches multiple containers, an error is returned listing the ambiguous matches.
+**Service resolution:** Uses `MatchAllContainers` to resolve the service name to a container quadlet file. The container name is derived from the base filename by stripping the `cq-` prefix and `.container` suffix (e.g. `cq-myapp-web.container` → `myapp-web`). If the service matches multiple containers, an error is returned listing the ambiguous matches.
 
 **Flags:** `-u/--user` sets the user inside the container, `-t/--tty` controls TTY allocation (default `true`). The command is passed directly to `podman exec`, which handles `--` flag separation.
 
@@ -333,9 +340,10 @@ comquad has three output modes, controlled by flags on the root command:
 
 `--quiet` takes precedence over `--verbose`. `logger.Error(...)` always writes to stderr regardless of either flag.
 
-The logger lives in `internal/logger/` and exposes three tiers:
+The logger lives in `internal/logger/` and exposes four tiers:
 - **`logger.Print(msg)`** — normal operational output, suppressed by `--quiet`
-- **`logger.Action/Info/Success/Warn(msg)`** — verbose-only, also suppressed by `--quiet`
+- **`logger.Action/Success/Warn(msg)`** — user-facing actions and confirmations (blue/green/yellow), shown by default, suppressed by `--quiet`
+- **`logger.Info(msg)`** — verbose-only pipeline internals, requires `-v`
 - **`logger.Error(msg)`** — always to stderr, never suppressed
 
 Colors use ANSI codes (green=success, cyan=info, yellow=warning, red=error, blue=action) and are disabled when `NO_COLOR` is set.
@@ -371,7 +379,7 @@ When `-v` / `--verbose` is enabled, comquad additionally logs every transformati
 
 Network and volume removal errors are always printed to stderr regardless of verbose mode, so cleanup failures are never silently dropped.
 
-**Error output:** `logger.Error(...)` always writes to stderr regardless of the verbose setting. Only informational, success, warning, and action messages are gated behind `-v`.
+**Error output:** `logger.Error(...)` always writes to stderr regardless of the verbose setting. Only internal pipeline details (`logger.Info`) are gated behind `-v`.
 
 ## 🧪 Integration Testing
 
@@ -417,6 +425,7 @@ tests/
     lifecycle_test.go  # start/stop/restart command flows
     logs_test.go       # Log retrieval for running and stopped units
     exec_test.go       # podman exec command tests
+    exec_ambiguous_test.go # Ambiguous service matching validation
     rootless_test.go   # Rootless mode: port offsetting, target directory, user instance
     selinux_test.go    # SELinux :z label injection (quadlet files and runtime mounts)
     view_edit_test.go  # view/edit command tests

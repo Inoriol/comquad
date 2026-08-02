@@ -98,11 +98,11 @@ func (e *Engine) HandleImage(service, image string) error {
 		if !e.ImageExists(image) {
 			return fmt.Errorf("image %s not found locally and pull strategy is 'never'", image)
 		}
-		logger.Info("Using local image: " + image)
+		logger.Action("Using local image: " + image)
 		return nil
 	case PullMissing:
 		if e.ImageExists(image) {
-			logger.Info("Image already exists locally: " + image)
+			logger.Action("Image already exists locally: " + image)
 			return nil
 		}
 		return e.PullImage(image)

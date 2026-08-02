@@ -30,7 +30,7 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 	seen := make(map[string]struct{})
 	var units []string
 	for _, svc := range services {
-		matches := MatchContainers(o.projectName, state, svc)
+		matches := MatchAllContainers(o.projectName, state, svc)
 		if len(matches) == 0 {
 			return nil, fmt.Errorf("no units found matching service '%s' for project '%s'", svc, o.projectName)
 		}
@@ -47,10 +47,18 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 }
 
 // Start starts all units for the project, or specific services if provided.
-func (o *Orchestrator) Start(services []string) error {
+func (o *Orchestrator) Start(services []string, dryRun bool) error {
 	units, err := o.resolveUnits(services)
 	if err != nil {
 		return err
+	}
+
+	if dryRun {
+		fmt.Printf("Dry run: would start %d unit(s):\n", len(units))
+		for _, unitName := range units {
+			fmt.Println("  " + unitName)
+		}
+		return nil
 	}
 
 	dbusMgr, err := o.newSystemd()
@@ -76,10 +84,18 @@ func (o *Orchestrator) Start(services []string) error {
 }
 
 // Stop stops all units for the project, or specific services if provided.
-func (o *Orchestrator) Stop(services []string) error {
+func (o *Orchestrator) Stop(services []string, dryRun bool) error {
 	units, err := o.resolveUnits(services)
 	if err != nil {
 		return err
+	}
+
+	if dryRun {
+		fmt.Printf("Dry run: would stop %d unit(s):\n", len(units))
+		for _, unitName := range units {
+			fmt.Println("  " + unitName)
+		}
+		return nil
 	}
 
 	dbusMgr, err := o.newSystemd()
@@ -110,10 +126,18 @@ func (o *Orchestrator) Stop(services []string) error {
 }
 
 // Restart restarts all units for the project, or specific services if provided.
-func (o *Orchestrator) Restart(services []string) error {
+func (o *Orchestrator) Restart(services []string, dryRun bool) error {
 	units, err := o.resolveUnits(services)
 	if err != nil {
 		return err
+	}
+
+	if dryRun {
+		fmt.Printf("Dry run: would restart %d unit(s):\n", len(units))
+		for _, unitName := range units {
+			fmt.Println("  " + unitName)
+		}
+		return nil
 	}
 
 	dbusMgr, err := o.newSystemd()

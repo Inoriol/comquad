@@ -87,14 +87,14 @@ func Info(msg string) {
 }
 
 func Success(msg string) {
-	if !IsVerbose() || IsQuiet() {
+	if IsQuiet() {
 		return
 	}
 	fmt.Println(colorize(green, "comquad: "+msg))
 }
 
 func Warn(msg string) {
-	if !IsVerbose() || IsQuiet() {
+	if IsQuiet() {
 		return
 	}
 	fmt.Println(colorize(yellow, "comquad: "+msg))
@@ -106,7 +106,7 @@ func Error(msg string) {
 }
 
 func Action(msg string) {
-	if !IsVerbose() || IsQuiet() {
+	if IsQuiet() {
 		return
 	}
 	fmt.Println(colorize(blue, "comquad: "+msg))

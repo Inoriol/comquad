@@ -122,7 +122,7 @@ func TestStart_ProjectNotDeployed(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", t.TempDir(), state, newMockSystemdClient())
 
-	err := o.Start(nil)
+	err := o.Start(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "not deployed") {
 		t.Errorf("expected 'not deployed' error, got %v", err)
 	}
@@ -140,7 +140,7 @@ func TestStart_CallsStartUnitForEachContainer(t *testing.T) {
 	sys := newMockSystemdClient()
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Start(nil); err != nil {
+	if err := o.Start(nil, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(sys.startedUnits) != 2 {
@@ -160,7 +160,7 @@ func TestStart_SpecificService(t *testing.T) {
 	sys := newMockSystemdClient()
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Start([]string{"web"}); err != nil {
+	if err := o.Start([]string{"web"}, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(sys.startedUnits) != 1 || sys.startedUnits[0] != "cq-myapp-web.service" {
@@ -178,7 +178,7 @@ func TestStart_PropagatesStartError(t *testing.T) {
 	sys.startErrDefault = errors.New("unit failed")
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	err := o.Start(nil)
+	err := o.Start(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "unit failed") {
 		t.Errorf("expected start error propagated, got %v", err)
 	}
@@ -193,7 +193,7 @@ func TestStart_SystemdConnectionError(t *testing.T) {
 	})
 	o := newTestOrchestratorWithSystemdErr("myapp", dir, state, errors.New("dbus down"))
 
-	err := o.Start(nil)
+	err := o.Start(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "dbus down") {
 		t.Errorf("expected dbus error, got %v", err)
 	}
@@ -216,7 +216,7 @@ func TestStop_CallsStopUnitForEachContainer(t *testing.T) {
 	// Units are not active, so verifyUnitsStoppedByNames should pass
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Stop(nil); err != nil {
+	if err := o.Stop(nil, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(sys.stoppedUnits) != 2 {
@@ -234,7 +234,7 @@ func TestStop_PropagatesStopError(t *testing.T) {
 	sys.stopErr["cq-myapp-web.service"] = errors.New("stop failed")
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	err := o.Stop(nil)
+	err := o.Stop(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "stop failed") {
 		t.Errorf("expected stop error propagated, got %v", err)
 	}
@@ -244,7 +244,7 @@ func TestStop_ProjectNotDeployed(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", t.TempDir(), state, newMockSystemdClient())
 
-	err := o.Stop(nil)
+	err := o.Stop(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "not deployed") {
 		t.Errorf("expected 'not deployed' error, got %v", err)
 	}
@@ -265,7 +265,7 @@ func TestRestart_CallsRestartUnitForEachContainer(t *testing.T) {
 	sys := newMockSystemdClient()
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Restart(nil); err != nil {
+	if err := o.Restart(nil, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(sys.restarted) != 1 || sys.restarted[0] != "cq-myapp-web.service" {
@@ -283,7 +283,7 @@ func TestRestart_PropagatesRestartError(t *testing.T) {
 	sys.restartErr["cq-myapp-web.service"] = errors.New("restart failed")
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	err := o.Restart(nil)
+	err := o.Restart(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "restart failed") {
 		t.Errorf("expected restart error propagated, got %v", err)
 	}
@@ -293,7 +293,7 @@ func TestRestart_ProjectNotDeployed(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", t.TempDir(), state, newMockSystemdClient())
 
-	err := o.Restart(nil)
+	err := o.Restart(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "not deployed") {
 		t.Errorf("expected 'not deployed' error, got %v", err)
 	}

@@ -37,7 +37,7 @@ func (o *Orchestrator) editProject(state deploy.ProjectState, noReload bool) err
 func (o *Orchestrator) editUnit(state deploy.ProjectState, arg string, noReload bool) error {
 	var found string
 
-	if found = MatchContainer(o.projectName, state, arg); found != "" {
+	if found = MatchFirstContainer(o.projectName, state, arg); found != "" {
 		// do nothing
 	} else if found = MatchNetworkOrVolume(o.projectName, state, arg); found != "" {
 		// do nothing
@@ -84,6 +84,10 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	editorParts := strings.Fields(editorEnv)
 	editorBin := editorParts[0]
 	editorArgs := append(editorParts[1:], files...)
+
+	if _, err := exec.LookPath(editorBin); err != nil {
+		return fmt.Errorf("editor %q not found in PATH: %w", editorBin, err)
+	}
 
 	// Build editor command with all files
 	cmd := exec.Command(editorBin, editorArgs...)
@@ -136,18 +140,24 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 
 	// Restart changed container units
 	var restartCount int
+	var failedCount int
 	for _, f := range changedFiles {
 		if strings.HasSuffix(f, ".container") {
 			unitName := ContainerFileToUnitName(f)
 			fmt.Printf("Restarting unit: %s\n", unitName)
 			if err := dbusMgr.RestartUnit(unitName); err != nil {
-				fmt.Printf("Warning: failed to restart unit %s: %v\n", unitName, err)
+				fmt.Fprintf(os.Stderr, "Error: failed to restart unit %s: %v\n", unitName, err)
+				failedCount++
 			} else {
 				restartCount++
 			}
 		}
 	}
 
-	fmt.Printf("Reloaded daemon, restarted %d container unit(s)\n", restartCount)
+	fmt.Printf("Reloaded daemon, restarted %d container unit(s)", restartCount)
+	if failedCount > 0 {
+		fmt.Printf(", %d failed", failedCount)
+	}
+	fmt.Println()
 	return nil
 }

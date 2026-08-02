@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 )
 
 // ResourceInfo tracks Podman resources for a managed project
@@ -24,6 +25,7 @@ type ProjectState struct {
 
 // StateManager manages the persistence of project states in a JSON file
 type StateManager struct {
+	mu            sync.Mutex
 	StateFilePath string
 	Projects      map[string]ProjectState
 }
@@ -66,6 +68,12 @@ func (sm *StateManager) load() error {
 }
 
 func (sm *StateManager) Save() error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	return sm.save()
+}
+
+func (sm *StateManager) save() error {
 	dir := filepath.Dir(sm.StateFilePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
@@ -103,6 +111,9 @@ func (sm *StateManager) Save() error {
 }
 
 func (sm *StateManager) RegisterProject(project ProjectState) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	// Preserve the existing Resources field if the caller didn't supply one.
 	// This prevents up from silently clearing resource info written by regenerate.
 	if project.Resources == nil {
@@ -111,17 +122,23 @@ func (sm *StateManager) RegisterProject(project ProjectState) error {
 		}
 	}
 	sm.Projects[project.ProjectName] = project
-	return sm.Save()
+	return sm.save()
 }
 
 func (sm *StateManager) UnregisterProject(projectName string) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	delete(sm.Projects, projectName)
-	return sm.Save()
+	return sm.save()
 }
 
 // GetProject returns the state for the named project and whether it exists.
 // This satisfies the StateStore interface without exposing the raw Projects map.
 func (sm *StateManager) GetProject(name string) (ProjectState, bool) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	p, ok := sm.Projects[name]
 	return p, ok
 }
@@ -132,6 +149,9 @@ func (sm *StateManager) GetStateFilePath() string {
 }
 
 func (sm *StateManager) ListProjects() []ProjectState {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	projects := make([]ProjectState, 0, len(sm.Projects))
 	for _, p := range sm.Projects {
 		projects = append(projects, p)
@@ -140,4 +160,12 @@ func (sm *StateManager) ListProjects() []ProjectState {
 		return projects[i].ProjectName < projects[j].ProjectName
 	})
 	return projects
+}
+
+// SetProject directly sets a project in the state without saving.
+// This is used by RegenerateState to batch-populate the map before a single Save.
+func (sm *StateManager) SetProject(name string, state ProjectState) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.Projects[name] = state
 }

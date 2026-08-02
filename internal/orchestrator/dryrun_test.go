@@ -241,9 +241,8 @@ func TestPrintDryRun_InvalidPullStrategy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
-	// This test requires podlet in PATH. Skip gracefully if not present.
-	if _, err := os.LookupEnv("COMQUAD_TEST_WITH_PODLET"); err {
-		t.Skip("set COMQUAD_TEST_WITH_PODLET=1 to run tests requiring podlet")
+	if _, ok := os.LookupEnv("SKIP_PODLET_TESTS"); ok {
+		t.Skip("skipping test that interacts with podlet")
 	}
 
 	dir := t.TempDir()

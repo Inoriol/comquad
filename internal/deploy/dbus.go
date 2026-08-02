@@ -237,10 +237,12 @@ func removePodmanResources(resourceType, projectName string) error {
 
 	var errs []error
 	for _, name := range names {
-		logger.Info(fmt.Sprintf("Removing %s: %s", resourceType, name))
+		logger.Action(fmt.Sprintf("Removing %s: %s", resourceType, name))
 		rmCmd := exec.Command("podman", resourceType, "rm", name)
 		if err := rmCmd.Run(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to remove %s %s: %w", resourceType, name, err))
+			rmErr := fmt.Errorf("failed to remove %s %s: %w", resourceType, name, err)
+			errs = append(errs, rmErr)
+			logger.Error(rmErr.Error())
 		}
 	}
 
@@ -273,10 +275,24 @@ func RegenerateState() (*StateManager, error) {
 		return nil, fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
-	// Discover containers, networks, and volumes by label
-	containers := discoverResources("container", "com.comquad.managed")
-	networks := discoverResources("network", "com.comquad.managed")
-	volumes := discoverResources("volume", "com.comquad.managed")
+	var errs []error
+
+	containers, err := discoverResources("container", "com.comquad.managed")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	networks, err := discoverResources("network", "com.comquad.managed")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	volumes, err := discoverResources("volume", "com.comquad.managed")
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("failed to discover podman resources: %w", errors.Join(errs...))
+	}
 
 	// Group by project
 	projects := make(map[string]*ResourceInfo)
@@ -329,37 +345,36 @@ func RegenerateState() (*StateManager, error) {
 			}
 		}
 
-		stateMgr.Projects[projectName] = ProjectState{
+		stateMgr.SetProject(projectName, ProjectState{
 			ProjectName: projectName,
 			SourcePath:  "",
 			Files:       files,
 			Resources:   resources,
-		}
+		})
 	}
 
 	return stateMgr, nil
 }
 
 // discoverResources queries Podman for resources of a given type with the managed label
-func discoverResources(resourceType, label string) []PodmanResource {
+func discoverResources(resourceType, label string) ([]PodmanResource, error) {
 	var results []PodmanResource
 
 	var cmd *exec.Cmd
 	switch resourceType {
 	case "container":
-		cmd = exec.Command("podman", "ps", "-a", "--filter", "label="+label, "--format", "{{.Names}}|{{.Label \"com.comquad.project\"}}")
+		cmd = exec.Command("podman", "ps", "-a", "--filter", "label="+label, "--format", "{{json .}}")
 	case "network":
 		cmd = exec.Command("podman", "network", "ls", "--filter", "label="+label, "--format", "{{json .}}")
 	case "volume":
 		cmd = exec.Command("podman", "volume", "ls", "--filter", "label="+label, "--format", "{{json .}}")
 	default:
-		return results
+		return results, nil
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to list %ss: %v\n", resourceType, err)
-		return results
+		return nil, fmt.Errorf("failed to list %ss: %w", resourceType, err)
 	}
 
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
@@ -404,23 +419,27 @@ func discoverResources(resourceType, label string) []PodmanResource {
 				}
 			}
 		default:
-			// container: use the original pipe-delimited format
-			parts := strings.SplitN(line, "|", 2)
-			if len(parts) != 2 {
+			var ctr struct {
+				Names  []string          `json:"Names"`
+				Labels map[string]string `json:"Labels"`
+			}
+			if err := json.Unmarshal([]byte(line), &ctr); err != nil {
 				continue
 			}
-			name := parts[0]
-			project := parts[1]
-			if name == "" || project == "" {
-				continue
+			if len(ctr.Names) > 0 && ctr.Labels != nil {
+				if project, ok := ctr.Labels["com.comquad.project"]; ok && project != "" {
+					name := ctr.Names[0]
+					if name != "" {
+						results = append(results, PodmanResource{
+							Name:        name,
+							ProjectName: project,
+							Type:        resourceType,
+						})
+					}
+				}
 			}
-			results = append(results, PodmanResource{
-				Name:        name,
-				ProjectName: project,
-				Type:        resourceType,
-			})
 		}
 	}
 
-	return results
+	return results, nil
 }

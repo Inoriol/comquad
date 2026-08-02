@@ -121,6 +121,12 @@ func flushEntries(entries []journalEntry, showTime bool) {
 
 // Logs prints logs for a deployed project's services via journalctl.
 func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, showTime bool) error {
+	if since != "" {
+		if err := validateSince(since); err != nil {
+			return err
+		}
+	}
+
 	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
 		return err
@@ -129,7 +135,7 @@ func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, 
 	var unitNames []string
 	seen := make(map[string]bool)
 	for _, s := range services {
-		for _, f := range MatchContainers(o.projectName, state, s) {
+		for _, f := range MatchAllContainers(o.projectName, state, s) {
 			unitName := ContainerFileToUnitName(f)
 			if !seen[unitName] {
 				seen[unitName] = true
@@ -277,6 +283,10 @@ func (o *Orchestrator) collectJournalEntries(unitNames []string, invocationID, t
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed reading journalctl output: %w", err)
+	}
+
 	if err := cmd.Wait(); err != nil {
 		return nil, fmt.Errorf("journalctl failed: %w", err)
 	}
@@ -322,9 +332,10 @@ func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) err
 
 	var mu sync.Mutex
 	var entries []journalEntry
-	done := make(chan struct{})
 
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 		for scanner.Scan() {
@@ -338,7 +349,11 @@ func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) err
 				mu.Unlock()
 			}
 		}
-		close(done)
+	}()
+
+	waitErr := make(chan error, 1)
+	go func() {
+		waitErr <- cmd.Wait()
 	}()
 
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -346,11 +361,24 @@ func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) err
 
 	for {
 		select {
-		case <-done:
+		case err := <-waitErr:
+			<-done
 			mu.Lock()
 			flushEntries(entries, showTime)
 			mu.Unlock()
-			return cmd.Wait()
+			if err != nil {
+				return fmt.Errorf("journalctl failed: %w", err)
+			}
+			return nil
+		case <-done:
+			err := <-waitErr
+			mu.Lock()
+			flushEntries(entries, showTime)
+			mu.Unlock()
+			if err != nil {
+				return fmt.Errorf("journalctl failed: %w", err)
+			}
+			return nil
 		case <-ticker.C:
 			mu.Lock()
 			if len(entries) > 0 {
@@ -365,6 +393,12 @@ func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) err
 // FollowLogs streams all journalctl logs for every unit in the project
 // from the given timestamp onward.
 func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
+	if since != "" {
+		if err := validateSince(since); err != nil {
+			return err
+		}
+	}
+
 	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
 		return err
@@ -408,4 +442,29 @@ func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 	cmd.Stderr = os.Stderr
 
 	return o.runJournalctlJSONFollow(cmd, showTime)
+}
+
+// validateSince checks that the --since argument is plausibly valid.
+// journalctl accepts dates (YYYY-MM-DD), relative times (-10m, 1h ago), and keywords (today, yesterday, now).
+func validateSince(since string) error {
+	knownWords := map[string]bool{
+		"today": true, "yesterday": true, "now": true,
+		"boot": true, "reboot": true,
+	}
+	if knownWords[strings.ToLower(since)] {
+		return nil
+	}
+	if strings.HasPrefix(since, "-") || strings.HasSuffix(since, " ago") {
+		return nil
+	}
+	for _, f := range []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	} {
+		if _, err := time.Parse(f, since); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid --since %q: expected a date (YYYY-MM-DD [HH:MM[:SS]]), relative time (-10m, -1h, 1h ago), or keyword (today, yesterday, now, boot)", since)
 }

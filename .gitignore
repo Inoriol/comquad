@@ -11,6 +11,9 @@
 # Test binary, built with `go test -c`
 *.test
 
+#Changelog
+CHANGELOG.txt
+
 # Comquad compiled binary
 comquad
 

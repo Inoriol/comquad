@@ -20,7 +20,7 @@ I am an infrastructure engineer, not a full-time software developer. I built **C
 
 ### Requirements
 
-* **Podman** (for `podman pull`)
+* **Podman 4.4+** (quadlet support)
 * **podlet** (for transpiling `compose` yaml into quadlet files)
 * **systemd** with quadlet support
 * Go 1.23+ (if building from source)
@@ -64,8 +64,11 @@ comquad ps -a  # Includes exited containers
 
 # Control services
 comquad start [service ...]
+comquad start --dry-run        # Preview which units would be started
 comquad stop [service ...]
+comquad stop --dry-run         # Preview which units would be stopped
 comquad restart [service ...]
+comquad restart --dry-run      # Preview which units would be restarted
 
 # Stream logs (auto-sorted chronologically across units)
 comquad logs                 # All services (one-shot)
@@ -86,7 +89,8 @@ comquad exec -u root web bash        # Run as root
 
 # Tear down the project
 comquad down
-comquad down -d                      # Also removes Podman volumes
+comquad down -d                  # Also removes Podman volumes
+comquad down --dry-run           # Preview what would be removed
 
 ```
 
@@ -101,6 +105,12 @@ Before committing changes to systemd, you can preview exactly what `comquad` wil
 ```bash
 # Preview generated files without writing them
 comquad up --dry-run
+
+# Preview lifecycle actions without affecting running units
+comquad start --dry-run
+comquad stop --dry-run
+comquad restart --dry-run
+comquad down --dry-run
 
 # Show every transformation (port offsets, path normalizations, etc.)
 comquad up -v
@@ -129,7 +139,7 @@ If your local state gets out of sync, `comquad` can rebuild its tracking from Po
 ```bash
 comquad regenerate --force           # Reconstruct state file from live labels
 comquad regenerate --force --dry-run # Preview what would be reconstructed
-comquad check                        # Run a quick prerequisites sanity check
+comquad check                        # Check prerequisites (tools, podman >= 4.4, D-Bus, target dir)
 
 ```
 

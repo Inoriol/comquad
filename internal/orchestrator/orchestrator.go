@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -137,11 +138,14 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 		return err
 	}
 
-	// cleanup only removes files if registration fails
-	// NOT on startUnits failure — files must stay for systemd
+	// cleanup removes written files and unregisters state on failure.
+	// NOT used on startUnits failure — files must stay for systemd.
 	cleanup := func() {
 		for _, f := range projectFiles {
 			os.Remove(f)
+		}
+		if sm, err := o.newState(); err == nil {
+			sm.UnregisterProject(o.projectName)
 		}
 		if dbusMgr, err := o.newSystemd(); err == nil {
 			defer dbusMgr.Close()
@@ -156,6 +160,7 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 
 	// Handle images (build or pull) before starting units
 	if err := o.handleImages(projectFiles, buildInfo, forceBuild, pullStrategy); err != nil {
+		cleanup()
 		return err
 	}
 
@@ -179,10 +184,24 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 
 // Down stops all units, removes quadlet files, removes networks, and unregisters the project.
 // If removeVolumes is true, also removes Podman volumes.
-func (o *Orchestrator) Down(removeVolumes bool) error {
+func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 	stateMgr, state, err := o.ensureProjectDeployed()
 	if err != nil {
 		return err
+	}
+
+	if dryRun {
+		fmt.Println("Dry run: project '" + o.projectName + "' — would:")
+		fmt.Printf("  Stop %d unit(s)\n", len(state.Files))
+		for _, f := range state.Files {
+			fmt.Println("    " + filepath.Base(f))
+		}
+		fmt.Println("  Remove quadlet files and unregister project")
+		fmt.Println("  Remove podman networks")
+		if removeVolumes {
+			fmt.Println("  Remove podman volumes")
+		}
+		return nil
 	}
 
 	// Open a single D-Bus connection for the entire down sequence.
@@ -320,7 +339,7 @@ func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) error {
 
 	selinuxEnabled := preprocess.IsSELinuxEnabled()
 	if selinuxEnabled {
-		logger.Info(fmt.Sprintf("SELinux detected (%s), adding :z labels to all volumes", preprocess.SELinuxMode()))
+		logger.Action(fmt.Sprintf("SELinux detected (%s), adding :z labels to all volumes", preprocess.SELinuxMode()))
 	}
 
 	cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless, portOffset, selinuxEnabled)
@@ -423,7 +442,7 @@ func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]
 			}
 			logger.Success("Built image: " + imageTag)
 		} else {
-			logger.Info("Image already exists locally, skipping build: " + imageTag)
+			logger.Action("Image already exists locally, skipping build: " + imageTag)
 		}
 	}
 
@@ -594,6 +613,7 @@ func (o *Orchestrator) stopUnits(dbusMgr deploy.SystemdClient, projectFiles []st
 
 func (o *Orchestrator) verifyUnitsStopped(dbusMgr deploy.SystemdClient, projectFiles []string) error {
 	var activeUnits []string
+	var errs []error
 	for _, f := range projectFiles {
 		if !strings.HasSuffix(f, ".container") {
 			continue
@@ -601,6 +621,7 @@ func (o *Orchestrator) verifyUnitsStopped(dbusMgr deploy.SystemdClient, projectF
 		unitName := ContainerFileToUnitName(f)
 		units, err := dbusMgr.ListUnitsByNames([]string{unitName})
 		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to check unit %s: %w", unitName, err))
 			continue
 		}
 		if len(units) > 0 && units[0].ActiveState == "active" {
@@ -610,6 +631,10 @@ func (o *Orchestrator) verifyUnitsStopped(dbusMgr deploy.SystemdClient, projectF
 
 	if len(activeUnits) > 0 {
 		return fmt.Errorf("units still active after stop: %s", strings.Join(activeUnits, ", "))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to verify all units stopped: %w", errors.Join(errs...))
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -53,7 +54,7 @@ var downCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Down(downRemoveVolumes)
+		return o.Down(downRemoveVolumes, dryRun)
 	},
 }
 
@@ -128,6 +129,23 @@ var checkCmd = &cobra.Command{
 		for _, tool := range tools {
 			path, _ := exec.LookPath(tool)
 			fmt.Printf("  %s: %s\n", tool, path)
+		}
+
+		// Check podman version (quadlet support requires 4.4+)
+		if out, err := exec.Command("podman", "version", "--format", "{{.Version}}").Output(); err == nil {
+			raw := strings.TrimSpace(string(out))
+			// Strip leading "v" if present
+			raw = strings.TrimPrefix(raw, "v")
+			fmt.Printf("  Podman version: %s\n", raw)
+			parts := strings.SplitN(raw, ".", 3)
+			if len(parts) >= 2 {
+				major, _ := strconv.Atoi(parts[0])
+				minor, _ := strconv.Atoi(parts[1])
+				if major < 4 || (major == 4 && minor < 4) {
+					warnings = append(warnings, fmt.Sprintf(
+						"Podman %d.%d detected — quadlet support requires 4.4+", major, minor))
+				}
+			}
 		}
 
 		if _, err := exec.LookPath("systemctl"); err != nil {
@@ -219,7 +237,7 @@ var startCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Start(args)
+		return o.Start(args, dryRun)
 	},
 }
 
@@ -231,7 +249,7 @@ var stopCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Stop(args)
+		return o.Stop(args, dryRun)
 	},
 }
 
@@ -243,7 +261,7 @@ var restartCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.Restart(args)
+		return o.Restart(args, dryRun)
 	},
 }
 
@@ -303,6 +321,7 @@ func init() {
 	upCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed information about changes made during deployment")
 	upCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview generated quadlet files without writing or starting anything")
 	downCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	downCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be removed without actually removing anything")
 	downCmd.Flags().BoolVarP(&downRemoveVolumes, "delete-volumes", "d", false, "Remove named volumes declared in the compose file")
 	listCmd.Flags().StringVarP(&projectName, "name", "n", "", "Filter by project name")
 	logsCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
@@ -316,8 +335,11 @@ func init() {
 	editCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	editCmd.Flags().BoolVar(&noReload, "no-reload", false, "Open files in editor without reloading systemd")
 	startCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	startCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show which units would be started without actually starting them")
 	stopCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	stopCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show which units would be stopped without actually stopping them")
 	restartCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
+	restartCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show which units would be restarted without actually restarting them")
 	execCmd.Flags().StringVarP(&projectName, "name", "n", "", "Override project name (default: current directory name)")
 	execCmd.Flags().StringVarP(&execUser, "user", "u", "", "User to run as inside the container")
 	execCmd.Flags().BoolVarP(&execTTY, "tty", "t", true, "Allocate a TTY (default: true)")
