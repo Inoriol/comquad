@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -225,6 +226,9 @@ func newTestOrchestrator(projectName, cwd string, state *mockStateStore, sys *mo
 		newSystemd: func() (deploy.SystemdClient, error) {
 			return sys, nil
 		},
+		newJournalCmd: func(name string, args ...string) *exec.Cmd {
+			return exec.Command(name, args...)
+		},
 	}
 }
 
@@ -240,6 +244,9 @@ func newTestOrchestratorWithStateErr(projectName, cwd string, err error) *Orches
 		newSystemd: func() (deploy.SystemdClient, error) {
 			return newMockSystemdClient(), nil
 		},
+		newJournalCmd: func(name string, args ...string) *exec.Cmd {
+			return exec.Command(name, args...)
+		},
 	}
 }
 
@@ -254,6 +261,9 @@ func newTestOrchestratorWithSystemdErr(projectName, cwd string, state *mockState
 		},
 		newSystemd: func() (deploy.SystemdClient, error) {
 			return nil, err
+		},
+		newJournalCmd: func(name string, args ...string) *exec.Cmd {
+			return exec.Command(name, args...)
 		},
 	}
 }

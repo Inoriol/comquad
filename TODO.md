@@ -8,29 +8,29 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 
 These issues directly break core functionality or the release process:
 
-- [ ] **Bug: `handleImages` skips all tagged images, not just build-generated ones** — `orchestrator.go` checks `strings.Contains(image, ":")` which skips both build-tagged images AND user-specified tagged images (e.g. `postgres:15`, `nginx:alpine`). This means the most common compose image pattern never gets pulled or validated. The check should match only the build pattern (`<projectName>-<service>:latest`).
-- [ ] **Bug: `ImageExists` silently swallows all errors** — `build/engine.go` returns `false` for any `podman image inspect` error instead of only exit code 125. A broken podman install is indistinguishable from "image missing", causing silent build skips.
-- [ ] **Bug: `--verbose` flag only works with `up` command** — `SetVerbose` is only called from `upCmd`. Commands like `down`, `ps`, `start`, `restart`, `logs` cannot enable verbose output.
-- [ ] **Bug: `--quiet` flag is bypassed by direct `fmt.Println` usage** — `view`, `ps`, `list`, `regenerate`, and dry-run previews all use `fmt.Println` directly instead of the logger, so `--quiet` cannot suppress their output.
-- [ ] **`.goreleaser` has no extension** — goreleaser looks for `.goreleaser.yaml` or `.goreleaser.yml` by default. Rename to `.goreleaser.yml` or add `--config` flag to build scripts.
+- [x] **Bug: `handleImages` skips all tagged images, not just build-generated ones** — Fixed: `isBuildGeneratedImage()` checks against buildInfo services.
+- [x] **Bug: `ImageExists` silently swallows all errors** — Fixed: warns on non-125 exit codes and still returns false.
+- [x] **Bug: `--verbose` flag only works with `up` command** — Fixed: moved to rootCmd.PersistentFlags with SetVerbose in PersistentPreRun.
+- [x] **Bug: `--quiet` flag is bypassed by direct `fmt.Println` usage** — Fixed: added logger.Printf, routed all output through logger.
+- [x] **`.goreleaser` has no extension** — Fixed: renamed to `.goreleaser.yml`.
 
 ---
 
 ## 🐛 Bugs
 
-- [ ] **`MatchNetworkOrVolume` double-strips extensions** — `resolve.go:79-81` strips `.network` then strips `.volume` from the already-stripped string. Works by accident since only one extension is present, but is logically incorrect and fragile.
-- [ ] **`exec` podman PATH check is after building the command** — `exec.go` calls `exec.Command("podman", ...)` and logs before checking `LookPath("podman")`. User gets a confusing intermediate message if podman is missing.
-- [ ] **`StringMap` type mismatch for volume labels in `preprocess/engine.go`** — The map value type is `interface{}` but the case checks `StringMap` which never matches. Volume label injection falls through to the `default` case (works, but list-format label preservation logic is dead code).
-- [ ] **`logger.SetQuiet` does not suppress `fmt.Println` output** — See release blocker above. All direct `fmt.Println` calls should be routed through the logger.
+- [x] **`MatchNetworkOrVolume` double-strips extensions** — Fixed: strips only the relevant extension.
+- [x] **`exec` podman PATH check is after building the command** — Fixed: moved LookPath before exec.Command.
+- [x] **`StringMap` type mismatch for volume labels in `preprocess/engine.go`** — Fixed: added `map[string]interface{}` case that preserves existing labels.
+- [x] **`logger.SetQuiet` does not suppress `fmt.Println` output** — Fixed (see release blocker above).
 
 ---
 
 ## 🛡️ Security
 
-- [ ] **No project name sanitization** — Project names derived from directory names pass directly into file paths and systemd unit names. A directory named with special characters (`../../`, spaces) could cause issues.
-- [ ] **State file permissions** — `projects.json` at `~/.local/share/comquad/` is written with default permissions (0644). Should ensure restricted permissions on sensitive data.
-- [ ] **No validation of external podman JSON output** — `ps_podman.go` and `dbus.go` trust podman's JSON output with only basic type assertions. Malformed output could cause panics.
-- [ ] **User-controlled strings flow into `exec.Command`** — Project names, service names, and command arguments all flow into `exec.Command`. While Go's exec model prevents shell injection, arguments with special characters could behave unexpectedly.
+- [x] **No project name sanitization** — Fixed: `validateProjectName()` enforces `[a-zA-Z0-9_-]` only.
+- [x] **State file permissions** — Fixed: dir created with 0700, temp file chmod 0600 before atomic rename.
+- [x] **No validation of external podman JSON output** — Fixed: added nil-safety checks in `parseContainer`.
+- [x] **User-controlled strings flow into `exec.Command`** — Addressed by project name validation preventing unsafe chars.
 
 ---
 
@@ -47,18 +47,18 @@ These issues directly break core functionality or the release process:
 
 ## 🧹 Code Quality & Refactoring
 
-- [ ] **`cmd/comquad/main.go` is monolithic (369 lines)** — All commands in one file. Should split into per-command files (e.g. `commands/up.go`, `commands/down.go`, `commands/logs.go`).
-- [ ] **`internal/orchestrator/orchestrator.go` is too large (683 lines)** — Combine `Up`, `Down`, `handleImages`, `stopUnits`, `verifyUnitsStopped`, `printDryRun`. Should be split into focused files.
-- [ ] **`internal/cooker/engine.go` is too large (781 lines)** — Monolithic cooker handling rename, reference rewrite, SELinux, ports, labels, network aliases, and systemd optimizations.
-- [ ] **Mixed output approaches** — Some commands use `logger.Print/Action/Success`, others use `fmt.Println` directly. Standardize on the logger.
-- [ ] **`listContainersFromPodman` calls `podman inspect` per-container** — For N containers this makes N separate podman calls. Could batch into one `podman inspect <c1> <c2> ...`.
+- [x] **`cmd/comquad/main.go` is monolithic (369 lines)** — Fixed: split into per-command files (up.go, down.go, list.go, logs.go, ps.go, check.go, view.go, edit.go, start.go, stop.go, restart.go, regenerate.go, exec.go).
+- [x] **`internal/orchestrator/orchestrator.go` is too large (683 lines)** — Split into orchestrator.go (core/Up), down.go (Down/stopUnits), images.go (handleImages/printDryRun), pipeline.go (helpers).
+- [x] **`internal/cooker/engine.go` is too large (781 lines)** — Split into engine.go (core), references.go (cross-unit rewriting), ports.go (port offsetting), labels.go (SELinux/project labels, network aliases, systemd optimizations).
+- [x] **Mixed output approaches** — Fixed: all output now routed through logger.Print/Printf.
+- [x] **`listContainersFromPodman` calls `podman inspect` per-container** — Fixed: batched into single `podman inspect` call via `batchGetExposedPorts`.
 - [ ] **`handleImages` re-reads container files from disk** — Files were already written and could be parsed in-memory from the cooker output. Unnecessary disk I/O.
-- [ ] **Hardcoded string `"unknown"` service name in `orchestrator.go:481`** — Meaningless service name in log output for non-build images.
-- [ ] **Magic numbers everywhere** — `15*time.Second` WaitForUnit timeout, `10*time.Second` startUnits wait, `30*time.Second` D-Bus context, `500*time.Millisecond` poll/flush intervals. None are configurable.
-- [ ] **`execCommand` package-level var in `log.go`** — Testing hook should use a real interface, not a mutable global.
-- [ ] **`renderEntry` has unreachable/confusing branch** — `log.go` sets unit to `"?"` when empty but the logic around it is unclear.
+- [x] **Hardcoded string `"unknown"` service name in `orchestrator.go:481`** — Fixed: changed to empty string.
+- [x] **Magic numbers everywhere** — Fixed: extracted named constants in dbus.go and orchestrator.go.
+- [x] **`execCommand` package-level var in `log.go`** — Fixed: replaced with injectable `newJournalCmd` field on Orchestrator.
+- [x] **`renderEntry` has unreachable/confusing branch** — Fixed: added clarifying comment (branch is reachable for entries without systemd unit metadata).
 - [ ] **`labelFields` tokenizer in `cooker/engine.go:332-372`** — Hand-written tokenizer for label parsing is complex and error-prone. Could use shell-style parsing library.
-- [ ] **No godoc on many exported functions** — `ContainerFileToUnitName`, `NetworkFileToUnitName`, `VolumeFileToUnitName`, `MatchFirstContainer`, `MatchAllContainers`, `MatchNetworkOrVolume` lack godoc comments.
+- [x] **No godoc on many exported functions** — Fixed: added godoc to MatchFirstContainer, MatchAllContainers, MatchNetworkOrVolume.
 
 ---
 

@@ -75,7 +75,7 @@ func (sm *StateManager) Save() error {
 
 func (sm *StateManager) save() error {
 	dir := filepath.Dir(sm.StateFilePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
@@ -91,6 +91,12 @@ func (sm *StateManager) save() error {
 		return err
 	}
 	tmpName := tmp.Name()
+
+	if err := tmp.Chmod(0600); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return err
+	}
 
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()

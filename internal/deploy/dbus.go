@@ -16,6 +16,14 @@ import (
 	"github.com/coreos/go-systemd/v22/dbus"
 )
 
+const (
+	unitStartTimeout     = 30 * time.Second
+	unitStopTimeout      = 30 * time.Second
+	unitRestartTimeout   = 30 * time.Second
+	waitForUnitTimeout   = 15 * time.Second
+	waitForUnitPoll      = 500 * time.Millisecond
+)
+
 // SystemdManager handles direct communication with the systemd D-Bus
 type SystemdManager struct {
 	conn *dbus.Conn
@@ -63,7 +71,7 @@ func (s *SystemdManager) ReloadDaemon(filePaths ...string) error {
 			continue
 		}
 		unitName := strings.TrimSuffix(filepath.Base(f), ".container") + ".service"
-		if err := s.WaitForUnit(unitName, 15*time.Second); err != nil {
+		if err := s.WaitForUnit(unitName, waitForUnitTimeout); err != nil {
 			return fmt.Errorf("quadlet generator did not produce unit %s after reload: %w", unitName, err)
 		}
 	}
@@ -87,7 +95,7 @@ func (s *SystemdManager) WaitForUnit(unitName string, timeout time.Duration) err
 			return nil
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(waitForUnitPoll)
 	}
 
 	return fmt.Errorf("timed out waiting for unit %s to appear in systemd", unitName)
@@ -96,7 +104,7 @@ func (s *SystemdManager) WaitForUnit(unitName string, timeout time.Duration) err
 // StartUnit starts a specific systemd unit and waits for the job to complete.
 // Returns an error if the unit fails to start or the job does not complete with "done".
 func (s *SystemdManager) StartUnit(unitName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), unitStartTimeout)
 	defer cancel()
 
 	ch := make(chan string, 1)
@@ -122,7 +130,7 @@ func (s *SystemdManager) StartUnit(unitName string) error {
 // StopUnit stops a specific systemd unit and waits for the job to complete.
 // Returns an error if the unit fails to stop or the job does not complete with "done".
 func (s *SystemdManager) StopUnit(unitName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), unitStopTimeout)
 	defer cancel()
 
 	ch := make(chan string, 1)
@@ -147,7 +155,7 @@ func (s *SystemdManager) StopUnit(unitName string) error {
 // RestartUnit restarts a specific systemd unit and waits for the job to complete.
 // Unlike StartUnit, this always tears down and recreates the unit even if already active.
 func (s *SystemdManager) RestartUnit(unitName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), unitRestartTimeout)
 	defer cancel()
 
 	ch := make(chan string, 1)
@@ -333,7 +341,7 @@ func RegenerateState() (*StateManager, error) {
 		var files []string
 		entries, err := os.ReadDir(targetDir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to read target directory %s: %v\n", targetDir, err)
+			logger.Warn(fmt.Sprintf("Failed to read target directory %s: %v", targetDir, err))
 			continue
 		}
 

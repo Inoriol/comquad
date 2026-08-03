@@ -54,9 +54,9 @@ func (o *Orchestrator) Start(services []string, dryRun bool) error {
 	}
 
 	if dryRun {
-		fmt.Printf("Dry run: would start %d unit(s):\n", len(units))
+		logger.Printf("Dry run: would start %d unit(s):\n", len(units))
 		for _, unitName := range units {
-			fmt.Println("  " + unitName)
+			logger.Print("  " + unitName)
 		}
 		return nil
 	}
@@ -77,7 +77,7 @@ func (o *Orchestrator) Start(services []string, dryRun bool) error {
 	if len(services) == 0 {
 		logger.Print("Successfully started project: " + o.projectName)
 	} else {
-		logger.Print(fmt.Sprintf("Successfully started %d unit(s) for project: %s", len(units), o.projectName))
+		logger.Printf("Successfully started %d unit(s) for project: %s\n", len(units), o.projectName)
 	}
 
 	return nil
@@ -91,9 +91,9 @@ func (o *Orchestrator) Stop(services []string, dryRun bool) error {
 	}
 
 	if dryRun {
-		fmt.Printf("Dry run: would stop %d unit(s):\n", len(units))
+		logger.Printf("Dry run: would stop %d unit(s):\n", len(units))
 		for _, unitName := range units {
-			fmt.Println("  " + unitName)
+			logger.Print("  " + unitName)
 		}
 		return nil
 	}
@@ -119,7 +119,7 @@ func (o *Orchestrator) Stop(services []string, dryRun bool) error {
 	if len(services) == 0 {
 		logger.Print("Successfully stopped project: " + o.projectName)
 	} else {
-		logger.Print(fmt.Sprintf("Successfully stopped %d unit(s) for project: %s", len(units), o.projectName))
+		logger.Printf("Successfully stopped %d unit(s) for project: %s\n", len(units), o.projectName)
 	}
 
 	return nil
@@ -133,9 +133,9 @@ func (o *Orchestrator) Restart(services []string, dryRun bool) error {
 	}
 
 	if dryRun {
-		fmt.Printf("Dry run: would restart %d unit(s):\n", len(units))
+		logger.Printf("Dry run: would restart %d unit(s):\n", len(units))
 		for _, unitName := range units {
-			fmt.Println("  " + unitName)
+			logger.Print("  " + unitName)
 		}
 		return nil
 	}
@@ -156,7 +156,7 @@ func (o *Orchestrator) Restart(services []string, dryRun bool) error {
 	if len(services) == 0 {
 		logger.Print("Successfully restarted project: " + o.projectName)
 	} else {
-		logger.Print(fmt.Sprintf("Successfully restarted %d unit(s) for project: %s", len(units), o.projectName))
+		logger.Printf("Successfully restarted %d unit(s) for project: %s\n", len(units), o.projectName)
 	}
 
 	return nil

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
+
+	"comquad/internal/logger"
 )
 
 // Ps shows the current state of containers for the project.
@@ -20,7 +22,7 @@ func (o *Orchestrator) Ps(all bool) error {
 	}
 
 	if len(containers) == 0 {
-		fmt.Printf("No containers found for project %s\n", o.projectName)
+		logger.Printf("No containers found for project %s\n", o.projectName)
 		return nil
 	}
 
@@ -100,8 +102,8 @@ func printPsTable(containers []ContainerInfo) {
 		createdW, "CREATED",
 		statusW, "STATUS",
 		portsW, "PORTS")
-	fmt.Println(header)
-	fmt.Println(strings.Repeat("-", len(header)))
+	logger.Print(header)
+	logger.Print(strings.Repeat("-", len(header)))
 
 	for _, c := range containers {
 		status := c.Status
@@ -122,7 +124,7 @@ func printPsTable(containers []ContainerInfo) {
 			createdW, created,
 			statusW, truncate(status, statusW),
 			portsW, truncate(portStr, portsW))
-		fmt.Println(row)
+		logger.Print(row)
 	}
 }
 

@@ -1,6 +1,7 @@
 package build
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -34,10 +35,17 @@ type ImageResult struct {
 	Error    error
 }
 
-// ImageExists checks if an image exists locally
+// ImageExists checks if an image exists locally.
+// Returns false if the image is not found (exit code 125) or if podman
+// encounters an unexpected error. Non-125 errors are logged as warnings
+// since they may indicate a podman installation problem.
 func (e *Engine) ImageExists(image string) bool {
 	cmd := exec.Command("podman", "image", "inspect", image)
 	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() != 125 {
+			logger.Warn(fmt.Sprintf("podman image inspect failed for %s: %v", image, err))
+		}
 		return false
 	}
 	return true

@@ -56,7 +56,10 @@ func matchAllContainers(projectName string, state deploy.ProjectState, arg strin
 	return matches
 }
 
-// MatchFirstContainer finds the first container quadlet file matching the given arg.
+// MatchFirstContainer finds the first container quadlet file matching arg.
+// Six patterns are tried: exact base name, name without extension,
+// name without .service suffix, short name (strip cq-<project>- prefix),
+// internal Podman name (strip cq- prefix), ContainerName= directive.
 func MatchFirstContainer(projectName string, state deploy.ProjectState, arg string) string {
 	matches := matchAllContainers(projectName, state, arg)
 	if len(matches) == 0 {
@@ -65,7 +68,9 @@ func MatchFirstContainer(projectName string, state deploy.ProjectState, arg stri
 	return matches[0]
 }
 
-// MatchAllContainers finds all container quadlet files matching the given arg.
+// MatchAllContainers finds all container quadlet files matching arg.
+// Uses the same six matching patterns as MatchFirstContainer but returns
+// all matches instead of just the first.
 func MatchAllContainers(projectName string, state deploy.ProjectState, arg string) []string {
 	return matchAllContainers(projectName, state, arg)
 }
@@ -73,17 +78,22 @@ func MatchAllContainers(projectName string, state deploy.ProjectState, arg strin
 // MatchNetworkOrVolume finds a network or volume quadlet file matching the given arg.
 func MatchNetworkOrVolume(projectName string, state deploy.ProjectState, arg string) string {
 	for _, f := range state.Files {
-		if !strings.HasSuffix(f, ".network") && !strings.HasSuffix(f, ".volume") {
+		base := filepath.Base(f)
+		if !strings.HasSuffix(base, ".network") && !strings.HasSuffix(base, ".volume") {
 			continue
 		}
-		base := filepath.Base(f)
-		nameWithoutExt := strings.TrimSuffix(base, ".network")
-		nameWithoutExt = strings.TrimSuffix(nameWithoutExt, ".volume")
 
-		serviceName := nameWithoutExt
+		var nameWithoutExt string
+		if strings.HasSuffix(base, ".network") {
+			nameWithoutExt = strings.TrimSuffix(base, ".network")
+		} else {
+			nameWithoutExt = strings.TrimSuffix(base, ".volume")
+		}
+
+		var serviceName string
 		if strings.HasSuffix(base, ".network") {
 			serviceName = nameWithoutExt + "-network"
-		} else if strings.HasSuffix(base, ".volume") {
+		} else {
 			serviceName = nameWithoutExt + "-volume"
 		}
 

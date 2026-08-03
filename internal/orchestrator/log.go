@@ -11,6 +11,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"comquad/internal/logger"
+)
+
+const (
+	logFlushInterval = 500 * time.Millisecond
 )
 
 // journalEntry represents a parsed journalctl JSON log entry.
@@ -102,7 +108,7 @@ func renderEntry(entry journalEntry, showTime bool) string {
 	}
 	unitStr := entry.unit
 	if unitStr == "" {
-		unitStr = "?"
+		unitStr = "?" // fallback for entries without SYSTEMD_UNIT or _SYSTEMD_USER_UNIT
 	}
 	parts = append(parts, "["+unitStr+"]")
 	parts = append(parts, priorityText(entry.priority)+": "+entry.message)
@@ -114,9 +120,12 @@ func flushEntries(entries []journalEntry, showTime bool) {
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].timestamp < entries[j].timestamp
 	})
+	var buf strings.Builder
 	for _, e := range entries {
-		fmt.Println(renderEntry(e, showTime))
+		buf.WriteString(renderEntry(e, showTime))
+		buf.WriteByte('\n')
 	}
+	logger.Printf("%s", buf.String())
 }
 
 // Logs prints logs for a deployed project's services via journalctl.
@@ -235,8 +244,6 @@ func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, 
 	return nil
 }
 
-var execCommand = exec.Command
-
 // collectJournalEntries runs journalctl and returns parsed entries (no sorting).
 func (o *Orchestrator) collectJournalEntries(unitNames []string, invocationID, tail, since string) ([]journalEntry, error) {
 	args := []string{"--no-pager", "--output=json"}
@@ -259,7 +266,7 @@ func (o *Orchestrator) collectJournalEntries(unitNames []string, invocationID, t
 		args = append(args, "--invocation="+invocationID)
 	}
 
-	cmd := execCommand("journalctl", args...)
+	cmd := o.newJournalCmd("journalctl", args...)
 	cmd.Stderr = os.Stderr
 
 	stdout, err := cmd.StdoutPipe()
@@ -313,7 +320,7 @@ func (o *Orchestrator) runJournalctlJSONFollowForGroup(unitNames []string, invoc
 		args = append(args, "--invocation="+invocationID)
 	}
 
-	cmd := execCommand("journalctl", args...)
+	cmd := o.newJournalCmd("journalctl", args...)
 	cmd.Stderr = os.Stderr
 
 	return o.runJournalctlJSONFollow(cmd, showTime)
@@ -356,7 +363,7 @@ func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) err
 		waitErr <- cmd.Wait()
 	}()
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(logFlushInterval)
 	defer ticker.Stop()
 
 	for {
@@ -438,7 +445,7 @@ func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 		args = append(args, "-u", unit)
 	}
 
-	cmd := execCommand("journalctl", args...)
+	cmd := o.newJournalCmd("journalctl", args...)
 	cmd.Stderr = os.Stderr
 
 	return o.runJournalctlJSONFollow(cmd, showTime)
