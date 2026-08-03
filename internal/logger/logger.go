@@ -65,6 +65,17 @@ func Print(msg string) {
 	fmt.Println(msg)
 }
 
+// Printf formats and prints a plain message, suppressed when quiet mode is active.
+func Printf(format string, args ...interface{}) {
+	mu.Lock()
+	q := quiet
+	mu.Unlock()
+	if q {
+		return
+	}
+	fmt.Printf(format, args...)
+}
+
 func colorize(colorCode, msg string) string {
 	mu.Lock()
 	n := noColor

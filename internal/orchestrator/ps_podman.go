@@ -32,17 +32,22 @@ func listContainersFromPodman(projectName string, all bool) ([]ContainerInfo, er
 		if c == nil {
 			continue
 		}
-		exposed, err := getExposedPorts(c.Name)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "comquad: warning: failed to get exposed ports for %s: %v\n", c.Name, err)
-		}
-		c.ExposedPorts = exposed
 		containers = append(containers, *c)
+	}
+
+	exposedPortsMap := batchGetExposedPorts(containers)
+
+	for i := range containers {
+		containers[i].ExposedPorts = exposedPortsMap[containers[i].Name]
 	}
 	return containers, nil
 }
 
 func parseContainer(raw map[string]interface{}) *ContainerInfo {
+	if raw == nil {
+		return nil
+	}
+
 	var name string
 	if namesRaw, ok := raw["Names"].([]interface{}); ok && len(namesRaw) > 0 {
 		if n, ok := namesRaw[0].(string); ok {
@@ -156,29 +161,46 @@ func parseStringSlice(raw interface{}) []string {
 	return result
 }
 
-func getExposedPorts(containerName string) ([]string, error) {
-	cmd := exec.Command("podman", "inspect", containerName)
+func batchGetExposedPorts(containers []ContainerInfo) map[string][]string {
+	if len(containers) == 0 {
+		return nil
+	}
+
+	names := make([]string, len(containers))
+	for i, c := range containers {
+		names[i] = c.Name
+	}
+
+	args := append([]string{"inspect"}, names...)
+	cmd := exec.Command("podman", args...)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to inspect container %s: %w", containerName, err)
+		fmt.Fprintf(os.Stderr, "comquad: warning: failed to inspect containers: %v\n", err)
+		return nil
 	}
 
 	var inspectResults []struct {
 		Config struct {
 			ExposedPorts map[string]interface{} `json:"ExposedPorts"`
 		} `json:"Config"`
+		Name string `json:"Name"`
 	}
 	if err := json.Unmarshal(output, &inspectResults); err != nil {
-		return nil, fmt.Errorf("failed to parse inspect output: %w", err)
-	}
-	if len(inspectResults) == 0 || inspectResults[0].Config.ExposedPorts == nil {
-		return nil, nil
+		fmt.Fprintf(os.Stderr, "comquad: warning: failed to parse inspect output: %v\n", err)
+		return nil
 	}
 
-	var exposed []string
-	for portKey := range inspectResults[0].Config.ExposedPorts {
-		exposed = append(exposed, portKey)
+	result := make(map[string][]string, len(inspectResults))
+	for _, r := range inspectResults {
+		if r.Name == "" || r.Config.ExposedPorts == nil {
+			continue
+		}
+		var ports []string
+		for portKey := range r.Config.ExposedPorts {
+			ports = append(ports, portKey)
+		}
+		sort.Strings(ports)
+		result[r.Name] = ports
 	}
-	sort.Strings(exposed)
-	return exposed, nil
+	return result
 }

@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"comquad/internal/logger"
 )
 
 // Exec runs a command inside a single running container via podman exec.
@@ -54,6 +56,10 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 	base := strings.TrimSuffix(filepath.Base(matches[0]), ".container")
 	containerName := strings.TrimPrefix(base, "cq-")
 
+	if _, err := exec.LookPath("podman"); err != nil {
+		return fmt.Errorf("podman not found in PATH: %w", err)
+	}
+
 	// Build podman exec command
 	cmdArgs := []string{"exec"}
 	if tty {
@@ -70,11 +76,7 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	fmt.Printf("Executing in container '%s': podman exec %s\n", containerName, strings.Join(cmdArgs[2:], " "))
-
-	if _, err := exec.LookPath("podman"); err != nil {
-		return fmt.Errorf("podman not found in PATH: %w", err)
-	}
+	logger.Printf("Executing in container '%s': podman exec %s\n", containerName, strings.Join(cmdArgs[2:], " "))
 
 	return cmd.Run()
 }

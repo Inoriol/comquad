@@ -27,13 +27,16 @@ Steps 4–5 are skipped entirely: no files are written to the systemd directory,
 The codebase is organized cleanly into domains matching the execution lifecycle steps:
 
 ```text
-cmd/comquad/           # CLI entry point managed by Cobra commands
+cmd/comquad/           # CLI entry point: main.go + per-command files (up.go, down.go, logs.go, …)
 internal/build/        # Image building and registry pulling routines
-internal/cooker/       # Post-processes quadlet files (renaming, reference rewriting)
+internal/cooker/       # Post-processes quadlet files: engine.go (core), references.go (rewriting),
+                       #   ports.go (offsetting), labels.go (SELinux/aliases/systemd opts)
 internal/deploy/       # Systemd D-Bus communication, target directories, state tracking,
                        # and the SystemdClient / StateStore interfaces used for testing
-internal/logger/       # Colorized verbose logging utility
-internal/orchestrator/ # The engine that wires all packages together to drive the up/down lifecycle
+internal/logger/       # Colorized logging with quiet/verbose tiers
+internal/orchestrator/ # The engine wiring all packages: orchestrator.go (core/Up), down.go,
+                       #   images.go (build/pull/printDryRun), pipeline.go (helpers), plus
+                       #   per-command files (lifecycle, logs, exec, view, edit, etc.)
 internal/preprocess/   # Pre-parser to normalize raw compose.yaml files
 internal/transpile/    # Wrapper executing the podlet binary
 
@@ -300,12 +303,13 @@ The orchestrator package was historically untestable because it constructed `Sys
 - **`SystemdClient`** — all nine D-Bus methods used by the orchestrator (`StartUnit`, `StopUnit`, `RestartUnit`, `ReloadDaemon`, `WaitForUnit`, `ListUnitsByNames`, `ListAllUnits`, `GetInvocationID`, `Close`). The concrete `SystemdManager` satisfies this interface.
 - **`StateStore`** — all state operations used by the orchestrator (`GetProject`, `GetStateFilePath`, `ListProjects`, `RegisterProject`, `UnregisterProject`, `Save`). The concrete `StateManager` satisfies this interface. `GetProject` replaces direct `Projects[name]` map access, making the interface satisfiable without exposing the map.
 
-`Orchestrator` holds three factory fields instead of calling the constructors directly:
+`Orchestrator` holds four factory fields instead of calling the constructors directly:
 
 ```go
 newState       func() (deploy.StateStore, error)
 newSystemd     func() (deploy.SystemdClient, error)
 listContainers func(projectName string, all bool) ([]ContainerInfo, error)
+newJournalCmd  func(name string, args ...string) *exec.Cmd
 ```
 
 `NewOrchestrator` wires in the real implementations. Tests override these fields with in-memory fakes (`mockStateStore`, `mockSystemdClient`) that record calls and return canned responses, enabling full unit-test coverage without a live D-Bus or Podman daemon.

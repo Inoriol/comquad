@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"comquad/internal/deploy"
+	"comquad/internal/logger"
 )
 
 // Edit opens project units or a specific unit file in the editor.
@@ -112,17 +113,17 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	}
 
 	if len(changedFiles) == 0 {
-		fmt.Println("No changes detected.")
+		logger.Print("No changes detected.")
 		return nil
 	}
 
-	fmt.Printf("Changes detected in %d file(s):\n", len(changedFiles))
+	logger.Printf("Changes detected in %d file(s):\n", len(changedFiles))
 	for _, f := range changedFiles {
-		fmt.Printf("  %s\n", f)
+		logger.Printf("  %s\n", f)
 	}
 
 	if noReload {
-		fmt.Println("Skipping reload (--no-reload flag set).")
+		logger.Print("Skipping reload (--no-reload flag set).")
 		return nil
 	}
 
@@ -133,7 +134,7 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	}
 	defer dbusMgr.Close()
 
-	fmt.Println("Reloading systemd daemon...")
+	logger.Print("Reloading systemd daemon...")
 	if err := dbusMgr.ReloadDaemon(changedFiles...); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
@@ -144,7 +145,7 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	for _, f := range changedFiles {
 		if strings.HasSuffix(f, ".container") {
 			unitName := ContainerFileToUnitName(f)
-			fmt.Printf("Restarting unit: %s\n", unitName)
+			logger.Printf("Restarting unit: %s\n", unitName)
 			if err := dbusMgr.RestartUnit(unitName); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: failed to restart unit %s: %v\n", unitName, err)
 				failedCount++
@@ -154,10 +155,10 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 		}
 	}
 
-	fmt.Printf("Reloaded daemon, restarted %d container unit(s)", restartCount)
+	msg := fmt.Sprintf("Reloaded daemon, restarted %d container unit(s)", restartCount)
 	if failedCount > 0 {
-		fmt.Printf(", %d failed", failedCount)
+		msg += fmt.Sprintf(", %d failed", failedCount)
 	}
-	fmt.Println()
+	logger.Print(msg)
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/coreos/go-systemd/v22/dbus"
 
 	"comquad/internal/deploy"
+	"comquad/internal/logger"
 )
 
 // View shows systemd units for a project or the contents of a specific unit file.
@@ -46,7 +47,7 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 	}
 
 	if len(projectUnits) == 0 {
-		fmt.Printf("No units found for project %s\n", o.projectName)
+		logger.Printf("No units found for project %s\n", o.projectName)
 		return nil
 	}
 
@@ -67,15 +68,15 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 		status = "degraded"
 	}
 
-	fmt.Printf("%-12s %-40s %s\n", "PROJECT", "SOURCE", "STATUS")
-	fmt.Println(strings.Repeat("-", 62))
-	fmt.Printf("%-12s %-40s %s\n", o.projectName, state.SourcePath, status)
-	fmt.Println()
+	logger.Printf("%-12s %-40s %s\n", "PROJECT", "SOURCE", "STATUS")
+	logger.Print(strings.Repeat("-", 62))
+	logger.Printf("%-12s %-40s %s\n", o.projectName, state.SourcePath, status)
+	logger.Print("")
 
-	fmt.Printf("%-40s %-10s %-10s\n", "UNIT", "ACTIVE", "SUB")
-	fmt.Println(strings.Repeat("-", 60))
+	logger.Printf("%-40s %-10s %-10s\n", "UNIT", "ACTIVE", "SUB")
+	logger.Print(strings.Repeat("-", 60))
 	for _, u := range projectUnits {
-		fmt.Printf("%-40s %-10s %-10s\n", u.Name, u.ActiveState, u.SubState)
+		logger.Printf("%-40s %-10s %-10s\n", u.Name, u.ActiveState, u.SubState)
 	}
 
 	return nil
@@ -114,9 +115,9 @@ func (o *Orchestrator) printFile(path string) error {
 		return fmt.Errorf("failed to read %s: %w", path, err)
 	}
 
-	fmt.Print(string(content))
+	logger.Printf("%s", string(content))
 	if !strings.HasSuffix(string(content), "\n") {
-		fmt.Println()
+		logger.Print("")
 	}
 
 	return nil

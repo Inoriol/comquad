@@ -114,6 +114,8 @@ comquad down --dry-run
 
 # Show every transformation (port offsets, path normalizations, etc.)
 comquad up -v
+comquad down -v     # Also works with all subcommands
+comquad ps -v
 
 ```
 

@@ -3,6 +3,8 @@ package orchestrator
 import (
 	"fmt"
 	"strings"
+
+	"comquad/internal/logger"
 )
 
 // List prints all currently deployed projects and their files
@@ -15,17 +17,17 @@ func (o *Orchestrator) List() error {
 	projects := stateMgr.ListProjects()
 
 	if len(projects) == 0 {
-		fmt.Println("No projects currently deployed.")
+		logger.Print("No projects currently deployed.")
 		return nil
 	}
 
-	fmt.Printf("%-20s %-40s %s\n", "PROJECT", "SOURCE", "FILES")
-	fmt.Println(strings.Repeat("-", 72))
+	logger.Printf("%-20s %-40s %s\n", "PROJECT", "SOURCE", "FILES")
+	logger.Print(strings.Repeat("-", 72))
 	for _, p := range projects {
 		if o.projectName != "" && p.ProjectName != o.projectName {
 			continue
 		}
-		fmt.Printf("%-20s %-40s %d units\n", p.ProjectName, p.SourcePath, len(p.Files))
+		logger.Printf("%-20s %-40s %d units\n", p.ProjectName, p.SourcePath, len(p.Files))
 	}
 
 	return nil

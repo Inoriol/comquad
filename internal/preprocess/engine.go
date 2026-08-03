@@ -116,6 +116,15 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		case StringMap:
 			labels["com.comquad.force-volume"] = "true"
 			vol["labels"] = labels
+		case map[string]interface{}:
+			sm := make(StringMap)
+			for k, v := range labels {
+				if s, ok := v.(string); ok {
+					sm[k] = s
+				}
+			}
+			sm["com.comquad.force-volume"] = "true"
+			vol["labels"] = sm
 		case []interface{}:
 			// Convert list format to StringMap, preserving existing entries
 			sm := make(StringMap)
