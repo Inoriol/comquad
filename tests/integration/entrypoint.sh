@@ -1,20 +1,19 @@
 #!/bin/bash
-# Integration test entrypoint — builds comquad and runs the test suite.
+# Integration test entrypoint — runs the test suite inside the container.
 # Set CQ_ROOTLESS=1 to run tests as the testuser (rootless mode).
+# The comquad binary must already be built at CQ_BINARY before running.
 
 set -e
 
 echo "=== Comquad Integration Test Runner ==="
-echo "Building comquad..."
-go build -o /workspace/comquad ./cmd/comquad
-export CQ_BINARY=/workspace/comquad
+echo "Using binary: $CQ_BINARY"
 
 TEST_ARGS="${@:-./tests/integration/...}"
 
 if [ "${CQ_ROOTLESS:-}" = "1" ]; then
     echo "=== Running ROOTLESS integration tests ==="
     su - testuser -c "
-        export CQ_BINARY=/workspace/comquad
+        export CQ_BINARY=$CQ_BINARY
         export XDG_RUNTIME_DIR=/run/user/\$(id -u)
         mkdir -p \$XDG_RUNTIME_DIR
         cd /workspace

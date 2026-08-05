@@ -330,6 +330,23 @@ The `normalizeImage()` function in `internal/preprocess/` ensures images have fu
 
 The `transpile` package is tested via a fake `podlet` shell script placed on a temp PATH entry, exercising the stdin pipe, argument passing, and error paths without requiring the real binary.
 
+### CI Pipeline & Build
+
+Automated testing runs via `.github/workflows/test.yml` on every push and PR to `main`:
+
+- **Build & vet** — `go build ./...` and `go vet ./...`
+- **Short tests** — `go test -short` (skips tests requiring external binaries)
+- **Race detector** — `go test -race` on all packages
+- **Coverage** — `go test -cover` with per-package and total coverage report
+
+Makefile targets (`make test-unit`, `make test-race`, `make test-cover`, `make test-short`) provide
+the same commands locally. Coverage currently sits at ~60% overall, with `cooker` (89%), `transpile`
+(85%), and `preprocess` (82%) leading the way.
+
+The `captureStdout` helper in `internal/orchestrator/dryrun_test.go` uses a `sync.Mutex` to serialize
+`os.Stdout` redirection, making it safe to use alongside `t.Parallel()` — only the capture window
+serializes, not the entire test.
+
 ## 📋 Follow Logs on Deploy
 
 When `comquad up -f` is used, after successfully deploying all units the CLI captures the current timestamp and streams all journal logs for every project unit (containers, networks, and volumes) from that point onward. This emulates the default `docker compose up` behavior (without `-d`), keeping the terminal attached to live output until interrupted with Ctrl+C.
@@ -417,15 +434,19 @@ real cgroup hierarchy, and real systemd unit activation — without touching the
 The test image is defined in `tests/integration/Containerfile` and baked ahead of
 time (never installed at test runtime) with all required dependencies:
 
-- `golang` — to compile comquad inside the container
+- `golang` — to compile and run integration test binaries
 - `podman` — container runtime
 - `systemd` — PID 1, D-Bus, unit management
 - `podlet` — quadlet transpiler (Fedora package)
 - `sudo`, `shadow-utils`, `slirp4netns`, `fuse-overlayfs` — rootless support
 
+The `comquad` binary is pre-built on the host (`make build`) and mounted read-only
+into the container via the workspace volume, so the container never rebuilds it.
+
 A non-root user (`testuser`) is pre-created with `/etc/subuid` and `/etc/subgid`
-entries and `loginctl enable-linger` applied, so the systemd user instance starts
-correctly for rootless test scenarios.
+entries. Linger is enabled by writing `/var/lib/systemd/linger/testuser` directly
+(no runtime `loginctl` call needed), so the systemd user instance starts correctly
+for rootless test scenarios.
 
 ### Test Structure
 

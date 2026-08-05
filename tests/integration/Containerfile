@@ -1,6 +1,5 @@
-FROM fedora:43
+FROM fedora:41
 
-# Core dependencies — baked in, never pulled at test time
 RUN dnf install -y \
     golang \
     podman \
@@ -16,19 +15,13 @@ RUN dnf install -y \
     iptables \
     && dnf clean all
 
-# Create a non-root test user for rootless scenarios
 RUN useradd -m -s /bin/bash testuser \
     && echo "testuser:100000:65536" >> /etc/subuid \
     && echo "testuser:100000:65536" >> /etc/subgid \
     && echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Enable linger so the user systemd instance starts at boot
-RUN loginctl enable-linger testuser || true
+RUN mkdir -p /var/lib/systemd/linger && touch /var/lib/systemd/linger/testuser
 
-# Helper script: starts systemd, builds comquad, runs tests.
-# Usage:
-#   podman run ... comquad-test:latest /entrypoint.sh            # root tests
-#   podman run -e CQ_ROOTLESS=1 ... comquad-test:latest /entrypoint.sh  # rootless
 COPY tests/integration/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
