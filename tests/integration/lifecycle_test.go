@@ -5,7 +5,6 @@ package integration
 import (
  "fmt"
  "testing"
- "time"
 
  "comquad/tests/integration/helpers"
 )
@@ -55,11 +54,8 @@ func TestLifecycle_Restart(t *testing.T) {
  unitName := fmt.Sprintf("cq-%s-web.service", project)
  helpers.AssertUnitActive(t, unitName, false)
 
- helpers.MustSucceed(t, dir, "restart", "--name", project)
-
- // Give systemd time to cycle the unit
- time.Sleep(2 * time.Second)
- helpers.AssertUnitActive(t, unitName, false)
+	helpers.MustSucceed(t, dir, "restart", "--name", project)
+	helpers.AssertUnitActive(t, unitName, false)
 }
 
 func TestLifecycle_StopSpecificService(t *testing.T) {
@@ -134,10 +130,8 @@ func TestLifecycle_RestartSpecificService(t *testing.T) {
  helpers.AssertUnitActive(t, apiUnit, false)
 
  // Restart only web
- helpers.MustSucceed(t, dir, "restart", "--name", project, "web")
- time.Sleep(2 * time.Second)
-
- helpers.AssertUnitActive(t, webUnit, false)
+	helpers.MustSucceed(t, dir, "restart", "--name", project, "web")
+	helpers.AssertUnitActive(t, webUnit, false)
  // api should be untouched
  helpers.AssertUnitActive(t, apiUnit, false)
 }

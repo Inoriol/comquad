@@ -8,9 +8,9 @@ When you run `comquad up`, the engine moves your configuration through a five-st
 
 1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels, replaces `build:` blocks with `image:` directives).
 2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, and `.volume` quadlet files.
-3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed.
-4. **Build** — Builds local images via `podman build` using build context extracted from the original compose file during preprocessing, validates existing local images, or pulls missing ones from the registry.
-5. **Deploy** — Relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus.
+3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed. Returns a `CookResult` containing the in-memory content of all written files (keyed by destination path) to avoid redundant disk I/O in subsequent steps.
+4. **Build** — Builds local images via `podman build` using build context extracted from the original compose file during preprocessing, validates existing local images, or pulls missing ones from the registry. Receives the in-memory file contents from step 3 instead of re-reading from disk to extract `Image=` directives.
+5. **Deploy** — Relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus. If `startUnits` fails, the cleanup function removes all files, unregisters the project, and reloads the daemon to prevent a half-deployed state.
 
 ### Dry Run Mode (`--dry-run`)
 
@@ -62,6 +62,8 @@ my_nginx             docker.io/library/nginx:alpine nginx -g daemon off;      ng
 
 Columns are auto-width based on content. Exited containers show `Exited (<code>) <time>` in the status column. Dead containers show `Dead`. Ports are formatted as `host_ip:host_port->container_port/protocol` for published ports, and `port/protocol` for exposed ports (container-only, no host binding). Exposed ports are listed first, followed by published ports. Created time uses relative format (`just now`, `5m ago`, `2d ago`, or `Jan 02 2006` for older entries).
 
+Containers are sorted: running first (by name), then exited (by name), then other states (by name). This ensures `ps -a` groups exited containers together at the bottom of the table.
+
 **Flags:**
 
 * `-a, --all` — Include exited/dead containers (uses `podman ps -a`)
@@ -74,7 +76,7 @@ The `view` command provides two modes of inspection:
 
 **Project view** (no service argument): queries systemd D-Bus for all units belonging to a project, computes aggregate health status, and displays a table of `UNIT`, `ACTIVE`, and `SUB` states. Status is `healthy` when all units are active, `down` when none are active, and `degraded` when only some are active.
 
-**Unit file view** (with service argument): resolves the quadlet file using five matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, `cq-myapp-web.container`, or `myapp-web`), reads the file, and prints its contents.
+**Unit file view** (with service argument): resolves the quadlet file using five matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, `cq-myapp-web.container`, or `myapp-web`), reads the file, and prints its contents prefixed with a `── <filename> ──` header.
 
 Unit resolution iterates over `state.Files` from `projects.json`, checking each pattern in order until a match is found.
 
@@ -82,7 +84,7 @@ Unit resolution iterates over `state.Files` from `projects.json`, checking each 
 
 The `edit` command provides two modes of file editing:
 
-**Project edit** (no service argument): resolves all `.container`, `.network`, and `.volume` quadlet files for a project and opens them in `$EDITOR` (falls back to `vi`). `$EDITOR` is split on whitespace, so values like `"vim -o"` or `"code --wait"` work correctly. After the editor exits, comquad compares file contents and auto-reloads systemd, restarting any changed container units.
+**Project edit** (no service argument): resolves all `.container`, `.network`, and `.volume` quadlet files for a project and opens them in `$EDITOR` (falls back to `findDefaultEditor()` which probes `editor`, `nano`, `vim`, then `vi`). `$EDITOR` is split on whitespace, so values like `"vim -o"` or `"code --wait"` work correctly. After the editor exits, comquad compares file contents and auto-reloads systemd, restarting any changed container units.
 
 **Unit file edit** (with service argument): resolves a single quadlet file using the same matching patterns as `view`, opens it in the editor, and reloads systemd if changes were detected.
 
@@ -140,11 +142,15 @@ The `down` command performs a complete teardown of a deployed project in six ste
 ```bash
 comquad down          # stops containers, removes networks, removes quadlet files
 comquad down -d       # also removes Podman volumes
+comquad down -y       # skip confirmation prompt
 comquad down --dry-run # preview what would be removed without making changes
 ```
 
+The `down` command prompts for confirmation when stdin is a terminal. This prevents accidental teardown. Confirmation is skipped when `--dry-run`, `--yes`/`-y`, or when stdin is not a terminal (piped/non-interactive).
+
 **Flags:**
 * `-d, --delete-volumes` — Also remove Podman volumes
+* `-y, --yes` — Skip confirmation prompt
 * `--dry-run` — Show what would be removed without actually removing anything
 
 ## 🐳 Exec Command
@@ -338,9 +344,19 @@ comquad has three output modes, controlled by flags on the root command:
 
 | Mode | Flag | What's shown |
 |---|---|---|
-| Normal (default) | *(none)* | Operational messages: unit starts/stops, deploy success, errors |
+| Normal (default) | *(none)* | Operational messages: pipeline stage progress, unit starts/stops, deploy success, errors |
 | Verbose | `-v` / `--verbose` | All of the above plus every pipeline transformation |
 | Quiet | `-q` / `--quiet` | Errors only (stderr). All other output is suppressed. Useful in scripts. |
+
+The `Up` pipeline now prints progress indicators at each stage via `logger.Action()`:
+- "Reading compose file..."
+- "Preprocessing compose configuration..."
+- "Transpiling to quadlet files..."
+- "Generating quadlet files..."
+- "Handling images..."
+- "Starting services..."
+
+These appear in normal mode (blue), distinct from verbose-only `logger.Info()` output.
 
 `--quiet` takes precedence over `--verbose`. `logger.Error(...)` always writes to stderr regardless of either flag.
 

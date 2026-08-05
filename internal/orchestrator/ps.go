@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -58,6 +59,23 @@ func (o *Orchestrator) Ps(all bool) error {
 	}
 
 	// Print table
+	// Sort: running first by name, then other states by name
+	sort.SliceStable(containers, func(i, j int) bool {
+		if containers[i].State == "running" && containers[j].State != "running" {
+			return true
+		}
+		if containers[i].State != "running" && containers[j].State == "running" {
+			return false
+		}
+		if containers[i].State == "exited" && containers[j].State != "exited" && containers[j].State != "running" {
+			return true
+		}
+		if containers[i].State != "exited" && containers[i].State != "running" && containers[j].State == "exited" {
+			return false
+		}
+		return strings.ToLower(containers[i].Name) < strings.ToLower(containers[j].Name)
+	})
+
 	printPsTable(containers)
 
 	return nil

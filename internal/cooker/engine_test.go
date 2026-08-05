@@ -20,7 +20,7 @@ func TestCook_RenamesFiles(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -42,7 +42,7 @@ func TestCook_AlreadyHasPrefix(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -61,7 +61,7 @@ func TestCook_ReplacesGenericComquadPrefix(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -89,7 +89,7 @@ func TestCook_RewritesNetworkReferences(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -126,7 +126,7 @@ func TestCook_RewritesVolumeReferences(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -158,7 +158,7 @@ func TestCook_NoDoublePrefixOnNetworkReference(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -192,7 +192,7 @@ func TestCook_NoDoublePrefixOnVolumeReference(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -227,7 +227,7 @@ func TestCook_RewritesUnitSectionAfter(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -264,7 +264,7 @@ func TestCook_RewritesUnitSectionMultipleRefs(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -295,7 +295,7 @@ func TestCook_NoDoublePrefixOnUnitReference(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -330,7 +330,7 @@ func TestCook_RewritesUnitSectionWithCqPrefix(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -358,7 +358,7 @@ func TestCook_AddsInstallSectionToContainer(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -386,7 +386,7 @@ func TestCook_AddsInstallSectionToNetwork(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -411,7 +411,7 @@ func TestCook_SkipsAutoUpdateWhenNoAutoupdateLabel(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -436,7 +436,7 @@ func TestCook_AddsAutoUpdateWhenNoLabel(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -460,7 +460,7 @@ func TestCook_CreatesTargetDir(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -480,7 +480,7 @@ func TestCook_IgnoresDirectories(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 0, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 }
@@ -680,7 +680,7 @@ func TestCook_PortOffsetting_PrivilegedPorts(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", true, 2000, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -710,7 +710,7 @@ func TestCook_PortOffsetting_UnprivilegedPorts(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", true, 2000, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -736,7 +736,7 @@ func TestCook_PortOffsetting_NoOffsetForNonRootless(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", false, 2000, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -771,7 +771,7 @@ func TestCook_PortOffsetting_InternalConflict(t *testing.T) {
 	}
 
 	c := NewCooker(tempDir, targetDir, "myproject", true, 2000, false)
-	if err := c.Cook(); err != nil {
+	if _, err := c.Cook(); err != nil {
 		t.Fatalf("Cook failed: %v", err)
 	}
 
@@ -935,5 +935,126 @@ func TestInjectNetworkAliases_WithExistingLabels(t *testing.T) {
 	}
 	if !strings.Contains(result, "Label=com.comquad.managed=true") {
 		t.Errorf("expected existing labels preserved, got:\n%s", result)
+	}
+}
+
+func TestLabelFields_SimpleKeyValue(t *testing.T) {
+	result := labelFields("app.name=myapp")
+	if len(result) != 1 || result[0] != "app.name=myapp" {
+		t.Errorf("expected [app.name=myapp], got %v", result)
+	}
+}
+
+func TestLabelFields_MultiplePairs(t *testing.T) {
+	result := labelFields("app.name=myapp app.env=production")
+	if len(result) != 2 {
+		t.Fatalf("expected 2 fields, got %d: %v", len(result), result)
+	}
+	if result[0] != "app.name=myapp" {
+		t.Errorf("expected app.name=myapp, got %q", result[0])
+	}
+	if result[1] != "app.env=production" {
+		t.Errorf("expected app.env=production, got %q", result[1])
+	}
+}
+
+func TestLabelFields_QuotedValue(t *testing.T) {
+	result := labelFields(`app.owner="Alice Bob"`)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 field, got %d: %v", len(result), result)
+	}
+	if result[0] != `app.owner="Alice Bob"` {
+		t.Errorf("expected app.owner=\"Alice Bob\", got %q", result[0])
+	}
+}
+
+func TestLabelFields_SingleQuotedValue(t *testing.T) {
+	result := labelFields(`app.owner='Alice Bob'`)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 field, got %d: %v", len(result), result)
+	}
+	if result[0] != `app.owner='Alice Bob'` {
+		t.Errorf("expected app.owner='Alice Bob', got %q", result[0])
+	}
+}
+
+func TestLabelFields_MixedQuotedAndUnquoted(t *testing.T) {
+	result := labelFields(`app.name=myapp app.owner="Alice Bob" app.env=production`)
+	if len(result) != 3 {
+		t.Fatalf("expected 3 fields, got %d: %v", len(result), result)
+	}
+	if result[0] != "app.name=myapp" {
+		t.Errorf("expected app.name=myapp, got %q", result[0])
+	}
+	if result[1] != `app.owner="Alice Bob"` {
+		t.Errorf("expected app.owner=\"Alice Bob\", got %q", result[1])
+	}
+	if result[2] != "app.env=production" {
+		t.Errorf("expected app.env=production, got %q", result[2])
+	}
+}
+
+func TestLabelFields_EscapedQuoteInValue(t *testing.T) {
+	result := labelFields(`app.msg="hello \"world\""`)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 field, got %d: %v", len(result), result)
+	}
+	if result[0] != `app.msg="hello \"world\""` {
+		t.Errorf("expected app.msg=\"hello \\\"world\\\"\", got %q", result[0])
+	}
+}
+
+func TestLabelFields_EmptyString(t *testing.T) {
+	result := labelFields("")
+	if len(result) != 0 {
+		t.Errorf("expected 0 fields, got %d: %v", len(result), result)
+	}
+}
+
+func TestLabelFields_WhitespaceOnly(t *testing.T) {
+	result := labelFields("   ")
+	if len(result) != 0 {
+		t.Errorf("expected 0 fields, got %d: %v", len(result), result)
+	}
+}
+
+func TestLabelFields_LeadingTrailingSpaces(t *testing.T) {
+	result := labelFields("  app.name=myapp  ")
+	if len(result) != 1 || result[0] != "app.name=myapp" {
+		t.Errorf("expected [app.name=myapp], got %v", result)
+	}
+}
+
+func TestLabelFields_BareKeyWithoutValue(t *testing.T) {
+	result := labelFields("barekey")
+	if len(result) != 1 || result[0] != "barekey" {
+		t.Errorf("expected [barekey], got %v", result)
+	}
+}
+
+func TestLabelFields_EmptyValue(t *testing.T) {
+	result := labelFields("app.name=")
+	if len(result) != 1 || result[0] != "app.name=" {
+		t.Errorf("expected [app.name=], got %v", result)
+	}
+}
+
+func TestLabelFields_UnclosedQuote(t *testing.T) {
+	result := labelFields(`app.owner="Alice Bob`)
+	if len(result) != 1 || result[0] != `app.owner="Alice Bob` {
+		t.Errorf("expected [app.owner=\"Alice Bob], got %v", result)
+	}
+}
+
+func TestLabelFields_MultipleSpacesBetweenPairs(t *testing.T) {
+	result := labelFields("app.name=myapp    app.env=production")
+	if len(result) != 2 {
+		t.Fatalf("expected 2 fields, got %d: %v", len(result), result)
+	}
+	if result[0] != "app.name=myapp" {
+		t.Errorf("expected app.name=myapp, got %q", result[0])
+	}
+	if result[1] != "app.env=production" {
+		t.Errorf("expected app.env=production, got %q", result[1])
 	}
 }

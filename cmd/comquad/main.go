@@ -9,14 +9,17 @@ import (
 	"comquad/internal/logger"
 )
 
+var version = "dev"
+
 var quiet bool
 var verbose bool
 var projectName string
 var dryRun bool
 
 var rootCmd = &cobra.Command{
-	Use:   "comquad",
-	Short: "comquad is a developer-friendly CLI for deploying Podman Quadlets.",
+	Use:     "comquad",
+	Short:   "comquad is a developer-friendly CLI for deploying Podman Quadlets.",
+	Version: version,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		logger.SetQuiet(quiet)
 		logger.SetVerbose(verbose)

@@ -115,6 +115,7 @@ func (o *Orchestrator) printFile(path string) error {
 		return fmt.Errorf("failed to read %s: %w", path, err)
 	}
 
+	logger.Printf("── %s ──\n", filepath.Base(path))
 	logger.Printf("%s", string(content))
 	if !strings.HasSuffix(string(content), "\n") {
 		logger.Print("")

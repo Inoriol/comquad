@@ -78,7 +78,7 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 
 	editorEnv := os.Getenv("EDITOR")
 	if editorEnv == "" {
-		editorEnv = "vi"
+		editorEnv = findDefaultEditor()
 	}
 
 	// Split $EDITOR on whitespace so that values like "vim -o" or "code --wait" work.
@@ -161,4 +161,13 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	}
 	logger.Print(msg)
 	return nil
+}
+
+func findDefaultEditor() string {
+	for _, editor := range []string{"editor", "nano", "vim", "vi"} {
+		if _, err := exec.LookPath(editor); err == nil {
+			return editor
+		}
+	}
+	return "vi"
 }

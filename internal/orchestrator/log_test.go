@@ -1,6 +1,8 @@
 package orchestrator
 
 import (
+	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -191,9 +193,31 @@ func TestRenderEntry_WithoutTime(t *testing.T) {
 
 func TestFlushEntries_SortsByTimestamp(t *testing.T) {
 	entries := []journalEntry{
-		{timestamp: 3000, unit: "unit3", message: "third"},
-		{timestamp: 1000, unit: "unit1", message: "first"},
-		{timestamp: 2000, unit: "unit2", message: "second"},
+		{timestamp: 3000, unit: "unit3", message: "third", priority: 0},
+		{timestamp: 1000, unit: "unit1", message: "first", priority: 0},
+		{timestamp: 2000, unit: "unit2", message: "second", priority: 0},
 	}
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
 	flushEntries(entries, false)
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	firstIdx := strings.Index(output, "first")
+	secondIdx := strings.Index(output, "second")
+	thirdIdx := strings.Index(output, "third")
+	if firstIdx < 0 || secondIdx < 0 || thirdIdx < 0 {
+		t.Fatalf("missing expected messages in output: %q", output)
+	}
+	if firstIdx >= secondIdx || secondIdx >= thirdIdx {
+		t.Errorf("entries not sorted by timestamp, got: %q", output)
+	}
 }

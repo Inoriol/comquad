@@ -31,15 +31,26 @@ func NewCooker(tempDir, targetDir, projectName string, isRootless bool, portOffs
 	}
 }
 
+// CookResult holds the in-memory contents of all written quadlet files,
+// keyed by their destination path.
+type CookResult struct {
+	FileContents map[string]string
+}
+
 // Cook processes all files in the temp directory, renames them, and moves them to target.
-func (c *Cooker) Cook() error {
+// It returns the in-memory contents of all written files to avoid redundant disk I/O.
+func (c *Cooker) Cook() (*CookResult, error) {
 	entries, err := os.ReadDir(c.TempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read temp directory: %w", err)
+		return nil, fmt.Errorf("failed to read temp directory: %w", err)
 	}
 
 	if err := os.MkdirAll(c.TargetDir, 0755); err != nil {
-		return fmt.Errorf("failed to create target directory: %w", err)
+		return nil, fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	result := &CookResult{
+		FileContents: make(map[string]string),
 	}
 
 	renameMap := make(map[string]string)
@@ -66,7 +77,7 @@ func (c *Cooker) Cook() error {
 
 		content, err := os.ReadFile(srcPath)
 		if err != nil {
-			return fmt.Errorf("failed to read file %s: %w", oldName, err)
+			return nil, fmt.Errorf("failed to read file %s: %w", oldName, err)
 		}
 
 		original := string(content)
@@ -93,17 +104,37 @@ func (c *Cooker) Cook() error {
 		logger.Info(fmt.Sprintf("Added labels to %s", newName))
 
 		if err := os.WriteFile(dstPath, []byte(updatedContent), 0644); err != nil {
-			return fmt.Errorf("failed to write file %s: %w", newName, err)
+			return nil, fmt.Errorf("failed to write file %s: %w", newName, err)
 		}
+
+		result.FileContents[dstPath] = updatedContent
 	}
 
 	if c.IsRootless && c.PortOffset > 0 {
 		if err := c.offsetPorts(); err != nil {
-			return fmt.Errorf("failed to offset ports: %w", err)
+			return nil, fmt.Errorf("failed to offset ports: %w", err)
 		}
 		logger.Action(fmt.Sprintf("Applied port offset %d for rootless mode", c.PortOffset))
+		oerr := c.updatePortOffsetsInResult(result)
+		if oerr != nil {
+			return nil, oerr
+		}
 	}
 
+	return result, nil
+}
+
+func (c *Cooker) updatePortOffsetsInResult(result *CookResult) error {
+	for dstPath := range result.FileContents {
+		if !strings.HasSuffix(dstPath, ".container") {
+			continue
+		}
+		content, err := os.ReadFile(dstPath)
+		if err != nil {
+			return fmt.Errorf("failed to read %s for result update: %w", dstPath, err)
+		}
+		result.FileContents[dstPath] = string(content)
+	}
 	return nil
 }
 

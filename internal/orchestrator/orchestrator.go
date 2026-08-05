@@ -68,6 +68,7 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 // Up preprocesses, transpiles, cooks and deploys the project
 // defined in the compose.yaml in the current working directory.
 func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dryRun bool) error {
+	logger.Action("Reading compose file...")
 	composeFile := findComposeFile(o.cwd)
 	if composeFile == "" {
 		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
@@ -94,11 +95,13 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 		return err
 	}
 
+	logger.Action("Preprocessing compose configuration...")
 	processedYaml, err := o.preprocess(composeData)
 	if err != nil {
 		return err
 	}
 
+	logger.Action("Transpiling to quadlet files...")
 	if err := o.transpile(processedYaml, tempDir); err != nil {
 		return err
 	}
@@ -112,7 +115,9 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 		}
 		defer os.RemoveAll(previewDir)
 
-		if err := o.cook(tempDir, previewDir, isRootless); err != nil {
+		logger.Action("Generating quadlet files (dry run)...")
+		previewContents, err := o.cook(tempDir, previewDir, isRootless)
+		if err != nil {
 			return err
 		}
 
@@ -121,10 +126,12 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 			return err
 		}
 
-		return o.printDryRun(projectFiles, previewDir, targetDir, buildInfo, pullStrategy)
+		return o.printDryRun(projectFiles, previewContents, previewDir, targetDir, buildInfo, pullStrategy)
 	}
 
-	if err := o.cook(tempDir, targetDir, isRootless); err != nil {
+	logger.Action("Generating quadlet files...")
+	fileContents, err := o.cook(tempDir, targetDir, isRootless)
+	if err != nil {
 		return err
 	}
 
@@ -151,15 +158,18 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 		return err
 	}
 
-	if err := o.handleImages(projectFiles, buildInfo, forceBuild, pullStrategy); err != nil {
+	logger.Action("Handling images...")
+	if err := o.handleImages(projectFiles, fileContents, buildInfo, forceBuild, pullStrategy); err != nil {
 		cleanup()
 		return err
 	}
 
 	deployTime := time.Now().Format("2006-01-02 15:04:05")
 
+	logger.Action("Starting services...")
 	if err := o.startUnits(projectFiles); err != nil {
-		return fmt.Errorf("units written but failed to start: %w", err)
+		cleanup()
+		return fmt.Errorf("failed to start services: %w", err)
 	}
 
 	logger.Success("Successfully deployed project: " + o.projectName)
