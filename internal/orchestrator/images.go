@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -13,7 +12,7 @@ import (
 )
 
 // handleImages builds or pulls images based on the compose file and strategy.
-func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]*preprocess.BuildInfo, forceBuild bool, pullStrategy string) error {
+func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[string]string, buildInfo map[string]*preprocess.BuildInfo, forceBuild bool, pullStrategy string) error {
 	sortedServiceNames := make([]string, 0, len(buildInfo))
 	for name := range buildInfo {
 		sortedServiceNames = append(sortedServiceNames, name)
@@ -58,12 +57,12 @@ func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]
 			continue
 		}
 
-		content, err := os.ReadFile(f)
-		if err != nil {
-			return fmt.Errorf("failed to read %s: %w", f, err)
+		content, ok := fileContents[f]
+		if !ok {
+			return fmt.Errorf("content not found for %s", f)
 		}
 
-		for _, line := range strings.Split(string(content), "\n") {
+		for _, line := range strings.Split(content, "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "Image=") {
 				image := strings.TrimSpace(strings.TrimPrefix(line, "Image="))
@@ -92,6 +91,7 @@ func (o *Orchestrator) handleImages(projectFiles []string, buildInfo map[string]
 // writing anything to the real systemd directory or starting any units.
 func (o *Orchestrator) printDryRun(
 	projectFiles []string,
+	fileContents map[string]string,
 	previewDir string,
 	targetDir string,
 	buildInfo map[string]*preprocess.BuildInfo,
@@ -126,11 +126,11 @@ func (o *Orchestrator) printDryRun(
 		if !strings.HasSuffix(f, ".container") {
 			continue
 		}
-		content, err := os.ReadFile(f)
-		if err != nil {
-			return fmt.Errorf("failed to read preview file %s: %w", f, err)
+		content, ok := fileContents[f]
+		if !ok {
+			return fmt.Errorf("content not found for %s", f)
 		}
-		for _, line := range strings.Split(string(content), "\n") {
+		for _, line := range strings.Split(content, "\n") {
 			line = strings.TrimSpace(line)
 			if !strings.HasPrefix(line, "Image=") {
 				continue
@@ -170,15 +170,15 @@ func (o *Orchestrator) printDryRun(
 		}
 		targetPath := filepath.Join(targetDir, rel)
 
-		content, err := os.ReadFile(f)
-		if err != nil {
-			return fmt.Errorf("failed to read preview file %s: %w", f, err)
+		content, ok := fileContents[f]
+		if !ok {
+			return fmt.Errorf("content not found for %s", f)
 		}
 
 		logger.Print(separator)
 		logger.Printf("  %s\n", targetPath)
 		logger.Print(separator)
-		logger.Print(strings.TrimRight(string(content), "\n"))
+		logger.Print(strings.TrimRight(content, "\n"))
 		logger.Print("")
 	}
 

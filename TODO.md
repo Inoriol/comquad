@@ -36,11 +36,11 @@ These issues directly break core functionality or the release process:
 
 ## 🧩 Missing Features
 
-- [ ] **No `--version` flag** on root command
-- [ ] **No shell completion generation** — Cobra supports `completion` subcommand for bash/zsh/fish but it's not wired up
+- [x] **No `--version` flag** on root command — Added: `version` variable set via ldflags, displayed in rootCmd.Version.
+- [x] **No shell completion generation** — Already wired up by default in Cobra v1.8.0. Works for bash/zsh/fish/powershell via `comquad completion`.
 - [ ] **No standalone `comquad build` command** — only possible via `comquad up --build`
 - [ ] **No config file / global defaults** — no way to set project-level or user-level defaults
-- [ ] **No `comquad ls` alias for `comquad list`**
+- [x] **No `comquad ls` alias for `comquad list`** — Added: `Aliases: []string{"ls"}` on listCmd.
 - [ ] **No project-level health status summary** (beyond `view` table)
 
 ---
@@ -52,12 +52,12 @@ These issues directly break core functionality or the release process:
 - [x] **`internal/cooker/engine.go` is too large (781 lines)** — Split into engine.go (core), references.go (cross-unit rewriting), ports.go (port offsetting), labels.go (SELinux/project labels, network aliases, systemd optimizations).
 - [x] **Mixed output approaches** — Fixed: all output now routed through logger.Print/Printf.
 - [x] **`listContainersFromPodman` calls `podman inspect` per-container** — Fixed: batched into single `podman inspect` call via `batchGetExposedPorts`.
-- [ ] **`handleImages` re-reads container files from disk** — Files were already written and could be parsed in-memory from the cooker output. Unnecessary disk I/O.
+- [x] **`handleImages` re-reads container files from disk** — Fixed: Cook() returns CookResult with in-memory FileContents, handleImages/printDryRun accept content map instead of reading from disk.
 - [x] **Hardcoded string `"unknown"` service name in `orchestrator.go:481`** — Fixed: changed to empty string.
 - [x] **Magic numbers everywhere** — Fixed: extracted named constants in dbus.go and orchestrator.go.
 - [x] **`execCommand` package-level var in `log.go`** — Fixed: replaced with injectable `newJournalCmd` field on Orchestrator.
 - [x] **`renderEntry` has unreachable/confusing branch** — Fixed: added clarifying comment (branch is reachable for entries without systemd unit metadata).
-- [ ] **`labelFields` tokenizer in `cooker/engine.go:332-372`** — Hand-written tokenizer for label parsing is complex and error-prone. Could use shell-style parsing library.
+- [x] **`labelFields` tokenizer in `cooker/engine.go:332-372`** — Rewritten: cleaner string-based implementation using strings.IndexByte. 13 unit tests added.
 - [x] **No godoc on many exported functions** — Fixed: added godoc to MatchFirstContainer, MatchAllContainers, MatchNetworkOrVolume.
 
 ---
@@ -67,7 +67,7 @@ These issues directly break core functionality or the release process:
 ### Missing Unit Tests
 
 - [ ] **`handleImages`** — Complex image-building logic with pull strategies has zero direct test coverage
-- [ ] **`stopUnits` / `verifyUnitsStopped`** — Container/network/volume stopping logic
+- [x] **`stopUnits` / `verifyUnitsStopped`** — Added: 5 direct unit tests for stopUnits with mock D-Bus (stopsOnlyContainers, noContainerFiles, multipleContainers, propagatesError, emptyProjectFiles). verifyUnitsStopped already had direct tests.
 - [ ] **`offsetPorts` in cooker** — Port offset resolution with conflict detection tested only indirectly
 - [ ] **`discoverResources` in dbus.go** — Podman JSON output parsing and resource grouping
 - [ ] **`removePodmanResources` in dbus.go** — Network/volume removal and error handling
@@ -75,17 +75,17 @@ These issues directly break core functionality or the release process:
 - [ ] **`Regenerate` orchestrator command** — Entire state reconstruction pipeline
 - [ ] **`Build()` in build package** — Only tag generation and pull strategy parsing tested
 - [ ] **`PullImage()`** — No tests for pull with different strategies
-- [ ] **`parseContainer` (podman JSON parsing)** — Only tested through full ps pipeline, not in isolation
-- [ ] **`formatTimeAgo`** — Only tested through ps output capture
-- [ ] **`StringMap.UnmarshalYAML` / `MarshalYAML`** — No direct tests for edge cases (empty list, mixed types, YAML null)
+- [x] **`parseContainer` (podman JSON parsing)** — Added: 6 direct unit tests (basicFields, serviceNameDerivation, exitedContainer, nilInput, emptyName, noNamesField). Also 3 parsePorts + 4 parseStringSlice tests.
+- [x] **`formatTimeAgo`** — Added: 10 direct unit tests covering now, seconds, minutes, hours, days, 1+ weeks, future dates. Also 3 formatPorts, 3 formatCreated, 4 truncate tests.
+- [x] **`StringMap.UnmarshalYAML` / `MarshalYAML`** — Added: 8 direct unit tests (listFormat, mapFormat, emptyList, emptyMap, yamlNull, invalidFormat, marshalYAML, marshalYAML_empty).
 - [ ] **Main `Execute()` orchestrator pipeline** — No unit test for full preprocess→transpile→cook→deploy flow
 
 ### Flaky / Skipped Tests
 
-- [ ] **~10 integration tests use `time.Sleep(2-3s)`** — Race-prone. Should use polling helpers instead of fixed sleeps
-- [ ] **3 unit tests require `SKIP_PODLET_TESTS` env var to skip** — Should use `testing.Short()` or a proper build tag
-- [ ] **`TestUp_InvalidYamlReturnsError`** accepts either podlet-missing or strategy-invalid error — ambiguous coverage
-- [ ] **Multiple log tests collect output but never assert on content** — `result := ...; _ = result` in several tests
+- [x] **~10 integration tests use `time.Sleep(2-3s)`** — Fixed: replaced with polling helpers. Added WaitForLogs (polls every 500ms up to 30s). Removed redundant sleeps where AssertUnitActive already polls.
+- [x] **3 unit tests require `SKIP_PODLET_TESTS` env var to skip** — Fixed: replaced with `testing.Short()` (standard Go convention).
+- [x] **`TestUp_InvalidYamlReturnsError`** — Fixed: now validates error message contains yaml/preprocess/unmarshal keywords.
+- [x] **Multiple log tests collect output but never assert on content** — Fixed: TestLogs_StoppedUnit and TestLogs_SpecificService now assert non-empty output. TestFlushEntries_SortsByTimestamp now captures stdout and asserts sort order. TestUp_StateRegistrationError and TestUp_InvalidPullStrategyReturnsError now have proper assertions.
 
 ### Test Infrastructure
 
@@ -101,15 +101,15 @@ These issues directly break core functionality or the release process:
 
 ### Missing Integration Test Scenarios
 
-- [ ] `compose.yaml` with real `build:` blocks
-- [ ] `comquad ps` with real output verification
-- [ ] `comquad edit` with actual file modifications (only `--no-reload` tested)
+- [x] `compose.yaml` with real `build:` blocks — Added: TestUpDown_WithBuildBlocks in build_test.go
+- [x] `comquad ps` with real output verification — Added: TestPs_OutputFormat and TestPs_AllIncludesExitedContainers in ps_integration_test.go
+- [x] `comquad edit` with actual file modifications — Added: TestEdit_WithFileModifications in edit_modify_test.go (uses sed as EDITOR)
 - [ ] `comquad exec` with interactive TTY
 - [ ] `comquad follow-logs` (`--follow` flag)
 - [ ] Concurrent `comquad up` on same project
-- [ ] Network isolation (services on different networks)
+- [x] Network isolation (services on different networks) — Added: TestNetworkIsolation_DifferentNetworks in network_test.go
 - [ ] Upgrading a project (deploy, modify compose, redeploy)
-- [ ] `down` when systemd units are in `failed` state
+- [x] `down` when systemd units are in `failed` state — Added: TestDown_WhenUnitsAreFailed in up_down_test.go
 - [ ] Behavior with unresponsive podman
 - [ ] Large/complex compose files (10+ services)
 
@@ -117,25 +117,24 @@ These issues directly break core functionality or the release process:
 
 ## 📄 Documentation Gaps
 
-- [ ] **No `ROOTLESS_PORT_OFFSET` env var documentation** in README — only briefly mentioned in Architecture doc
-- [ ] **No `NO_COLOR` env var documentation**
+- [x] **No `ROOTLESS_PORT_OFFSET` env var documentation** — Added to README.
+- [x] **No `NO_COLOR` env var documentation** — Added to README.
 - [ ] **No example compose files** in the repository — `tests/integration/testdata/` is minimal
 - [ ] **No CONTRIBUTING.md** or development setup guide
 - [ ] **No man page** or extended help beyond cobra `--help`
-- [ ] **CHANGELOG.txt uses plain text format** — Manual `====` headings, not Markdown. Works but prevents nice GitHub rendering
 - [ ] **`projects.json` format has no version field** — No forward compatibility guarantee for state file schema evolution
 
 ---
 
 ## ✨ UX Improvements
 
-- [ ] **No progress indication during `up`** — Pipeline is silent between stages unless `-v` is used. Add at least spinner or stage messages.
-- [ ] **No confirmation prompt before `comquad down`** — Destructive action runs immediately without asking
-- [ ] **`comquad edit` fallback `vi` may not exist** — Systems with only `vim`/`nano` get a confusing error. Should check PATH.
-- [ ] **`comquad view <project>` shows raw file content without context** — No header indicating which file is being shown
-- [ ] **No `comquad --help` examples section** — Complex flags like `--since` format deserve usage examples
-- [ ] **`comquad ps -a` sorting** — Exited containers mixed into the table could be sorted or grouped for clarity
-- [ ] **Error recovery UX** — When `startUnits` fails after files are written, user is told to manually `comquad down` to clean up
+- [x] **No progress indication during `up`** — Fixed: added logger.Action() calls at each pipeline stage (Reading, Preprocessing, Transpiling, Generating quadlet, Handling images, Starting services).
+- [x] **No confirmation prompt before `comquad down`** — Fixed: prompts "Are you sure?" when stdin is a terminal. Added `-y`/`--yes` flag to skip. Dry-run also skips prompt.
+- [x] **`comquad edit` fallback `vi` may not exist** — Fixed: findDefaultEditor() tries editor, nano, vim, vi in order.
+- [x] **`comquad view <project>` shows raw file content without context** — Fixed: printFile() now shows `── <filename> ──` header.
+- [x] **No `comquad --help` examples section** — Fixed: added Example fields to up, down, logs, exec, ps, regenerate, edit commands.
+- [x] **`comquad ps -a` sorting** — Fixed: running containers first (by name), then exited (by name), then other states.
+- [x] **Error recovery UX** — Fixed: cleanup() now called on startUnits failure, removing files and unregistering project.
 
 ---
 

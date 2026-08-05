@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -198,5 +199,94 @@ func TestDown_StopsNetworkAndVolumeUnits(t *testing.T) {
 		if !found {
 			t.Errorf("expected unit %q to be stopped, got %v", expected, sys.stoppedUnits)
 		}
+	}
+}
+
+func TestStopUnits_StopsOnlyContainers(t *testing.T) {
+	dir := t.TempDir()
+	containerFile := writeContainerFile(t, dir, "cq-myapp-web.container")
+	networkFile := filepath.Join(dir, "cq-myapp-default.network")
+	volumeFile := filepath.Join(dir, "cq-myapp-data.volume")
+	writeFile(t, networkFile, "[Network]\n")
+	writeFile(t, volumeFile, "[Volume]\n")
+
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", dir, newMockStateStore(nil), sys)
+
+	err := o.stopUnits(sys, []string{containerFile, networkFile, volumeFile})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sys.stoppedUnits) != 1 {
+		t.Fatalf("expected 1 stopped unit, got %d: %v", len(sys.stoppedUnits), sys.stoppedUnits)
+	}
+	if sys.stoppedUnits[0] != "cq-myapp-web.service" {
+		t.Errorf("expected 'cq-myapp-web.service', got %q", sys.stoppedUnits[0])
+	}
+}
+
+func TestStopUnits_NoContainerFiles(t *testing.T) {
+	dir := t.TempDir()
+	networkFile := filepath.Join(dir, "cq-myapp-default.network")
+	writeFile(t, networkFile, "[Network]\n")
+
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", dir, newMockStateStore(nil), sys)
+
+	err := o.stopUnits(sys, []string{networkFile})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sys.stoppedUnits) != 0 {
+		t.Errorf("expected 0 stopped units, got %d", len(sys.stoppedUnits))
+	}
+}
+
+func TestStopUnits_MultipleContainers(t *testing.T) {
+	dir := t.TempDir()
+	webFile := writeContainerFile(t, dir, "cq-myapp-web.container")
+	dbFile := writeContainerFile(t, dir, "cq-myapp-db.container")
+
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", dir, newMockStateStore(nil), sys)
+
+	err := o.stopUnits(sys, []string{webFile, dbFile})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sys.stoppedUnits) != 2 {
+		t.Fatalf("expected 2 stopped units, got %d", len(sys.stoppedUnits))
+	}
+}
+
+func TestStopUnits_PropagatesError(t *testing.T) {
+	dir := t.TempDir()
+	containerFile := writeContainerFile(t, dir, "cq-myapp-web.container")
+
+	sys := newMockSystemdClient()
+	sys.stopErr = map[string]error{
+		"cq-myapp-web.service": fmt.Errorf("unit does not exist"),
+	}
+	o := newTestOrchestrator("myapp", dir, newMockStateStore(nil), sys)
+
+	err := o.stopUnits(sys, []string{containerFile})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to stop unit") {
+		t.Errorf("expected error to contain 'failed to stop unit', got %q", err.Error())
+	}
+}
+
+func TestStopUnits_EmptyProjectFiles(t *testing.T) {
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), sys)
+
+	err := o.stopUnits(sys, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

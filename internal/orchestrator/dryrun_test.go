@@ -36,14 +36,26 @@ func captureStdout(t *testing.T, fn func()) string {
 }
 
 // makePreviewDir creates a temp directory with a minimal cooked quadlet file
-// and returns the dir path and the file's absolute path.
-func makePreviewDir(t *testing.T) (previewDir string, containerFile string) {
+// and returns the dir path, the file's absolute path, and its content for the fileContents map.
+func makePreviewDir(t *testing.T) (previewDir string, containerFile string, fileContent string) {
 	t.Helper()
 	dir := t.TempDir()
 	content := "[Container]\nImage=docker.io/library/nginx\nLabel=com.comquad.project=myapp\n\n[Install]\nWantedBy=default.target\n"
 	path := filepath.Join(dir, "cq-myapp-web.container")
 	writeFile(t, path, content)
-	return dir, path
+	return dir, path, content
+}
+
+func makeFileContentMap(paths ...string) map[string]string {
+	m := make(map[string]string)
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		m[p] = string(data)
+	}
+	return m
 }
 
 // ---------------------------------------------------------------------------
@@ -51,13 +63,13 @@ func makePreviewDir(t *testing.T) (previewDir string, containerFile string) {
 // ---------------------------------------------------------------------------
 
 func TestPrintDryRun_PrintsProjectAndTargetDir(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 	targetDir := t.TempDir()
 
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		if err := o.printDryRun([]string{containerFile}, previewDir, targetDir, nil, "missing"); err != nil {
+		if err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, nil, "missing"); err != nil {
 			t.Errorf("printDryRun error: %v", err)
 		}
 	})
@@ -71,13 +83,13 @@ func TestPrintDryRun_PrintsProjectAndTargetDir(t *testing.T) {
 }
 
 func TestPrintDryRun_ShowsTargetPathForEachFile(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 	targetDir := "/fake/systemd/target"
 
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, previewDir, targetDir, nil, "missing")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, nil, "missing")
 	})
 
 	expectedTarget := filepath.Join(targetDir, "cq-myapp-web.container")
@@ -87,12 +99,12 @@ func TestPrintDryRun_ShowsTargetPathForEachFile(t *testing.T) {
 }
 
 func TestPrintDryRun_ShowsFileContent(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, previewDir, t.TempDir(), nil, "missing")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "missing")
 	})
 
 	if !strings.Contains(out, "[Container]") {
@@ -104,7 +116,7 @@ func TestPrintDryRun_ShowsFileContent(t *testing.T) {
 }
 
 func TestPrintDryRun_PrintsFileCount(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 
 	// Add a second file
 	networkFile := filepath.Join(previewDir, "cq-myapp-default.network")
@@ -113,7 +125,7 @@ func TestPrintDryRun_PrintsFileCount(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile, networkFile}, previewDir, t.TempDir(), nil, "missing")
+		o.printDryRun([]string{containerFile, networkFile}, makeFileContentMap(containerFile, networkFile), previewDir, t.TempDir(), nil, "missing")
 	})
 
 	if !strings.Contains(out, "2 quadlet file(s)") {
@@ -122,12 +134,12 @@ func TestPrintDryRun_PrintsFileCount(t *testing.T) {
 }
 
 func TestPrintDryRun_PrintsDryRunCompleteSummary(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, previewDir, t.TempDir(), nil, "missing")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "missing")
 	})
 
 	if !strings.Contains(out, "Dry run complete") {
@@ -139,12 +151,12 @@ func TestPrintDryRun_PrintsDryRunCompleteSummary(t *testing.T) {
 }
 
 func TestPrintDryRun_ImagePullNeverReported(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, previewDir, t.TempDir(), nil, "never")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "never")
 	})
 
 	if !strings.Contains(out, "pull skipped: never") {
@@ -153,12 +165,12 @@ func TestPrintDryRun_ImagePullNeverReported(t *testing.T) {
 }
 
 func TestPrintDryRun_ImagePullAlwaysReported(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, previewDir, t.TempDir(), nil, "always")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "always")
 	})
 
 	if !strings.Contains(out, "would pull: always") {
@@ -184,7 +196,7 @@ func TestPrintDryRun_BuildServiceReported(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, previewDir, t.TempDir(), buildInfo, "missing")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), buildInfo, "missing")
 	})
 
 	// Should mention the service and the build context
@@ -216,7 +228,7 @@ func TestPrintDryRun_MultipleFilesAllShown(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(files, previewDir, "/fake/target", nil, "missing")
+		o.printDryRun(files, makeFileContentMap(files...), previewDir, "/fake/target", nil, "missing")
 	})
 
 	for _, name := range []string{"cq-myapp-web.container", "cq-myapp-db.container", "cq-myapp-default.network"} {
@@ -227,10 +239,10 @@ func TestPrintDryRun_MultipleFilesAllShown(t *testing.T) {
 }
 
 func TestPrintDryRun_InvalidPullStrategy(t *testing.T) {
-	previewDir, containerFile := makePreviewDir(t)
+		previewDir, containerFile, _ := makePreviewDir(t)
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
-	err := o.printDryRun([]string{containerFile}, previewDir, t.TempDir(), nil, "badstrategy")
+	err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "badstrategy")
 	if err == nil {
 		t.Error("expected error for invalid pull strategy, got nil")
 	}
@@ -241,8 +253,8 @@ func TestPrintDryRun_InvalidPullStrategy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
-	if _, ok := os.LookupEnv("SKIP_PODLET_TESTS"); ok {
-		t.Skip("skipping test that interacts with podlet")
+	if testing.Short() {
+		t.Skip("skipping test that requires podlet binary")
 	}
 
 	dir := t.TempDir()
@@ -250,6 +262,8 @@ func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "compose.yaml"), "services:\n  web:\n    image: nginx\n")
 
 	state := newMockStateStore(nil)
+	// Use manual Orchestrator construction so we can override newState/newSystemd
+	// while still hitting the real resolveTargetDir/transpile/cook paths.
 	o := &Orchestrator{
 		projectName: "myapp",
 		cwd:         dir,
@@ -258,8 +272,6 @@ func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
 			return newMockSystemdClient(), nil
 		},
 	}
-	// Override target dir resolution by pointing at our temp dir
-	_ = targetDir
 
 	captureStdout(t, func() {
 		o.Up(false, "missing", false, true)

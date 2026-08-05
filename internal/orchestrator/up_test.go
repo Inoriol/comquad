@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,36 +43,35 @@ func TestUp_InvalidYamlReturnsError(t *testing.T) {
 	o.cwd = dir
 
 	err := o.Up(false, "missing", false, false)
-	// Should fail at preprocessing step
 	if err == nil {
 		t.Error("expected error for invalid YAML")
+	} else if !strings.Contains(err.Error(), "YAML") &&
+		!strings.Contains(err.Error(), "preprocess") &&
+		!strings.Contains(err.Error(), "unmarshal") &&
+		!strings.Contains(err.Error(), "yaml") {
+		t.Errorf("expected YAML-related error, got: %v", err)
 	}
 }
 
 func TestUp_StateRegistrationError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test that requires podlet binary")
+	}
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
 
-	if _, ok := os.LookupEnv("SKIP_PODLET_TESTS"); ok {
-		t.Skip("skipping test that interacts with podlet")
-	}
-
-	// Use the helper that injects a state error
 	o := newTestOrchestratorWithStateErr("myapp", dir, errors.New("cannot write state"))
 	o.cwd = dir
 
 	err := o.Up(false, "missing", false, false)
-	if err == nil {
-		// Either podlet not present or state injection worked — either is fine
-		// The absence of podlet causes a different error first
+	if err == nil || !strings.Contains(err.Error(), "cannot write state") {
+		t.Errorf("expected 'cannot write state' error, got %v", err)
 	}
-	// We just verify Up doesn't panic; the error path is exercised
-	_ = err
 }
 
 func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
-	if _, ok := os.LookupEnv("SKIP_PODLET_TESTS"); ok {
-		t.Skip("skipping test that interacts with podlet")
+	if testing.Short() {
+		t.Skip("skipping test that requires podlet binary")
 	}
 
 	dir := t.TempDir()
@@ -83,14 +81,10 @@ func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	// "badstrategy" is not a valid pull strategy
 	err := o.Up(false, "badstrategy", false, false)
-	if err == nil {
-		// If podlet is missing the error will be about podlet, not the strategy.
-		// Either way Up fails, which is what we need.
-		return
+	if err == nil || !strings.Contains(err.Error(), "invalid pull strategy") {
+		t.Errorf("expected 'unknown pull strategy' error, got %v", err)
 	}
-	// If we got here Up did fail — good.
 }
 
 // ---------------------------------------------------------------------------

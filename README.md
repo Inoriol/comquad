@@ -28,14 +28,25 @@ I am an infrastructure engineer, not a full-time software developer. I built **C
 ### Installation
 
 ```bash
-# Build from source
-go build -o comquad ./cmd/comquad/
+# Build from source (with version)
+go build -ldflags "-X main.version=$(git describe --tags --always 2>/dev/null || echo dev)" -o comquad ./cmd/comquad/
 sudo cp comquad /usr/local/bin/
 
 # Or install directly via Go
 go install comquad/cmd/comquad@latest
 
+# Verify
+comquad --version
 ```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EDITOR` | auto-detected | Editor for `comquad edit`. Falls back to `editor`, `nano`, `vim`, then `vi`. |
+| `NO_COLOR` | *(unset)* | Set to any value to disable ANSI color output. |
+| `ROOTLESS_PORT_OFFSET` | `2000` | In rootless mode, privileged ports (< 1024) are offset by this value. |
+| `XDG_DATA_HOME` | `~/.local/share` | Base directory for `comquad/projects.json` state file. |
 
 ---
 
@@ -54,6 +65,7 @@ comquad up
 * **Force rebuild:** `comquad up --build` forces an image rebuild.
 * **Image Pull Control:** `comquad up --pull [always|missing|never]` *(default: missing)*.
 * **Override name:** `comquad up -n my-service` overrides the default project name.
+* **Progress indication:** Pipeline stages are reported during deployment (`--verbose`/`-v` for full detail).
 
 ### 2. Monitoring & Lifecycle (`ps`, `start`, `stop`, `logs`)
 
@@ -89,6 +101,7 @@ comquad exec -u root web bash        # Run as root
 
 # Tear down the project
 comquad down
+comquad down -y                  # Skip confirmation prompt
 comquad down -d                  # Also removes Podman volumes
 comquad down --dry-run           # Preview what would be removed
 
@@ -143,6 +156,31 @@ comquad regenerate --force           # Reconstruct state file from live labels
 comquad regenerate --force --dry-run # Preview what would be reconstructed
 comquad check                        # Check prerequisites (tools, podman >= 4.4, D-Bus, target dir)
 
+```
+
+### Managing Projects
+
+```bash
+# List all deployed projects (also accessible as `comquad ls`)
+comquad list
+
+# Shell completion generation
+comquad completion bash              # Generate for bash
+comquad completion zsh               # Generate for zsh
+comquad completion fish              # Generate for fish
+
+# Help with examples
+comquad up --help                    # Each command shows usage examples
+```
+
+### Getting Help
+
+All commands have built-in examples — just append `--help`:
+
+```bash
+comquad up --help      # Deploy examples
+comquad logs --help    # Logging examples with --since/--tail
+comquad exec --help    # Container exec examples
 ```
 
 ---

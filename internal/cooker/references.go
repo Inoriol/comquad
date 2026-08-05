@@ -180,41 +180,51 @@ func (c *Cooker) splitCombinedLabels(lines []string) []string {
 func labelFields(s string) []string {
 	var fields []string
 	s = strings.TrimSpace(s)
-	i := 0
-	for i < len(s) {
-		for i < len(s) && s[i] == ' ' {
-			i++
-		}
-		if i >= len(s) {
+
+	for len(s) > 0 {
+		s = strings.TrimLeft(s, " ")
+		if len(s) == 0 {
 			break
 		}
-		start := i
-		for i < len(s) && s[i] != '=' {
-			i++
-		}
-		if i >= len(s) {
-			fields = append(fields, s[start:])
+
+		eqIdx := strings.IndexByte(s, '=')
+		if eqIdx < 0 {
+			fields = append(fields, s)
 			break
 		}
-		i++ // skip '='
-		if i < len(s) && (s[i] == '"' || s[i] == '\'') {
-			quote := s[i]
-			i++ // skip opening quote
-			for i < len(s) && s[i] != quote {
+
+		afterEq := eqIdx + 1
+
+		if afterEq < len(s) && (s[afterEq] == '"' || s[afterEq] == '\'') {
+			quote := s[afterEq]
+			valStart := afterEq + 1
+			closeIdx := -1
+			for i := valStart; i < len(s); i++ {
 				if s[i] == '\\' && i+1 < len(s) {
-					i++ // skip escaped char
+					i++
+					continue
 				}
-				i++
+				if s[i] == quote {
+					closeIdx = i + 1
+					break
+				}
 			}
-			if i < len(s) {
-				i++ // skip closing quote
+			if closeIdx < 0 {
+				fields = append(fields, s)
+				break
 			}
+			fields = append(fields, s[:closeIdx])
+			s = s[closeIdx:]
 		} else {
-			for i < len(s) && s[i] != ' ' {
-				i++
+			spaceIdx := strings.IndexByte(s[afterEq:], ' ')
+			if spaceIdx < 0 {
+				fields = append(fields, s)
+				break
 			}
+			fields = append(fields, s[:afterEq+spaceIdx])
+			s = s[afterEq+spaceIdx:]
 		}
-		fields = append(fields, s[start:i])
 	}
+
 	return fields
 }

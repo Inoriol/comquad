@@ -6,7 +6,6 @@ import (
     "fmt"
     "strings"
     "testing"
-    "time"
 
     "comquad/tests/integration/helpers"
 )
@@ -174,9 +173,34 @@ func TestLifecycle_StartStopRestart(t *testing.T) {
     helpers.MustSucceed(t, dir, "start", "--name", project)
     helpers.AssertUnitActive(t, unitName, false)
 
-    // restart
-    helpers.MustSucceed(t, dir, "restart", "--name", project)
-    // give systemd a moment to cycle
-    time.Sleep(2 * time.Second)
-    helpers.AssertUnitActive(t, unitName, false)
+	// restart
+	helpers.MustSucceed(t, dir, "restart", "--name", project)
+	helpers.AssertUnitActive(t, unitName, false)
+}
+
+func TestDown_WhenUnitsAreFailed(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
+	// Use a compose where the service is expected to fail
+	dir, _ := helpers.WriteCompose(t, helpers.FailingCompose(project, "docker.io/library/alpine:latest"))
+
+	t.Cleanup(func() {
+		helpers.Comquad(t, dir, "down", "--name", project)
+	})
+
+	// UP: service exits immediately with non-zero code, systemd may mark it as failed
+	_ = helpers.Comquad(t, dir, "up", "--name", project)
+
+	// DOWN should still succeed and clean up everything, even if units are failed
+	result := helpers.Comquad(t, dir, "down", "--name", project)
+	if result.ExitCode != 0 {
+		t.Fatalf("down failed on failed units (exit=%d): stderr=%s", result.ExitCode, result.Stderr)
+	}
+
+	// Verify project is gone from state
+	helpers.AssertProjectGone(t, project)
+
+	// Verify container is gone
+	containerName := fmt.Sprintf("%s-failer", project)
+	helpers.AssertContainerGone(t, containerName)
 }

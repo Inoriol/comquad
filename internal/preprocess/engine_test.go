@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestProcess_NormalizesRelativePaths(t *testing.T) {
@@ -1130,4 +1132,139 @@ func TestReplaceBuildWithImage_ProjectNameInTag(t *testing.T) {
 	if cf.Services["web"]["image"] != "different-project-web:latest" {
 		t.Errorf("expected 'different-project-web:latest', got %v", cf.Services["web"]["image"])
 	}
+}
+
+func TestStringMap_UnmarshalYAML_ListFormat(t *testing.T) {
+	yamlData := `- app.name=myapp
+- app.env=production`
+
+	node := parseYAMLNode(t, yamlData)
+	var sm StringMap
+	if err := sm.UnmarshalYAML(node); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sm["app.name"] != "myapp" {
+		t.Errorf("expected app.name=myapp, got %q", sm["app.name"])
+	}
+	if sm["app.env"] != "production" {
+		t.Errorf("expected app.env=production, got %q", sm["app.env"])
+	}
+}
+
+func TestStringMap_UnmarshalYAML_MapFormat(t *testing.T) {
+	yamlData := `app.name: myapp
+app.env: production`
+
+	node := parseYAMLNode(t, yamlData)
+	var sm StringMap
+	if err := sm.UnmarshalYAML(node); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sm["app.name"] != "myapp" {
+		t.Errorf("expected app.name=myapp, got %q", sm["app.name"])
+	}
+	if sm["app.env"] != "production" {
+		t.Errorf("expected app.env=production, got %q", sm["app.env"])
+	}
+}
+
+func TestStringMap_UnmarshalYAML_EmptyList(t *testing.T) {
+	yamlData := "[]"
+
+	node := parseYAMLNode(t, yamlData)
+	var sm StringMap
+	if err := sm.UnmarshalYAML(node); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sm) != 0 {
+		t.Errorf("expected empty map, got %v", sm)
+	}
+}
+
+func TestStringMap_UnmarshalYAML_EmptyMap(t *testing.T) {
+	yamlData := "{}"
+
+	node := parseYAMLNode(t, yamlData)
+	var sm StringMap
+	if err := sm.UnmarshalYAML(node); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sm) != 0 {
+		t.Errorf("expected empty map, got %v", sm)
+	}
+}
+
+func TestStringMap_UnmarshalYAML_YAMLNull(t *testing.T) {
+	yamlData := "null"
+
+	node := parseYAMLNode(t, yamlData)
+	var sm StringMap
+	if err := sm.UnmarshalYAML(node); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sm) != 0 {
+		t.Errorf("expected empty map, got %v", sm)
+	}
+}
+
+func TestStringMap_UnmarshalYAML_InvalidFormat(t *testing.T) {
+	yamlData := "42"
+
+	node := parseYAMLNode(t, yamlData)
+	var sm StringMap
+	err := sm.UnmarshalYAML(node)
+	if err == nil {
+		t.Error("expected error for scalar value, got nil")
+	}
+}
+
+func TestStringMap_MarshalYAML(t *testing.T) {
+	sm := StringMap{
+		"app.name": "myapp",
+		"app.env":  "production",
+	}
+	result, err := sm.MarshalYAML()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	list, ok := result.([]string)
+	if !ok {
+		t.Fatalf("expected []string, got %T", result)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(list))
+	}
+	if list[0] != "app.env=production" {
+		t.Errorf("expected 'app.env=production', got %q", list[0])
+	}
+	if list[1] != "app.name=myapp" {
+		t.Errorf("expected 'app.name=myapp', got %q", list[1])
+	}
+}
+
+func TestStringMap_MarshalYAML_Empty(t *testing.T) {
+	sm := StringMap{}
+	result, err := sm.MarshalYAML()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	list, ok := result.([]string)
+	if !ok {
+		t.Fatalf("expected []string, got %T", result)
+	}
+	if len(list) != 0 {
+		t.Errorf("expected empty list, got %v", list)
+	}
+}
+
+func parseYAMLNode(t *testing.T, yamlData string) *yaml.Node {
+	t.Helper()
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(yamlData), &doc); err != nil {
+		t.Fatalf("failed to parse YAML: %v", err)
+	}
+	if len(doc.Content) == 0 {
+		t.Fatal("empty YAML document")
+	}
+	return doc.Content[0]
 }

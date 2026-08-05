@@ -6,7 +6,6 @@ import (
  "fmt"
  "strings"
  "testing"
- "time"
 
  "comquad/tests/integration/helpers"
 )
@@ -23,17 +22,13 @@ func TestLogs_RunningUnit(t *testing.T) {
  helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
- helpers.AssertUnitActive(t, unitName, false)
+	helpers.AssertUnitActive(t, unitName, false)
 
- // Give the container a moment to emit startup logs
- time.Sleep(3 * time.Second)
+	result := helpers.WaitForLogs(t, dir, project)
 
- result := helpers.MustSucceed(t, dir, "logs", "--name", project)
-
- // Logs command must succeed and return some output for a running unit
- if result.Stdout == "" && result.Stderr == "" {
-  t.Fatal("expected some log output for running unit, got nothing")
- }
+	if result.Stdout == "" && result.Stderr == "" {
+		t.Fatal("expected some log output for running unit, got nothing")
+	}
 }
 
 func TestLogs_TailFlag(t *testing.T) {
@@ -48,10 +43,9 @@ func TestLogs_TailFlag(t *testing.T) {
  helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
- helpers.AssertUnitActive(t, unitName, false)
- time.Sleep(3 * time.Second)
+	helpers.AssertUnitActive(t, unitName, false)
 
- result := helpers.MustSucceed(t, dir, "logs", "--name", project, "--tail", "5")
+	result := helpers.WaitForLogs(t, dir, project, "--tail", "5")
 
  lines := nonEmptyLines(result.Stdout)
  if len(lines) > 5 {
@@ -71,16 +65,15 @@ func TestLogs_StoppedUnit(t *testing.T) {
  helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
- helpers.AssertUnitActive(t, unitName, false)
- time.Sleep(2 * time.Second)
+	helpers.AssertUnitActive(t, unitName, false)
 
- // Stop the unit — logs should still be retrievable from history
- helpers.MustSucceed(t, dir, "stop", "--name", project)
- helpers.AssertUnitInactive(t, unitName, false)
+	helpers.MustSucceed(t, dir, "stop", "--name", project)
+	helpers.AssertUnitInactive(t, unitName, false)
 
- result := helpers.MustSucceed(t, dir, "logs", "--name", project)
- // Should not error even for a stopped unit
- _ = result
+	result := helpers.MustSucceed(t, dir, "logs", "--name", project)
+	if result.Stdout == "" && result.Stderr == "" {
+		t.Fatal("expected some log output for stopped unit, got nothing")
+	}
 }
 
 func TestLogs_SpecificService(t *testing.T) {
@@ -96,13 +89,13 @@ func TestLogs_SpecificService(t *testing.T) {
 
  for _, svc := range []string{"web", "api"} {
   unit := fmt.Sprintf("cq-%s-%s.service", project, svc)
-  helpers.AssertUnitActive(t, unit, false)
- }
- time.Sleep(3 * time.Second)
+		helpers.AssertUnitActive(t, unit, false)
+	}
 
- // Request logs for web only
- result := helpers.MustSucceed(t, dir, "logs", "--name", project, "web")
- _ = result
+	result := helpers.WaitForLogs(t, dir, project, "web")
+	if result.Stdout == "" && result.Stderr == "" {
+		t.Fatal("expected log output for web service, got nothing")
+	}
 }
 
 func TestLogs_MultiService_LinesPrefixed(t *testing.T) {
@@ -118,11 +111,10 @@ func TestLogs_MultiService_LinesPrefixed(t *testing.T) {
 
  for _, svc := range []string{"web", "api"} {
   unit := fmt.Sprintf("cq-%s-%s.service", project, svc)
-  helpers.AssertUnitActive(t, unit, false)
- }
- time.Sleep(3 * time.Second)
+		helpers.AssertUnitActive(t, unit, false)
+	}
 
- result := helpers.MustSucceed(t, dir, "logs", "--name", project)
+	result := helpers.WaitForLogs(t, dir, project)
 
  // When querying multiple units each non-separator line must be prefixed
  // with [<unit-name>]
@@ -150,10 +142,9 @@ func TestLogs_NoEmptyLines(t *testing.T) {
  helpers.MustSucceed(t, dir, "up", "--name", project)
 
  unitName := fmt.Sprintf("cq-%s-web.service", project)
- helpers.AssertUnitActive(t, unitName, false)
- time.Sleep(3 * time.Second)
+	helpers.AssertUnitActive(t, unitName, false)
 
- result := helpers.MustSucceed(t, dir, "logs", "--name", project)
+	result := helpers.WaitForLogs(t, dir, project)
 
  // Per architecture: all empty lines are stripped in every code path
  for i, line := range strings.Split(result.Stdout, "\n") {

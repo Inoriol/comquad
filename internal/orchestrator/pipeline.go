@@ -48,7 +48,7 @@ func (o *Orchestrator) transpile(processedYaml []byte, tempDir string) error {
 	return nil
 }
 
-func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) error {
+func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) (map[string]string, error) {
 	portOffset := 0
 	if isRootless {
 		portOffset = defaultPortOffset
@@ -65,10 +65,11 @@ func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) error {
 	}
 
 	cookerEngine := cooker.NewCooker(tempDir, targetDir, o.projectName, isRootless, portOffset, selinuxEnabled)
-	if err := cookerEngine.Cook(); err != nil {
-		return fmt.Errorf("cooking failed: %w", err)
+	result, err := cookerEngine.Cook()
+	if err != nil {
+		return nil, fmt.Errorf("cooking failed: %w", err)
 	}
-	return nil
+	return result.FileContents, nil
 }
 
 func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {

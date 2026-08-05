@@ -78,7 +78,7 @@ services:
 
 // WithVolumeCompose returns a compose with a named volume.
 func WithVolumeCompose(project string) string {
-    return `name: ` + project + `
+	return `name: ` + project + `
 services:
   db:
     image: docker.io/library/alpine:latest
@@ -87,5 +87,57 @@ services:
       - dbdata:/data
 volumes:
   dbdata:
+`
+}
+
+// WriteBuildCompose writes a compose.yaml with a build: section and a
+// Dockerfile into a temp directory. Returns the directory and project name.
+func WriteBuildCompose(t *testing.T, project string) (string, string) {
+	t.Helper()
+	compose := `name: ` + project + `
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+`
+	dockerfile := `FROM docker.io/library/alpine:latest
+CMD ["sleep", "infinity"]
+`
+	dir := t.TempDir()
+	WriteFile(t, dir, "compose.yaml", compose)
+	WriteFile(t, dir, "Dockerfile", dockerfile)
+	return dir, project
+}
+
+// MultiNetworkCompose returns a compose with two services on different
+// networks — they should not be able to resolve each other.
+func MultiNetworkCompose(project string) string {
+	return `name: ` + project + `
+services:
+  alpha:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    networks:
+      - alpha-net
+  beta:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    networks:
+      - beta-net
+networks:
+  alpha-net:
+  beta-net:
+`
+}
+
+// FailingCompose returns a compose with a service that will fail to start
+// because the command exits immediately with a non-zero code.
+func FailingCompose(project string, image string) string {
+	return `name: ` + project + `
+services:
+  failer:
+    image: ` + image + `
+    command: ["sh", "-c", "exit 1"]
 `
 }
