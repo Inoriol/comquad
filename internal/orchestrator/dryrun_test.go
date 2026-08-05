@@ -7,16 +7,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"comquad/internal/deploy"
 	"comquad/internal/preprocess"
 )
 
-// captureStdout redirects os.Stdout for the duration of fn and returns the
-// captured output. The original stdout is always restored.
+var captureStdoutMu sync.Mutex
+
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
+	captureStdoutMu.Lock()
+	defer captureStdoutMu.Unlock()
+
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("captureStdout: %v", err)
