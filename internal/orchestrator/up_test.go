@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"errors"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -54,8 +55,8 @@ func TestUp_InvalidYamlReturnsError(t *testing.T) {
 }
 
 func TestUp_StateRegistrationError(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test that requires podlet binary")
+	if _, err := exec.LookPath("podlet"); err != nil {
+		t.Skip("podlet not available")
 	}
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
@@ -70,8 +71,8 @@ func TestUp_StateRegistrationError(t *testing.T) {
 }
 
 func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test that requires podlet binary")
+	if _, err := exec.LookPath("podlet"); err != nil {
+		t.Skip("podlet not available")
 	}
 
 	dir := t.TempDir()

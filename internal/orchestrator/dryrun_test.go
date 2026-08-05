@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -257,8 +258,8 @@ func TestPrintDryRun_InvalidPullStrategy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test that requires podlet binary")
+	if _, err := exec.LookPath("podlet"); err != nil {
+		t.Skip("podlet not available")
 	}
 
 	dir := t.TempDir()

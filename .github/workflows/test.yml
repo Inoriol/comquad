@@ -17,6 +17,13 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Install podlet
+        run: |
+          curl -sSL "https://github.com/containers/podlet/releases/download/v0.3.2/podlet-x86_64-unknown-linux-gnu.tar.xz" -o /tmp/podlet.tar.xz
+          tar xf /tmp/podlet.tar.xz -C /tmp
+          sudo mv /tmp/podlet-x86_64-unknown-linux-gnu/podlet /usr/local/bin/
+          podlet --version
+
       - name: Build
         run: go build ./cmd/comquad/
 
