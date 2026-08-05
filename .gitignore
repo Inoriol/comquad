@@ -15,7 +15,7 @@
 CHANGELOG.txt
 
 # Comquad compiled binary
-comquad
+/comquad
 
 # Code coverage profiles and other test artifacts
 *.out

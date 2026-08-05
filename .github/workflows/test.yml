@@ -14,11 +14,11 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version-file: go.mod
           cache: true
 
       - name: Build
-        run: go build ./...
+        run: go build ./cmd/comquad/
 
       - name: Vet
         run: go vet ./...
