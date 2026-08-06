@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"comquad/internal/deploy"
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // Down stops all units, removes quadlet files, removes networks, and unregisters the project.

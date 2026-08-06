@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // offsetPorts applies port offsetting for rootless containers.

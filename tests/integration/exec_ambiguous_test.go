@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"comquad/tests/integration/helpers"
+	"github.com/Inoriol/comquad/tests/integration/helpers"
 )
 
 func TestExec_AmbiguousService_Errors(t *testing.T) {

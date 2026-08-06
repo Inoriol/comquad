@@ -3,51 +3,15 @@ package orchestrator
 import (
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 
-	"comquad/internal/build"
-	"comquad/internal/logger"
-	"comquad/internal/preprocess"
+	"github.com/Inoriol/comquad/internal/graft"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
-// handleImages builds or pulls images based on the compose file and strategy.
-func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[string]string, buildInfo map[string]*preprocess.BuildInfo, forceBuild bool, pullStrategy string) error {
-	sortedServiceNames := make([]string, 0, len(buildInfo))
-	for name := range buildInfo {
-		sortedServiceNames = append(sortedServiceNames, name)
-	}
-	sort.Strings(sortedServiceNames)
-
-	for _, serviceName := range sortedServiceNames {
-		info := buildInfo[serviceName]
-		imageTag := build.GenerateBuildTag(o.projectName, serviceName)
-
-		shouldBuild := forceBuild
-		if !shouldBuild {
-			engine := &build.Engine{}
-			shouldBuild = !engine.ImageExists(imageTag)
-		}
-
-		if shouldBuild {
-			engine := &build.Engine{}
-			if err := engine.BuildService(
-				serviceName,
-				info.Context,
-				info.Dockerfile,
-				info.Args,
-				info.Target,
-				imageTag,
-			); err != nil {
-				return fmt.Errorf("failed to build image for service %s: %w", serviceName, err)
-			}
-			logger.Success("Built image: " + imageTag)
-		} else {
-			logger.Action("Image already exists locally, skipping build: " + imageTag)
-		}
-	}
-
-	imagePullStrategy, err := build.ParsePullStrategy(pullStrategy)
+// handleImages pulls images based on the pull strategy.
+func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[string]string, pullStrategy string) error {
+	imagePullStrategy, err := graft.ParsePullStrategy(pullStrategy)
 	if err != nil {
 		return err
 	}
@@ -67,11 +31,7 @@ func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[stri
 			if strings.HasPrefix(line, "Image=") {
 				image := strings.TrimSpace(strings.TrimPrefix(line, "Image="))
 
-				if o.isBuildGeneratedImage(image, buildInfo) {
-					continue
-				}
-
-				engine := &build.Engine{
+				engine := &graft.Engine{
 					PullStrategy: imagePullStrategy,
 				}
 
@@ -94,32 +54,14 @@ func (o *Orchestrator) printDryRun(
 	fileContents map[string]string,
 	previewDir string,
 	targetDir string,
-	buildInfo map[string]*preprocess.BuildInfo,
 	pullStrategy string,
 ) error {
 	logger.Printf("Dry run — project: %s\n", o.projectName)
 	logger.Printf("Target directory: %s\n\n", targetDir)
 
-	imagePullStrategy, err := build.ParsePullStrategy(pullStrategy)
+	imagePullStrategy, err := graft.ParsePullStrategy(pullStrategy)
 	if err != nil {
 		return err
-	}
-
-	sortedNames := make([]string, 0, len(buildInfo))
-	for name := range buildInfo {
-		sortedNames = append(sortedNames, name)
-	}
-	sort.Strings(sortedNames)
-
-	for _, serviceName := range sortedNames {
-		info := buildInfo[serviceName]
-		imageTag := build.GenerateBuildTag(o.projectName, serviceName)
-		engine := &build.Engine{}
-		if engine.ImageExists(imageTag) {
-			logger.Printf("[image] %-12s %s  (already exists locally, would skip build)\n", serviceName, imageTag)
-		} else {
-			logger.Printf("[image] %-12s %s  (would build from %s)\n", serviceName, imageTag, info.Context)
-		}
 	}
 
 	for _, f := range projectFiles {
@@ -136,27 +78,24 @@ func (o *Orchestrator) printDryRun(
 				continue
 			}
 			image := strings.TrimSpace(strings.TrimPrefix(line, "Image="))
-			if o.isBuildGeneratedImage(image, buildInfo) {
-				break
-			}
 			switch imagePullStrategy {
-			case build.PullAlways:
+			case graft.PullAlways:
 				logger.Printf("[image] %-12s %s  (would pull: always)\n", filepath.Base(f), image)
-			case build.PullMissing:
-				engine := &build.Engine{}
+			case graft.PullMissing:
+				engine := &graft.Engine{}
 				if engine.ImageExists(image) {
 					logger.Printf("[image] %-12s %s  (already exists locally, would skip pull)\n", filepath.Base(f), image)
 				} else {
 					logger.Printf("[image] %-12s %s  (would pull: not found locally)\n", filepath.Base(f), image)
 				}
-			case build.PullNever:
+			case graft.PullNever:
 				logger.Printf("[image] %-12s %s  (pull skipped: never)\n", filepath.Base(f), image)
 			}
 			break
 		}
 	}
 
-	if len(buildInfo) > 0 || len(projectFiles) > 0 {
+	if len(projectFiles) > 0 {
 		logger.Print("")
 	}
 

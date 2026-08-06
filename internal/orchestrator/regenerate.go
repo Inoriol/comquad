@@ -3,8 +3,8 @@ package orchestrator
 import (
 	"fmt"
 
-	"comquad/internal/deploy"
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // Regenerate scans Podman for managed resources and reconstructs the state file.

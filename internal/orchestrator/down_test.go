@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/deploy"
 )
 
 func TestDown_ProjectNotDeployed(t *testing.T) {

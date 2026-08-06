@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/deploy"
 )
 
 // stateWithFiles builds a ProjectState whose Files are absolute paths formed

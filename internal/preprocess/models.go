@@ -1,9 +1,7 @@
 package preprocess
 
 import (
-	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -55,53 +53,8 @@ type ComposeFile struct {
 	Config   *ProjectConfig                      `yaml:"-"` // Internal use
 }
 
-// BuildConfig holds parsed build configuration from a compose service
-type BuildConfig struct {
-	Context    string            `yaml:"context,omitempty"`
-	Dockerfile string            `yaml:"dockerfile,omitempty"`
-	Args       map[string]string `yaml:"args,omitempty"`
-	Target     string            `yaml:"target,omitempty"`
-}
-
-// BuildInfo holds the build information for a service after preprocessing
-type BuildInfo struct {
-	Context    string
-	Dockerfile string
-	Args       []string
-	Target     string
-	Service    string
-}
-
 // ProjectConfig holds metadata injected during pre-processing
 type ProjectConfig struct {
 	ProjectName      string
 	WorkingDirectory string
-}
-
-// buildArgValue converts a YAML build arg value to its string representation.
-// Handles string, bool, integer, float, and nil types explicitly to avoid
-// surprises from fmt.Sprintf("%v", val) (e.g. nil becoming "<nil>").
-func buildArgValue(val interface{}) string {
-	if val == nil {
-		return ""
-	}
-	switch v := val.(type) {
-	case string:
-		return v
-	case bool:
-		return strconv.FormatBool(v)
-	case int:
-		return strconv.Itoa(v)
-	case int64:
-		return strconv.FormatInt(v, 10)
-	case float64:
-		// YAML unmarshals all numbers as float64; format without trailing zeros
-		// for integers (e.g. 1.0 -> "1", 1.5 -> "1.5")
-		if v == float64(int64(v)) {
-			return strconv.FormatInt(int64(v), 10)
-		}
-		return strconv.FormatFloat(v, 'f', -1, 64)
-	default:
-		return fmt.Sprintf("%v", v)
-	}
 }

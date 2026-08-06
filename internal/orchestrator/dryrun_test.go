@@ -11,8 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"comquad/internal/deploy"
-	"comquad/internal/preprocess"
+	"github.com/Inoriol/comquad/internal/deploy"
 )
 
 var captureStdoutMu sync.Mutex
@@ -74,7 +73,7 @@ func TestPrintDryRun_PrintsProjectAndTargetDir(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		if err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, nil, "missing"); err != nil {
+		if err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, "missing"); err != nil {
 			t.Errorf("printDryRun error: %v", err)
 		}
 	})
@@ -94,7 +93,7 @@ func TestPrintDryRun_ShowsTargetPathForEachFile(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, nil, "missing")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, "missing")
 	})
 
 	expectedTarget := filepath.Join(targetDir, "cq-myapp-web.container")
@@ -109,7 +108,7 @@ func TestPrintDryRun_ShowsFileContent(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "missing")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "missing")
 	})
 
 	if !strings.Contains(out, "[Container]") {
@@ -130,7 +129,7 @@ func TestPrintDryRun_PrintsFileCount(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile, networkFile}, makeFileContentMap(containerFile, networkFile), previewDir, t.TempDir(), nil, "missing")
+		o.printDryRun([]string{containerFile, networkFile}, makeFileContentMap(containerFile, networkFile), previewDir, t.TempDir(), "missing")
 	})
 
 	if !strings.Contains(out, "2 quadlet file(s)") {
@@ -144,7 +143,7 @@ func TestPrintDryRun_PrintsDryRunCompleteSummary(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "missing")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "missing")
 	})
 
 	if !strings.Contains(out, "Dry run complete") {
@@ -161,7 +160,7 @@ func TestPrintDryRun_ImagePullNeverReported(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "never")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "never")
 	})
 
 	if !strings.Contains(out, "pull skipped: never") {
@@ -175,44 +174,11 @@ func TestPrintDryRun_ImagePullAlwaysReported(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "always")
+		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "always")
 	})
 
 	if !strings.Contains(out, "would pull: always") {
 		t.Errorf("expected 'would pull: always' in output, got:\n%s", out)
-	}
-}
-
-func TestPrintDryRun_BuildServiceReported(t *testing.T) {
-	previewDir := t.TempDir()
-	// Container file with a build-generated image tag (contains ":")
-	content := "[Container]\nImage=myapp-web:latest\n\n[Install]\nWantedBy=default.target\n"
-	containerFile := filepath.Join(previewDir, "cq-myapp-web.container")
-	writeFile(t, containerFile, content)
-
-	buildInfo := map[string]*preprocess.BuildInfo{
-		"web": {
-			Context:    "/some/context",
-			Dockerfile: "Dockerfile",
-			Service:    "web",
-		},
-	}
-
-	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
-
-	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), buildInfo, "missing")
-	})
-
-	// Should mention the service and the build context
-	if !strings.Contains(out, "web") {
-		t.Errorf("expected service name 'web' in output, got:\n%s", out)
-	}
-	if !strings.Contains(out, "would build") {
-		// Image may already exist locally; either "would build" or "already exists" must appear
-		if !strings.Contains(out, "already exists") {
-			t.Errorf("expected build info in output, got:\n%s", out)
-		}
 	}
 }
 
@@ -233,7 +199,7 @@ func TestPrintDryRun_MultipleFilesAllShown(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(files, makeFileContentMap(files...), previewDir, "/fake/target", nil, "missing")
+		o.printDryRun(files, makeFileContentMap(files...), previewDir, "/fake/target", "missing")
 	})
 
 	for _, name := range []string{"cq-myapp-web.container", "cq-myapp-db.container", "cq-myapp-default.network"} {
@@ -247,7 +213,7 @@ func TestPrintDryRun_InvalidPullStrategy(t *testing.T) {
 		previewDir, containerFile, _ := makePreviewDir(t)
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
-	err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), nil, "badstrategy")
+	err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "badstrategy")
 	if err == nil {
 		t.Error("expected error for invalid pull strategy, got nil")
 	}
@@ -279,7 +245,7 @@ func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
 	}
 
 	captureStdout(t, func() {
-		o.Up(false, "missing", false, true)
+		o.Up("missing", false, true)
 	})
 
 	// State must NOT have been registered
@@ -300,7 +266,7 @@ func TestUp_DryRun_NoComposeFileReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up(false, "missing", false, true)
+	err := o.Up("missing", false, true)
 	if err == nil || !strings.Contains(err.Error(), "no compose file found") {
 		t.Errorf("expected 'no compose file found', got %v", err)
 	}

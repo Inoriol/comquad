@@ -8,7 +8,7 @@ import (
 
 	"github.com/coreos/go-systemd/v22/dbus"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // Ps shows the current state of containers for the project.

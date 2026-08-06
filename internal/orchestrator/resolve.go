@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/deploy"
 )
 
 // readContainerName reads the ContainerName= value from a .container quadlet file.

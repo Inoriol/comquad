@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 var version = "dev"

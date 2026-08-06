@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // List prints all currently deployed projects and their files

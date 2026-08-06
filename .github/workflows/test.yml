@@ -25,7 +25,7 @@ jobs:
           podlet --version
 
       - name: Build
-        run: go build ./cmd/comquad/
+        run: go build -ldflags "-X main.version=$(git describe --tags --always 2>/dev/null || echo dev)" -o comquad ./cmd/comquad/
 
       - name: Vet
         run: go vet ./...
@@ -41,3 +41,9 @@ jobs:
 
       - name: Coverage summary
         run: go tool cover -func=coverage.out
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: comquad-linux-amd64
+          path: comquad
