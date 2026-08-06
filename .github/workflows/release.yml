@@ -4,35 +4,27 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to build (e.g. v0.1.1)'
-        required: true
-        type: string
+
+permissions:
+  contents: write
 
 jobs:
-  release:
+  goreleaser:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
 
-      - name: Build
-        run: |
-          VERSION=${{ github.event.inputs.tag || github.ref_name }}
-          go build -ldflags "-X main.version=${VERSION}" -o comquad ./cmd/comquad/
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - uses: goreleaser/goreleaser-action@v7
         with:
-          files: comquad
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          generate_release_notes: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
