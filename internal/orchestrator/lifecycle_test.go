@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/deploy"
 )
 
 // ---------------------------------------------------------------------------

@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	"comquad/internal/cooker"
-	"comquad/internal/deploy"
-	"comquad/internal/logger"
-	"comquad/internal/preprocess"
-	"comquad/internal/transpile"
+	"github.com/Inoriol/comquad/internal/cooker"
+	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/graft"
+	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/preprocess"
+	"github.com/Inoriol/comquad/internal/transpile"
 )
 
 func (o *Orchestrator) resolveTargetDir() (string, error) {
@@ -30,11 +31,6 @@ func (o *Orchestrator) preprocess(composeData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("preprocessing failed: %w", err)
 	}
 	return processed, nil
-}
-
-func (o *Orchestrator) getBuildInfo(composeData []byte) (map[string]*preprocess.BuildInfo, error) {
-	engine := preprocess.NewEngine(o.projectName, o.cwd)
-	return engine.GetBuildInfo(composeData)
 }
 
 func (o *Orchestrator) transpile(processedYaml []byte, tempDir string) error {
@@ -70,6 +66,11 @@ func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) (map[str
 		return nil, fmt.Errorf("cooking failed: %w", err)
 	}
 	return result.FileContents, nil
+}
+
+func (o *Orchestrator) graft(fileContents map[string]string) (map[string]string, error) {
+	grafter := graft.Grafter{}
+	return grafter.Process(fileContents)
 }
 
 func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {

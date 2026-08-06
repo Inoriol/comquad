@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // Exec runs a command inside a single running container via podman exec.

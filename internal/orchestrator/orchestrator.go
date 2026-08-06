@@ -9,10 +9,8 @@ import (
 	"time"
 	"unicode"
 
-	"comquad/internal/build"
-	"comquad/internal/deploy"
-	"comquad/internal/logger"
-	"comquad/internal/preprocess"
+	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 const (
@@ -67,7 +65,7 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 
 // Up preprocesses, transpiles, cooks and deploys the project
 // defined in the compose.yaml in the current working directory.
-func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dryRun bool) error {
+func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 	logger.Action("Reading compose file...")
 	composeFile := findComposeFile(o.cwd)
 	if composeFile == "" {
@@ -88,11 +86,6 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 	composeData, err := os.ReadFile(composeFile)
 	if err != nil {
 		return fmt.Errorf("failed to read compose file: %w", err)
-	}
-
-	buildInfo, err := o.getBuildInfo(composeData)
-	if err != nil {
-		return err
 	}
 
 	logger.Action("Preprocessing compose configuration...")
@@ -126,11 +119,16 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 			return err
 		}
 
-		return o.printDryRun(projectFiles, previewContents, previewDir, targetDir, buildInfo, pullStrategy)
+		return o.printDryRun(projectFiles, previewContents, previewDir, targetDir, pullStrategy)
 	}
 
 	logger.Action("Generating quadlet files...")
 	fileContents, err := o.cook(tempDir, targetDir, isRootless)
+	if err != nil {
+		return err
+	}
+
+	fileContents, err = o.graft(fileContents)
 	if err != nil {
 		return err
 	}
@@ -159,7 +157,7 @@ func (o *Orchestrator) Up(forceBuild bool, pullStrategy string, follow bool, dry
 	}
 
 	logger.Action("Handling images...")
-	if err := o.handleImages(projectFiles, fileContents, buildInfo, forceBuild, pullStrategy); err != nil {
+	if err := o.handleImages(projectFiles, fileContents, pullStrategy); err != nil {
 		cleanup()
 		return err
 	}
@@ -219,17 +217,6 @@ func VolumeFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(base, ".volume")
 	return nameWithoutExt + "-volume.service"
-}
-
-// isBuildGeneratedImage returns true if the given image matches a
-// build-generated tag (<projectName>-<service>:latest) from buildInfo.
-func (o *Orchestrator) isBuildGeneratedImage(image string, buildInfo map[string]*preprocess.BuildInfo) bool {
-	for svc := range buildInfo {
-		if image == build.GenerateBuildTag(o.projectName, svc) {
-			return true
-		}
-	}
-	return false
 }
 
 func validateProjectName(name string) error {

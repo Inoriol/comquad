@@ -9,7 +9,7 @@ import (
  "strings"
  "testing"
 
- "comquad/tests/integration/helpers"
+ "github.com/Inoriol/comquad/tests/integration/helpers"
 )
 
 // skipIfRoot skips the test when running as UID 0.

@@ -7,7 +7,7 @@ import (
  "strings"
  "testing"
 
- "comquad/tests/integration/helpers"
+ "github.com/Inoriol/comquad/tests/integration/helpers"
 )
 
 func TestView_ProjectSummary(t *testing.T) {

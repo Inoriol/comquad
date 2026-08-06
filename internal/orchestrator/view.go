@@ -8,8 +8,8 @@ import (
 
 	"github.com/coreos/go-systemd/v22/dbus"
 
-	"comquad/internal/deploy"
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // View shows systemd units for a project or the contents of a specific unit file.

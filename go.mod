@@ -1,4 +1,4 @@
-module comquad
+module github.com/Inoriol/comquad
 
 go 1.23
 

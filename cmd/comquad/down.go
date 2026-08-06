@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"comquad/internal/orchestrator"
+	"github.com/Inoriol/comquad/internal/orchestrator"
 )
 
 var downRemoveVolumes bool

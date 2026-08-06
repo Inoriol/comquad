@@ -90,26 +90,6 @@ volumes:
 `
 }
 
-// WriteBuildCompose writes a compose.yaml with a build: section and a
-// Dockerfile into a temp directory. Returns the directory and project name.
-func WriteBuildCompose(t *testing.T, project string) (string, string) {
-	t.Helper()
-	compose := `name: ` + project + `
-services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-`
-	dockerfile := `FROM docker.io/library/alpine:latest
-CMD ["sleep", "infinity"]
-`
-	dir := t.TempDir()
-	WriteFile(t, dir, "compose.yaml", compose)
-	WriteFile(t, dir, "Dockerfile", dockerfile)
-	return dir, project
-}
-
 // MultiNetworkCompose returns a compose with two services on different
 // networks — they should not be able to resolve each other.
 func MultiNetworkCompose(project string) string {

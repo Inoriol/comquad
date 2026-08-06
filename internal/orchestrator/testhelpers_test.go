@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/coreos/go-systemd/v22/dbus"
 )
 

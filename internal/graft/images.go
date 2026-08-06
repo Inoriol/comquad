@@ -1,4 +1,4 @@
-package build
+package graft
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // PullStrategy defines how images should be pulled
@@ -22,17 +22,17 @@ const (
 	PullNever PullStrategy = "never"
 )
 
-// Engine handles image building and pulling
+// Engine handles image pulling
 type Engine struct {
 	PullStrategy PullStrategy
 }
 
 // ImageResult represents the outcome of handling an image
 type ImageResult struct {
-	Service  string
-	Image    string
-	Action   string // "built", "pulled", "found", "skipped"
-	Error    error
+	Service string
+	Image   string
+	Action  string // "pulled", "found", "skipped"
+	Error   error
 }
 
 // ImageExists checks if an image exists locally.
@@ -51,37 +51,6 @@ func (e *Engine) ImageExists(image string) bool {
 	return true
 }
 
-// BuildService builds an image from the given build configuration
-func (e *Engine) BuildService(service string, context string, dockerfile string, args []string, target string, tag string) error {
-	cmdArgs := []string{"build", "-t", tag}
-
-	if dockerfile != "" {
-		cmdArgs = append(cmdArgs, "--file", dockerfile)
-	}
-
-	if target != "" {
-		cmdArgs = append(cmdArgs, "--target", target)
-	}
-
-	for _, arg := range args {
-		cmdArgs = append(cmdArgs, "--build-arg", arg)
-	}
-
-	cmdArgs = append(cmdArgs, context)
-
-	cmd := exec.Command("podman", cmdArgs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	logger.Action("Building image for service " + service + ": " + tag)
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to build image for service %s: %w", service, err)
-	}
-
-	return nil
-}
-
 // PullImage pulls an image from a registry
 func (e *Engine) PullImage(image string) error {
 	logger.Action("Pulling image: " + image)
@@ -97,7 +66,7 @@ func (e *Engine) PullImage(image string) error {
 	return nil
 }
 
-// HandleImage handles image pulling or building based on strategy
+// HandleImage handles image pulling based on strategy
 func (e *Engine) HandleImage(service, image string) error {
 	switch e.PullStrategy {
 	case PullAlways:
@@ -117,21 +86,6 @@ func (e *Engine) HandleImage(service, image string) error {
 	default:
 		return fmt.Errorf("unknown pull strategy: %s", e.PullStrategy)
 	}
-}
-
-
-// GetBuildArgs returns podman build-arg flags from a map
-func GetBuildArgs(args map[string]string) []string {
-	result := []string{}
-	for k, v := range args {
-		result = append(result, fmt.Sprintf("%s=%s", k, v))
-	}
-	return result
-}
-
-// GenerateBuildTag generates a tag for a built image
-func GenerateBuildTag(projectName, serviceName string) string {
-	return fmt.Sprintf("%s-%s:latest", projectName, serviceName)
 }
 
 // ParsePullStrategy converts a string to PullStrategy

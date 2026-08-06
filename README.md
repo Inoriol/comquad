@@ -33,7 +33,7 @@ go build -ldflags "-X main.version=$(git describe --tags --always 2>/dev/null ||
 sudo cp comquad /usr/local/bin/
 
 # Or install directly via Go
-go install comquad/cmd/comquad@latest
+go install github.com/Inoriol/comquad/cmd/comquad@latest
 
 # Verify
 comquad --version
@@ -62,7 +62,6 @@ comquad up
 ```
 
 * **Follow logs:** `comquad up -f` streams journal logs from the deployment timestamp.
-* **Force rebuild:** `comquad up --build` forces an image rebuild.
 * **Image Pull Control:** `comquad up --pull [always|missing|never]` *(default: missing)*.
 * **Override name:** `comquad up -n my-service` overrides the default project name.
 * **Progress indication:** Pipeline stages are reported during deployment (`--verbose`/`-v` for full detail).

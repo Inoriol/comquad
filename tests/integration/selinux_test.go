@@ -7,7 +7,7 @@ import (
  "strings"
  "testing"
 
- "comquad/tests/integration/helpers"
+ "github.com/Inoriol/comquad/tests/integration/helpers"
 )
 
 // composeWithBindMount returns a compose file with a bind-mounted host path,

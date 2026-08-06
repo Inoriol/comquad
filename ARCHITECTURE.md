@@ -6,11 +6,11 @@ This document details the internal design, component mapping, and execution life
 
 When you run `comquad up`, the engine moves your configuration through a five-step pipeline:
 
-1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels, replaces `build:` blocks with `image:` directives).
+1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels). `build:` blocks are passed through unchanged to podlet.
 2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, and `.volume` quadlet files.
 3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed. Returns a `CookResult` containing the in-memory content of all written files (keyed by destination path) to avoid redundant disk I/O in subsequent steps.
-4. **Build** — Builds local images via `podman build` using build context extracted from the original compose file during preprocessing, validates existing local images, or pulls missing ones from the registry. Receives the in-memory file contents from step 3 instead of re-reading from disk to extract `Image=` directives.
-5. **Deploy** — Relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus. If `startUnits` fails, the cleanup function removes all files, unregisters the project, and reloads the daemon to prevent a half-deployed state.
+4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. Currently a no-op stub; future handlers in `graft/handlers/` will plug gaps (e.g. skipping registry pulls for locally-built images from `build:` blocks).
+5. **Deploy** — Pulls images based on the configured pull strategy, then relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus. If `startUnits` fails, the cleanup function removes all files, unregisters the project, and reloads the daemon to prevent a half-deployed state.
 
 ### Dry Run Mode (`--dry-run`)
 
@@ -18,9 +18,9 @@ When `comquad up --dry-run` is used, the pipeline runs steps 1–3 into a privat
 
 - The **target path** it *would* be written to
 - The full **file content** of each quadlet
-- **Image actions** (build/pull) that *would* be taken per service, based on the pull strategy and whether images exist locally
+- **Image pull actions** that *would* be taken per container, based on the pull strategy and whether images exist locally
 
-Steps 4–5 are skipped entirely: no files are written to the systemd directory, no state is registered, and no units are started. The temporary preview directory is cleaned up automatically.
+Steps 4–5 are skipped entirely: no graft processing, no files are written to the systemd directory, no state is registered, and no units are started. The temporary preview directory is cleaned up automatically.
 
 ## 📦 Project Directory Structure
 
@@ -28,7 +28,8 @@ The codebase is organized cleanly into domains matching the execution lifecycle 
 
 ```text
 cmd/comquad/           # CLI entry point: main.go + per-command files (up.go, down.go, logs.go, …)
-internal/build/        # Image building and registry pulling routines
+internal/graft/          # Post-processing engine for compose fields podlet doesn't handle
+                       #   (currently no-op; handlers/ will plug future gaps)
 internal/cooker/       # Post-processes quadlet files: engine.go (core), references.go (rewriting),
                        #   ports.go (offsetting), labels.go (SELinux/aliases/systemd opts)
 internal/deploy/       # Systemd D-Bus communication, target directories, state tracking,
@@ -242,7 +243,7 @@ The following compose service fields are **handled by comquad** (explicitly proc
 
 * `container_name` — auto-generated if missing (`<project>-<service>`); also registered as a second `NetworkAlias=` for DNS resolution
 * `image` — normalized to full registry path (`docker.io/library/`)
-* `build` — local build context (string or map); replaced with `image:` directive during preprocessing so podlet never sees it
+* `build` — passed through to podlet unchanged (future graft handlers will fill gaps)
 * `ports` — published host ports (offset in rootless mode)
 * `volumes` — bind mounts and named volumes (relative paths resolved)
 * `networks` — network attachments (auto-attached to `cq-default` if none defined)
@@ -269,24 +270,9 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
 * In rootless mode, privileged ports (< 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
 
-### Local Build Rules
+### Build: Blocks
 
-When a service contains a `build:` block, `comquad` extracts the build configuration during preprocessing (context, dockerfile, target, args), replaces the `build:` block with `image: <project>-<service>:latest`, and passes the modified YAML to `podlet`. After quadlet files are generated, `podman build` is invoked using the extracted build context.
-
-Standard shorthand formats and extended structural contexts are both supported:
-
-```yaml
-services:
-  web:
-    build:
-      context: ./apps/web          # Build context directory (default: .)
-      dockerfile: Dockerfile.prod  # Custom Dockerfile name (default: Dockerfile)
-      target: production           # Build target stage
-      args:                        # Build arguments (map or list format)
-        VERSION: "1.0"
-      # args:                        # Also supported:
-      #   - VERSION=1.0
-```
+`build:` blocks are passed through to podlet unchanged. Podlet handles `build:` sections natively by generating `.build` quadlet files. Any gaps in podlet's handling will be addressed by future handlers in `internal/graft/handlers/`.
 
 ### Quadlet Feature Injections
 
@@ -393,7 +379,6 @@ When `-v` / `--verbose` is enabled, comquad additionally logs every transformati
 - `Normalized volume path: <relative> → <absolute>` — relative volume path resolution
 - `Created default network: cq-default` — when a default bridge network was injected
 - `Auto-attached '<service>' to network 'cq-default'` — services auto-attached to default network
-- `Replaced build: with image: <tag>` — build blocks replaced with image directives for podlet compatibility
 
 **Cook stage** logs:
 - `Renamed <old> → <new>` — file renaming with `cq-<project>-` prefix
@@ -404,13 +389,7 @@ When `-v` / `--verbose` is enabled, comquad additionally logs every transformati
 - `Added labels: Label=com.comquad.project=<name>, Label=com.comquad.managed=true` — label injection
 - `Offset port: PublishPort=<original> → PublishPort=<offset>` — rootless port offsetting
 
-**Build stage** logs:
-- `Building image for service <name>: <tag>` — local image builds
-- `Built image: <tag>` — build completion
-- `Pulling image: <image>` — image pulls
-- `Handled image: <image>` — image handling completion
-
-**Down stage** logs (verbose):
+**Deploy stage** logs:
 - `Removing network: <name>` — network removal
 - `Removing volume: <name>` — volume removal
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/deploy"
 )
 
 func TestPs_HappyPathWithRunningContainers(t *testing.T) {

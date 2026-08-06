@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 const (

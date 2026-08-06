@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -47,14 +47,11 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 			logger.Info(fmt.Sprintf("Injected container_name: %s-%s", e.ProjectName, serviceName))
 		}
 
-		// Normalize image names only for services without build config
-		if img, ok := service["image"].(string); ok {
-			if _, hasBuild := service["build"]; !hasBuild {
-				originalImage := img
-				service["image"] = normalizeImage(img)
-				if service["image"] != originalImage {
-					logger.Info(fmt.Sprintf("Normalized image: %s → %s", originalImage, service["image"]))
-				}
+			if img, ok := service["image"].(string); ok {
+			originalImage := img
+			service["image"] = normalizeImage(img)
+			if service["image"] != originalImage {
+				logger.Info(fmt.Sprintf("Normalized image: %s → %s", originalImage, service["image"]))
 			}
 		}
 
@@ -142,117 +139,13 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 4. Replace build blocks with image directives so podlet never sees them.
-	replaced := replaceBuildWithImage(&cf, e.ProjectName)
-	if len(replaced) > 0 {
-		logger.Info("Replaced build blocks with image directives for: " + strings.Join(replaced, ", "))
-	}
-
-	// 5. Marshal back to YAML
+	// 4. Marshal back to YAML
 	output, err := yaml.Marshal(&cf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal processed compose file: %w", err)
 	}
 
 	return output, nil
-}
-
-// replaceBuildWithImage mutates cf in-place: for every service that has a
-// build: block it sets image to <project>-<service>:latest and deletes the
-// build key. It returns the list of service names that were replaced.
-func replaceBuildWithImage(cf *ComposeFile, projectName string) []string {
-	var replaced []string
-	for name := range cf.Services {
-		if _, hasBuild := cf.Services[name]["build"]; !hasBuild {
-			continue
-		}
-		tag := fmt.Sprintf("%s-%s:latest", projectName, name)
-		cf.Services[name]["image"] = tag
-		delete(cf.Services[name], "build")
-		replaced = append(replaced, name)
-	}
-	return replaced
-}
-
-// GetBuildInfo returns build configuration for services that have it
-func (e *Engine) GetBuildInfo(input []byte) (map[string]*BuildInfo, error) {
-	var cf ComposeFile
-
-	if err := yaml.Unmarshal(input, &cf); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal compose file: %w", err)
-	}
-
-	buildInfo := make(map[string]*BuildInfo)
-
-	for serviceName, service := range cf.Services {
-		buildRaw, hasBuild := service["build"]
-		if !hasBuild {
-			continue
-		}
-
-		bc := &BuildConfig{}
-
-		switch v := buildRaw.(type) {
-		case string:
-			bc.Context = v
-			bc.Dockerfile = "Dockerfile"
-		case map[string]interface{}:
-			if ctx, ok := v["context"].(string); ok {
-				bc.Context = ctx
-			}
-			if df, ok := v["dockerfile"].(string); ok {
-				bc.Dockerfile = df
-			}
-			if target, ok := v["target"].(string); ok {
-				bc.Target = target
-			}
-			if args, ok := v["args"].(map[string]interface{}); ok {
-				bc.Args = make(map[string]string)
-				for k, val := range args {
-					bc.Args[k] = buildArgValue(val)
-				}
-			} else if argsList, ok := v["args"].([]interface{}); ok {
-				bc.Args = make(map[string]string)
-				for _, item := range argsList {
-					if s, ok := item.(string); ok {
-						if idx := strings.Index(s, "="); idx >= 0 {
-							bc.Args[s[:idx]] = s[idx+1:]
-						}
-					}
-				}
-			}
-		}
-
-		context := bc.Context
-		if context == "" {
-			context = "."
-		}
-
-		// Resolve context to absolute path
-		if !filepath.IsAbs(context) {
-			context = filepath.Join(e.WorkingDirectory, context)
-		}
-
-		dockerfile := bc.Dockerfile
-		if dockerfile == "" {
-			dockerfile = "Dockerfile"
-		}
-
-		args := []string{}
-		for k, v := range bc.Args {
-			args = append(args, fmt.Sprintf("%s=%s", k, v))
-		}
-
-		buildInfo[serviceName] = &BuildInfo{
-			Context:    context,
-			Dockerfile: dockerfile,
-			Args:       args,
-			Target:     bc.Target,
-			Service:    serviceName,
-		}
-	}
-
-	return buildInfo, nil
 }
 
 // normalizeImage ensures the image has a full registry path.

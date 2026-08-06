@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"comquad/internal/deploy"
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 // Edit opens project units or a specific unit file in the editor.

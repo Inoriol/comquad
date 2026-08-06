@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/logger"
 	"github.com/coreos/go-systemd/v22/dbus"
 )
 

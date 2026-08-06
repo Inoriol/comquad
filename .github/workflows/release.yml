@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          go build -ldflags "-X main.version=${VERSION}" -o comquad ./cmd/comquad/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: comquad
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
