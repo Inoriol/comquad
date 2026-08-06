@@ -102,7 +102,7 @@ func TestTranspile_PassesOutputDirFlag(t *testing.T) {
 
 	// Script echoes its arguments to a file so we can inspect them.
 	argFile := filepath.Join(outDir, "args.txt")
-	makeFakePodlet(t, binDir, `echo "$@" > `+argFile)
+	makeFakePodlet(t, binDir, `echo "$@" > `+argFile+`; cat > /dev/null`)
 	withPATH(t, binDir)
 
 	runner, err := NewPodletRunner(outDir)
@@ -165,7 +165,7 @@ func TestTranspile_WritesOutputFiles(t *testing.T) {
 
 	// Script creates two quadlet files in the output directory, simulating podlet.
 	makeFakePodlet(t, binDir,
-		`touch "$2/web.container" "$2/default.network"`,
+		`touch "$2/web.container" "$2/default.network"; cat > /dev/null`,
 	)
 	withPATH(t, binDir)
 
@@ -254,7 +254,7 @@ func TestTranspile_EmptyInput(t *testing.T) {
 	outDir := t.TempDir()
 
 	// Script exits successfully regardless of input.
-	makeFakePodlet(t, binDir, "exit 0")
+	makeFakePodlet(t, binDir, "cat > /dev/null; exit 0")
 	withPATH(t, binDir)
 
 	runner, err := NewPodletRunner(outDir)
