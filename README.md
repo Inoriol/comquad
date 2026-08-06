@@ -10,7 +10,7 @@ It lets you define your services in a standard `compose.yaml` file and deploy th
 
 I am an infrastructure engineer, not a full-time software developer. I built **Comquad** to solve a specific problem for my own workflow.
 
-* **Philosophy:** This tool is intentionally small, simple, and transparent. It is not trying to become Kubernetes.
+* **Philosophy:** This tool is intentionally small, simple, and transparent. It is not trying to become Kubernetes. It's not trying to become podman compose 2.0 either.
 * **Contributions:** I am currently not accepting complex feature pull requests because I do not have the bandwidth or Go expertise to maintain them.
 * **Bugs:** Feel free to open issues if a specific Docker Compose file breaks, but fixes will happen on a "best effort" timeline.
 
