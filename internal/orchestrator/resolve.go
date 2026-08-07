@@ -75,27 +75,29 @@ func MatchAllContainers(projectName string, state deploy.ProjectState, arg strin
 	return matchAllContainers(projectName, state, arg)
 }
 
-// MatchNetworkOrVolume finds a network or volume quadlet file matching the given arg.
-func MatchNetworkOrVolume(projectName string, state deploy.ProjectState, arg string) string {
+// quadletResourceSuffixes lists all non-container quadlet file extensions handled by comquad.
+var quadletResourceSuffixes = []string{".network", ".volume", ".image", ".build"}
+
+// MatchQuadletResource finds a network, volume, image, or build quadlet file matching the given arg.
+func MatchQuadletResource(projectName string, state deploy.ProjectState, arg string) string {
 	for _, f := range state.Files {
 		base := filepath.Base(f)
-		if !strings.HasSuffix(base, ".network") && !strings.HasSuffix(base, ".volume") {
+
+		var nameWithoutExt, serviceSuffix string
+		matched := false
+		for _, ext := range quadletResourceSuffixes {
+			if strings.HasSuffix(base, ext) {
+				nameWithoutExt = strings.TrimSuffix(base, ext)
+				serviceSuffix = ext
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			continue
 		}
 
-		var nameWithoutExt string
-		if strings.HasSuffix(base, ".network") {
-			nameWithoutExt = strings.TrimSuffix(base, ".network")
-		} else {
-			nameWithoutExt = strings.TrimSuffix(base, ".volume")
-		}
-
-		var serviceName string
-		if strings.HasSuffix(base, ".network") {
-			serviceName = nameWithoutExt + "-network"
-		} else {
-			serviceName = nameWithoutExt + "-volume"
-		}
+		serviceName := nameWithoutExt + serviceSuffix
 
 		if base == arg {
 			return f

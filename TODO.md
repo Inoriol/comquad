@@ -7,9 +7,10 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 
 - [x] **No `--version` flag** on root command — Added: `version` variable set via ldflags, displayed in rootCmd.Version.
 - [x] **No shell completion generation** — Already wired up by default in Cobra v1.8.0. Works for bash/zsh/fish/powershell via `comquad completion`.
-- [ ] **No standalone `comquad build` command** — only possible via `comquad up --build`
+- [ ] **No standalone `comquad build` command** — `build:` blocks are explicitly rejected for now. Infrastructure for `.image`/`.build` quadlet file handling is in place (cooker, resolve, lifecycle, down, regenerate, logs, edit, view).
 - [ ] **No config file / global defaults** — no way to set project-level or user-level defaults
 - [x] **No `comquad ls` alias for `comquad list`** — Added: `Aliases: []string{"ls"}` on listCmd.
+- [x] **`.image` and `.build` quadlet file types** — Added: full support across cooker, lifecycle, resolve, down, view, edit, logs, and regenerate.
 - [ ] **No project-level health status summary** (beyond `view` table)
 
 ---
@@ -47,7 +48,7 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 
 ### Missing Integration Test Scenarios
 
-- [x] `compose.yaml` with real `build:` blocks — Added: TestUpDown_WithBuildBlocks in build_test.go
+- [ ] `compose.yaml` with real `build:` blocks — ~~Added: TestUpDown_WithBuildBlocks in build_test.go~~ (test no longer applicable; build blocks are now rejected by preprocessor)
 - [x] `comquad ps` with real output verification — Added: TestPs_OutputFormat and TestPs_AllIncludesExitedContainers in ps_integration_test.go
 - [x] `comquad edit` with actual file modifications — Added: TestEdit_WithFileModifications in edit_modify_test.go (uses sed as EDITOR)
 - [ ] `comquad exec` with interactive TTY

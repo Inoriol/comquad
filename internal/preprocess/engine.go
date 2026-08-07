@@ -24,7 +24,6 @@ func NewEngine(projectName string, workingDir string) *Engine {
 }
 
 // Process takes a raw YAML input and applies normalization rules.
-// It also extracts build configuration from services.
 func (e *Engine) Process(input []byte) ([]byte, error) {
 	var cf ComposeFile
 
@@ -42,6 +41,9 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 
 	// 1. Inject Container Names, Absolute-ize Paths & Inject Labels
 	for serviceName, service := range cf.Services {
+		if _, hasBuild := service["build"]; hasBuild {
+			return nil, fmt.Errorf("service %q uses a build: block — builds are not supported yet", serviceName)
+		}
 		if _, has := service["container_name"]; !has {
 			service["container_name"] = fmt.Sprintf("%s-%s", e.ProjectName, serviceName)
 			logger.Info(fmt.Sprintf("Injected container_name: %s-%s", e.ProjectName, serviceName))

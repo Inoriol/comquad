@@ -116,8 +116,8 @@ func TestExec_NetworkServiceReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
 	err := o.Exec("cq-myapp-default.network", "", true, []string{"ls"})
-	if err == nil || !strings.Contains(err.Error(), "cannot exec into network or volume") {
-		t.Errorf("expected 'cannot exec into network or volume' error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "cannot exec into non-container unit") {
+		t.Errorf("expected 'cannot exec into non-container unit' error, got %v", err)
 	}
 }
 

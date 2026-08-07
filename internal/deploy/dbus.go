@@ -67,10 +67,10 @@ func (s *SystemdManager) ReloadDaemon(filePaths ...string) error {
 
 	// Wait for quadlet-generated units to appear
 	for _, f := range filePaths {
-		if !strings.HasSuffix(f, ".container") {
+		if !strings.HasSuffix(f, ".container") && !strings.HasSuffix(f, ".image") && !strings.HasSuffix(f, ".build") {
 			continue
 		}
-		unitName := strings.TrimSuffix(filepath.Base(f), ".container") + ".service"
+		unitName := fileToServiceName(filepath.Base(f))
 		if err := s.WaitForUnit(unitName, waitForUnitTimeout); err != nil {
 			return fmt.Errorf("quadlet generator did not produce unit %s after reload: %w", unitName, err)
 		}
@@ -269,6 +269,20 @@ func RemoveVolumes(projectName string) error {
 	return removePodmanResources("volume", projectName)
 }
 
+// fileToServiceName derives the systemd unit name from a quadlet file path.
+func fileToServiceName(base string) string {
+	if strings.HasSuffix(base, ".container") {
+		return strings.TrimSuffix(base, ".container") + ".service"
+	}
+	if strings.HasSuffix(base, ".image") {
+		return strings.TrimSuffix(base, ".image") + "-image.service"
+	}
+	if strings.HasSuffix(base, ".build") {
+		return strings.TrimSuffix(base, ".build") + "-build.service"
+	}
+	return strings.TrimSuffix(base, filepath.Ext(base)) + ".service"
+}
+
 // PodmanResource represents a discovered Podman resource with its project label
 type PodmanResource struct {
 	Name        string
@@ -348,7 +362,8 @@ func RegenerateState() (*StateManager, error) {
 		prefix := "cq-" + projectName
 		for _, f := range entries {
 			if strings.HasPrefix(f.Name(), prefix) && (strings.HasSuffix(f.Name(), ".container") ||
-				strings.HasSuffix(f.Name(), ".network") || strings.HasSuffix(f.Name(), ".volume")) {
+				strings.HasSuffix(f.Name(), ".network") || strings.HasSuffix(f.Name(), ".volume") ||
+				strings.HasSuffix(f.Name(), ".image") || strings.HasSuffix(f.Name(), ".build")) {
 				files = append(files, filepath.Join(targetDir, f.Name()))
 			}
 		}

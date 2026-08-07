@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/Inoriol/comquad/internal/deploy"
@@ -20,8 +21,8 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 	if len(services) == 0 {
 		var units []string
 		for _, f := range state.Files {
-			if strings.HasSuffix(f, ".container") {
-				units = append(units, ContainerFileToUnitName(f))
+			if strings.HasSuffix(f, ".container") || strings.HasSuffix(f, ".image") || strings.HasSuffix(f, ".build") {
+				units = append(units, fileToUnitName(f))
 			}
 		}
 		return units, nil
@@ -31,11 +32,33 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 	var units []string
 	for _, svc := range services {
 		matches := MatchAllContainers(o.projectName, state, svc)
+		// Also match image and build files
+		for _, f := range state.Files {
+			base := filepath.Base(f)
+			var nameWithoutExt, ext string
+			if strings.HasSuffix(base, ".image") {
+				nameWithoutExt = strings.TrimSuffix(base, ".image")
+				ext = ".image"
+			} else if strings.HasSuffix(base, ".build") {
+				nameWithoutExt = strings.TrimSuffix(base, ".build")
+				ext = ".build"
+			} else {
+				continue
+			}
+			servicePrefix := "cq-" + o.projectName + "-"
+			if base == svc ||
+				nameWithoutExt == svc ||
+				strings.TrimSuffix(svc, ".service") == nameWithoutExt+"-"+ext[1:]+".service" ||
+				strings.TrimPrefix(nameWithoutExt, servicePrefix) == svc ||
+				strings.TrimPrefix(nameWithoutExt, "cq-") == svc {
+				matches = append(matches, f)
+			}
+		}
 		if len(matches) == 0 {
 			return nil, fmt.Errorf("no units found matching service '%s' for project '%s'", svc, o.projectName)
 		}
 		for _, f := range matches {
-			unitName := ContainerFileToUnitName(f)
+			unitName := fileToUnitName(f)
 			if _, exists := seen[unitName]; !exists {
 				seen[unitName] = struct{}{}
 				units = append(units, unitName)
@@ -44,6 +67,24 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 	}
 
 	return units, nil
+}
+
+// fileToUnitName converts a quadlet file path to its systemd unit name.
+func fileToUnitName(f string) string {
+	switch {
+	case strings.HasSuffix(f, ".container"):
+		return ContainerFileToUnitName(f)
+	case strings.HasSuffix(f, ".network"):
+		return NetworkFileToUnitName(f)
+	case strings.HasSuffix(f, ".volume"):
+		return VolumeFileToUnitName(f)
+	case strings.HasSuffix(f, ".image"):
+		return ImageFileToUnitName(f)
+	case strings.HasSuffix(f, ".build"):
+		return BuildFileToUnitName(f)
+	default:
+		return ""
+	}
 }
 
 // Start starts all units for the project, or specific services if provided.

@@ -88,7 +88,8 @@ func (c *Cooker) Cook() (*CookResult, error) {
 
 		updatedContent = c.addSELinuxLabels(updatedContent)
 
-		if strings.HasSuffix(newName, ".container") || strings.HasSuffix(newName, ".network") {
+		if strings.HasSuffix(newName, ".container") || strings.HasSuffix(newName, ".network") ||
+			strings.HasSuffix(newName, ".image") || strings.HasSuffix(newName, ".build") {
 			updatedContent = c.addSystemdOptimizations(updatedContent)
 			logger.Info(fmt.Sprintf("Added [Install] section to %s", newName))
 			if strings.Contains(updatedContent, "AutoUpdate=registry") {

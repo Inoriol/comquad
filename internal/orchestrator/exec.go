@@ -26,8 +26,8 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 	if service != "" {
 		matches = MatchAllContainers(o.projectName, state, service)
 		if len(matches) == 0 {
-			if MatchNetworkOrVolume(o.projectName, state, service) != "" {
-				return fmt.Errorf("cannot exec into network or volume '%s'", service)
+			if MatchQuadletResource(o.projectName, state, service) != "" {
+				return fmt.Errorf("cannot exec into non-container unit '%s'", service)
 			}
 			return fmt.Errorf("no containers found matching '%s' for project '%s'", service, o.projectName)
 		}

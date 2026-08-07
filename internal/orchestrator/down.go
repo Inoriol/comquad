@@ -64,6 +64,26 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 	}
 
 	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".image") {
+			unitName := ImageFileToUnitName(f)
+			logger.Print("Stopping unit: " + unitName)
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop image unit " + unitName + ": " + err.Error())
+			}
+		}
+	}
+
+	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".build") {
+			unitName := BuildFileToUnitName(f)
+			logger.Print("Stopping unit: " + unitName)
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop build unit " + unitName + ": " + err.Error())
+			}
+		}
+	}
+
+	for _, f := range state.Files {
 		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
 			logger.Warn("Failed to remove file " + f + ": " + err.Error())
 		}
