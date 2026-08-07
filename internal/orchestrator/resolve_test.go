@@ -250,40 +250,40 @@ func TestMatchAllContainers_ConsistentWithMatchFirstContainer(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// MatchNetworkOrVolume
+// MatchQuadletResource
 // ---------------------------------------------------------------------------
 
-func TestMatchNetworkOrVolume_ByExactBaseName(t *testing.T) {
+func TestMatchQuadletResource_ByExactBaseName(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-default.network")
-	got := MatchNetworkOrVolume("myapp", state, "cq-myapp-default.network")
+	got := MatchQuadletResource("myapp", state, "cq-myapp-default.network")
 	if got == "" {
 		t.Error("expected match by exact base name")
 	}
 }
 
-func TestMatchNetworkOrVolume_Volume(t *testing.T) {
+func TestMatchQuadletResource_Volume(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-data.volume")
-	got := MatchNetworkOrVolume("myapp", state, "cq-myapp-data.volume")
+	got := MatchQuadletResource("myapp", state, "cq-myapp-data.volume")
 	if got == "" {
 		t.Error("expected match for .volume file")
 	}
 }
 
-func TestMatchNetworkOrVolume_NoMatchOnContainerFile(t *testing.T) {
+func TestMatchQuadletResource_NoMatchOnContainerFile(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-web.container")
-	got := MatchNetworkOrVolume("myapp", state, "cq-myapp-web.container")
+	got := MatchQuadletResource("myapp", state, "cq-myapp-web.container")
 	if got != "" {
-		t.Errorf("MatchNetworkOrVolume should not match .container files, got %q", got)
+		t.Errorf("MatchQuadletResource should not match .container files, got %q", got)
 	}
 }
 
-func TestMatchNetworkOrVolume_NoMatch(t *testing.T) {
+func TestMatchQuadletResource_NoMatch(t *testing.T) {
 	dir := t.TempDir()
 	state := stateWithFiles(dir, "cq-myapp-default.network")
-	got := MatchNetworkOrVolume("myapp", state, "nonexistent")
+	got := MatchQuadletResource("myapp", state, "nonexistent")
 	if got != "" {
 		t.Errorf("expected no match, got %q", got)
 	}

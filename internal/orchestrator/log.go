@@ -421,6 +421,10 @@ func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 			unitName = NetworkFileToUnitName(f)
 		case strings.HasSuffix(f, ".volume"):
 			unitName = VolumeFileToUnitName(f)
+		case strings.HasSuffix(f, ".image"):
+			unitName = ImageFileToUnitName(f)
+		case strings.HasSuffix(f, ".build"):
+			unitName = BuildFileToUnitName(f)
 		}
 		if unitName != "" {
 			unitNames = append(unitNames, unitName)

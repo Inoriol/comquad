@@ -6,10 +6,10 @@ This document details the internal design, component mapping, and execution life
 
 When you run `comquad up`, the engine moves your configuration through a five-step pipeline:
 
-1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels). `build:` blocks are passed through unchanged to podlet.
-2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, and `.volume` quadlet files.
+1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels). `build:` blocks are explicitly rejected with an error — build support is not yet implemented.
+2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, `.volume`, `.image`, and `.build` quadlet files.
 3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed. Returns a `CookResult` containing the in-memory content of all written files (keyed by destination path) to avoid redundant disk I/O in subsequent steps.
-4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. Currently a no-op stub; future handlers in `graft/handlers/` will plug gaps (e.g. skipping registry pulls for locally-built images from `build:` blocks).
+4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. Currently a no-op stub; future handlers in `graft/handlers/` will plug gaps (e.g. intercepting `build:` blocks once they are supported).
 5. **Deploy** — Pulls images based on the configured pull strategy, then relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus. If `startUnits` fails, the cleanup function removes all files, unregisters the project, and reloads the daemon to prevent a half-deployed state.
 
 ### Dry Run Mode (`--dry-run`)
@@ -85,13 +85,13 @@ Unit resolution iterates over `state.Files` from `projects.json`, checking each 
 
 The `edit` command provides two modes of file editing:
 
-**Project edit** (no service argument): resolves all `.container`, `.network`, and `.volume` quadlet files for a project and opens them in `$EDITOR` (falls back to `findDefaultEditor()` which probes `editor`, `nano`, `vim`, then `vi`). `$EDITOR` is split on whitespace, so values like `"vim -o"` or `"code --wait"` work correctly. After the editor exits, comquad compares file contents and auto-reloads systemd, restarting any changed container units.
+**Project edit** (no service argument): resolves all `.container`, `.network`, `.volume`, `.image`, and `.build` quadlet files for a project and opens them in `$EDITOR` (falls back to `findDefaultEditor()` which probes `editor`, `nano`, `vim`, then `vi`). `$EDITOR` is split on whitespace, so values like `"vim -o"` or `"code --wait"` work correctly. After the editor exits, comquad compares file contents and auto-reloads systemd, restarting any changed container units.
 
 **Unit file edit** (with service argument): resolves a single quadlet file using the same matching patterns as `view`, opens it in the editor, and reloads systemd if changes were detected.
 
 The `--no-reload` flag opens files without triggering a systemd daemon reload or unit restart.
 
-Unit resolution shares the same matching logic as `view`, using `MatchFirstContainer` and `MatchNetworkOrVolume` helpers that iterate over `state.Files` from `projects.json`.
+Unit resolution shares the same matching logic as `view`, using `MatchFirstContainer` and `MatchQuadletResource` helpers that iterate over `state.Files` from `projects.json`.
 
 ## 📋 Logs Command
 
@@ -115,7 +115,7 @@ Logs from multiple units are collected via `journalctl --output=json`, parsed, s
 
 The `start`, `stop`, and `restart` commands manage the runtime state of deployed projects without touching quadlet files or triggering daemon-reload. They operate directly via D-Bus.
 
-**Service resolution:** All three commands accept optional `[service ...]` positional arguments. When provided, they use `MatchAllContainers` to resolve service names to unit names. When omitted, all `.container` files from the project's state are started/stopped/restarted.
+**Service resolution:** All three commands accept optional `[service ...]` positional arguments. When provided, they use `MatchAllContainers` to resolve service names to unit names. When omitted, all `.container`, `.image`, and `.build` files from the project's state are started/stopped/restarted.
 
 **Start** — Iterates over resolved unit names and calls `StartUnit` via D-Bus. Reports per-unit status messages.
 
@@ -131,8 +131,8 @@ All three commands require the project to exist in `projects.json` state. They s
 
 The `down` command performs a complete teardown of a deployed project in six steps:
 
-1. **Stop units** — Stops all container units via systemd D-Bus `StopUnit`, then verifies all units are no longer active.
-2. **Remove quadlet files** — Deletes all `.container`, `.network`, and `.volume` files from the systemd target directory.
+1. **Stop units** — Stops all container, image, and build units via systemd D-Bus `StopUnit`, then verifies all units are no longer active. Network and volume units are also stopped.
+2. **Remove quadlet files** — Deletes all `.container`, `.network`, `.volume`, `.image`, and `.build` files from the systemd target directory.
 3. **Reload daemon** — Triggers `daemon-reload` via D-Bus so systemd forgets the removed units and releases its references to networks and volumes.
 4. **Remove networks** — Lists all Podman networks with label `com.comquad.managed=true` and project label matching the current project, then removes them via `podman network rm`.
 5. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes with label `com.comquad.managed=true` and project label matching the current project, then removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
@@ -172,7 +172,7 @@ The `regenerate` command restores the state file by scanning Podman for managed 
 2. Queries Podman for all networks with label `com.comquad.managed=true`
 3. Queries Podman for all volumes with label `com.comquad.managed=true`
 4. Groups all resources by their `com.comquad.project` label value
-5. Resolves quadlet files in the systemd target directory matching `cq-<project>-*.container`, `*.network`, `*.volume`
+5. Resolves quadlet files in the systemd target directory matching `cq-<project>-*.container`, `*.network`, `*.volume`, `*.image`, `*.build`
 6. Writes the reconstructed state to `projects.json`
 
 **Flags:**
@@ -233,28 +233,20 @@ Quadlet configurations are copied into paths dictated by your execution context:
 
 `comquad` accepts standard Docker Compose v3 files supporting `services`, `networks`, and `volumes`.
 
-The following fields accept both map (`KEY: value`) and list (`- KEY=value`) formats:
+The following fields accept both map (`KEY: value`) and list (`- KEY=value`) formats when passed to podlet:
 
 * `environment` — service environment variables
 * `labels` — service, network, and volume labels
-* `build.args` — build arguments
 
-The following compose service fields are **handled by comquad** (explicitly processed or auto-injected):
+The following compose service fields are **explicitly processed** by comquad's preprocessor:
 
-* `container_name` — auto-generated if missing (`<project>-<service>`); also registered as a second `NetworkAlias=` for DNS resolution
+* `build` — explicitly rejected with an error; build support is not yet implemented
+* `container_name` — auto-generated if missing (`<project>-<service>`)
 * `image` — normalized to full registry path (`docker.io/library/`)
-* `build` — passed through to podlet unchanged (future graft handlers will fill gaps)
-* `ports` — published host ports (offset in rootless mode)
-* `volumes` — bind mounts and named volumes (relative paths resolved)
-* `networks` — network attachments (auto-attached to `cq-default` if none defined)
-* `entrypoint` — container entrypoint
-* `command` — container command
-* `expose` — ports exposed to linked services
-* `deploy` — deploy-time configuration
-* `environment` — environment variables (map or list format)
-* `labels` — service, network, and volume labels (map or list format)
+* `volumes` — bind mount host paths with `./` or `../` prefixes are resolved to absolute paths
+* `networks` — auto-attached to `cq-default` when a default bridge network is injected
 
-The following compose service fields are **not yet handled** by comquad but are **passed through unchanged** to `podlet`: `depends_on`, `restart`, `working_dir`, `user`, `healthcheck`, `cap_add`/`cap_drop`, `tmpfs`, `read_only`, `extra_hosts`, `dns`, `hostname`, `privileged`, `mem_limit`, `cpus`, `volumes_from`, `links`, `tty`, `stdin_open`, `security_opt`, `shm_size`. Unknown top-level keys (e.g. `version`, `x-` extensions, `secrets`, `configs`) are also preserved.
+All other compose fields (`entrypoint`, `command`, `expose`, `deploy`, `environment`, `depends_on`, `restart`, `working_dir`, `user`, `healthcheck`, `cap_add`/`cap_drop`, `tmpfs`, `read_only`, `extra_hosts`, `dns`, `hostname`, `privileged`, `mem_limit`, `cpus`, `volumes_from`, `links`, `tty`, `stdin_open`, `security_opt`, `shm_size`, `labels`, and `x-` extensions) are **passed through unchanged** to `podlet` via a schema-less YAML model.
 
 ### Automatic Behaviors & Opinionated Transforms
 
@@ -272,7 +264,7 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 
 ### Build: Blocks
 
-`build:` blocks are passed through to podlet unchanged. Podlet handles `build:` sections natively by generating `.build` quadlet files. Any gaps in podlet's handling will be addressed by future handlers in `internal/graft/handlers/`.
+`build:` blocks are currently **rejected** by the preprocessor. Attempting to deploy a compose file containing a `build:` block will produce an error. Build support is planned for a future release and will be implemented via graft handlers in `internal/graft/handlers/`.
 
 ### Quadlet Feature Injections
 
@@ -335,7 +327,7 @@ serializes, not the entire test.
 
 ## 📋 Follow Logs on Deploy
 
-When `comquad up -f` is used, after successfully deploying all units the CLI captures the current timestamp and streams all journal logs for every project unit (containers, networks, and volumes) from that point onward. This emulates the default `docker compose up` behavior (without `-d`), keeping the terminal attached to live output until interrupted with Ctrl+C.
+When `comquad up -f` is used, after successfully deploying all units the CLI captures the current timestamp and streams all journal logs for every project unit (containers, networks, volumes, images, and builds) from that point onward. This emulates the default `docker compose up` behavior (without `-d`), keeping the terminal attached to live output until interrupted with Ctrl+C.
 
 The deployment timestamp is captured after image handling completes but before `daemon-reload` and unit starts, ensuring no startup logs are missed.
 

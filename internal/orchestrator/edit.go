@@ -40,7 +40,7 @@ func (o *Orchestrator) editUnit(state deploy.ProjectState, arg string, noReload 
 
 	if found = MatchFirstContainer(o.projectName, state, arg); found != "" {
 		// do nothing
-	} else if found = MatchNetworkOrVolume(o.projectName, state, arg); found != "" {
+	} else if found = MatchQuadletResource(o.projectName, state, arg); found != "" {
 		// do nothing
 	}
 
@@ -58,7 +58,9 @@ func (o *Orchestrator) editUnit(state deploy.ProjectState, arg string, noReload 
 func (o *Orchestrator) resolveAllProjectFiles(state deploy.ProjectState) []string {
 	var files []string
 	for _, f := range state.Files {
-		if strings.HasSuffix(f, ".container") || strings.HasSuffix(f, ".network") || strings.HasSuffix(f, ".volume") {
+		if strings.HasSuffix(f, ".container") || strings.HasSuffix(f, ".network") ||
+			strings.HasSuffix(f, ".volume") || strings.HasSuffix(f, ".image") ||
+			strings.HasSuffix(f, ".build") {
 			files = append(files, f)
 		}
 	}

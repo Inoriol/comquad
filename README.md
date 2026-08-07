@@ -186,7 +186,7 @@ comquad exec --help    # Container exec examples
 
 ## 🏗️ Architecture & Automatic Behaviors
 
-`comquad` uses a schema-less YAML model to preserve all compose file fields through its preprocessing pipeline. Any field not explicitly handled (like `depends_on`, `healthcheck`, or `x-` extensions) is passed through completely unchanged to `podlet`.
+`comquad` uses a schema-less YAML model to preserve all compose file fields through its preprocessing pipeline. Most unhandled fields (like `depends_on`, `healthcheck`, or `x-` extensions) are passed through unchanged to `podlet`. However, `build:` blocks are currently explicitly rejected — build support is planned for a future release.
 
 For a deep dive into how `comquad` processes compose files, manages state, and maps directories, check out the [Architecture Guide](./ARCHITECTURE.md).
 

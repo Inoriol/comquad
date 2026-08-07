@@ -219,6 +219,22 @@ func VolumeFileToUnitName(filePath string) string {
 	return nameWithoutExt + "-volume.service"
 }
 
+// ImageFileToUnitName derives the systemd unit name from an image quadlet file path.
+// e.g. /path/to/cq-myapp-app.image -> cq-myapp-app-image.service
+func ImageFileToUnitName(filePath string) string {
+	base := filepath.Base(filePath)
+	nameWithoutExt := strings.TrimSuffix(base, ".image")
+	return nameWithoutExt + "-image.service"
+}
+
+// BuildFileToUnitName derives the systemd unit name from a build quadlet file path.
+// e.g. /path/to/cq-myapp-app.build -> cq-myapp-app-build.service
+func BuildFileToUnitName(filePath string) string {
+	base := filepath.Base(filePath)
+	nameWithoutExt := strings.TrimSuffix(base, ".build")
+	return nameWithoutExt + "-build.service"
+}
+
 func validateProjectName(name string) error {
 	if name == "" {
 		return fmt.Errorf("project name cannot be empty")

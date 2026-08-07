@@ -89,7 +89,7 @@ func (o *Orchestrator) viewUnit(state deploy.ProjectState, arg string) error {
 	}
 
 	// Try network/volume files
-	if found := o.matchNetworkOrVolume(state, arg); found != "" {
+	if found := o.matchQuadletResource(state, arg); found != "" {
 		return o.printFile(found)
 	}
 
@@ -105,8 +105,8 @@ func (o *Orchestrator) matchContainer(state deploy.ProjectState, arg string) str
 	return MatchFirstContainer(o.projectName, state, arg)
 }
 
-func (o *Orchestrator) matchNetworkOrVolume(state deploy.ProjectState, arg string) string {
-	return MatchNetworkOrVolume(o.projectName, state, arg)
+func (o *Orchestrator) matchQuadletResource(state deploy.ProjectState, arg string) string {
+	return MatchQuadletResource(o.projectName, state, arg)
 }
 
 func (o *Orchestrator) printFile(path string) error {
