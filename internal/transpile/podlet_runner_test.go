@@ -194,7 +194,7 @@ func TestTranspile_ReturnsErrorOnNonZeroExit(t *testing.T) {
 	binDir := t.TempDir()
 	outDir := t.TempDir()
 
-	makeFakePodlet(t, binDir, `echo "invalid compose file" >&2; exit 1`)
+	makeFakePodlet(t, binDir, `cat > /dev/null; echo "invalid compose file" >&2; exit 1`)
 	withPATH(t, binDir)
 
 	runner, err := NewPodletRunner(outDir)
@@ -215,7 +215,7 @@ func TestTranspile_IncludesStderrInError(t *testing.T) {
 	binDir := t.TempDir()
 	outDir := t.TempDir()
 
-	makeFakePodlet(t, binDir, `echo "detailed error message" >&2; exit 2`)
+	makeFakePodlet(t, binDir, `cat > /dev/null; echo "detailed error message" >&2; exit 2`)
 	withPATH(t, binDir)
 
 	runner, err := NewPodletRunner(outDir)

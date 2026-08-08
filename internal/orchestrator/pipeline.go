@@ -68,9 +68,9 @@ func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) (map[str
 	return result.FileContents, nil
 }
 
-func (o *Orchestrator) graft(fileContents map[string]string) (map[string]string, error) {
-	grafter := graft.Grafter{}
-	return grafter.Process(fileContents)
+func (o *Orchestrator) graft(fileContents map[string]string, services map[string]preprocess.ServiceImageSpec) map[string]string {
+	grafter := graft.Grafter{ProjectName: o.projectName}
+	return grafter.Process(fileContents, services)
 }
 
 func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
@@ -110,8 +110,29 @@ func (o *Orchestrator) startUnits(projectFiles []string) error {
 	}
 	defer dbusMgr.Close()
 
-	if err := dbusMgr.ReloadDaemon(projectFiles...); err != nil {
+	var reloadFiles []string
+	for _, f := range projectFiles {
+		if strings.HasSuffix(f, ".container") {
+			reloadFiles = append(reloadFiles, f)
+		}
+	}
+
+	if err := dbusMgr.ReloadDaemon(reloadFiles...); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+	}
+
+	for _, f := range projectFiles {
+		if strings.HasSuffix(f, ".image") {
+			unitName := ImageFileToUnitName(f)
+			logger.Action("Starting unit: " + unitName)
+			if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
+				logger.Warn(fmt.Sprintf("image unit %s not produced by quadlet generator, skipping: %v", unitName, err))
+				continue
+			}
+			if err := dbusMgr.StartUnit(unitName); err != nil {
+				logger.Warn(fmt.Sprintf("failed to start image unit %s: %v", unitName, err))
+			}
+		}
 	}
 
 	for _, f := range projectFiles {

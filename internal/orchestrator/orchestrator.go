@@ -11,6 +11,7 @@ import (
 
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/preprocess"
 )
 
 const (
@@ -63,6 +64,11 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 	}, nil
 }
 
+// ProjectName returns the resolved project name.
+func (o *Orchestrator) ProjectName() string {
+	return o.projectName
+}
+
 // Up preprocesses, transpiles, cooks and deploys the project
 // defined in the compose.yaml in the current working directory.
 func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
@@ -86,6 +92,11 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 	composeData, err := os.ReadFile(composeFile)
 	if err != nil {
 		return fmt.Errorf("failed to read compose file: %w", err)
+	}
+
+	serviceSpecs, err := preprocess.ExtractServiceImageSpecs(composeData)
+	if err != nil {
+		return fmt.Errorf("failed to extract service image specs: %w", err)
 	}
 
 	logger.Action("Preprocessing compose configuration...")
@@ -128,10 +139,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		return err
 	}
 
-	fileContents, err = o.graft(fileContents)
-	if err != nil {
-		return err
-	}
+	fileContents = o.graft(fileContents, serviceSpecs)
 
 	projectFiles, err := o.collectProjectFiles(targetDir)
 	if err != nil {

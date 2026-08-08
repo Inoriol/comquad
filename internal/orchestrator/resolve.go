@@ -80,6 +80,8 @@ var quadletResourceSuffixes = []string{".network", ".volume", ".image", ".build"
 
 // MatchQuadletResource finds a network, volume, image, or build quadlet file matching the given arg.
 func MatchQuadletResource(projectName string, state deploy.ProjectState, arg string) string {
+	servicePrefix := "cq-" + projectName + "-"
+
 	for _, f := range state.Files {
 		base := filepath.Base(f)
 
@@ -97,15 +99,15 @@ func MatchQuadletResource(projectName string, state deploy.ProjectState, arg str
 			continue
 		}
 
-		serviceName := nameWithoutExt + serviceSuffix
+		serviceType := strings.TrimPrefix(serviceSuffix, ".")
+		serviceUnitName := nameWithoutExt + "-" + serviceType + ".service"
+		shortName := strings.TrimPrefix(nameWithoutExt, servicePrefix)
 
-		if base == arg {
-			return f
-		}
-		if serviceName == arg {
-			return f
-		}
-		if strings.TrimSuffix(arg, ".service") == serviceName {
+		if base == arg ||
+			serviceUnitName == arg ||
+			strings.TrimSuffix(arg, ".service") == nameWithoutExt+"-"+serviceType ||
+			shortName == arg ||
+			shortName+serviceSuffix == arg {
 			return f
 		}
 	}

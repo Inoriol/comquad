@@ -9,7 +9,7 @@ When you run `comquad up`, the engine moves your configuration through a five-st
 1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels). `build:` blocks are explicitly rejected with an error — build support is not yet implemented.
 2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, `.volume`, `.image`, and `.build` quadlet files.
 3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed. Returns a `CookResult` containing the in-memory content of all written files (keyed by destination path) to avoid redundant disk I/O in subsequent steps.
-4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. Currently a no-op stub; future handlers in `graft/handlers/` will plug gaps (e.g. intercepting `build:` blocks once they are supported).
+4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. The primary handler is `handlers.ImageQuadletHandler` which creates `.image` quadlet files for every `.container`, moving image-related directives (`Image=`, `Policy=`, `OS=`, `Arch=`, `Variant=`) into dedicated image units so systemd can manage image pulls separately. Also injects `Retry=3` and `RetryDelay=5s` defaults. Containers are updated to reference `<name>.image` instead of raw image names. Returns the updated in-memory file contents map.
 5. **Deploy** — Pulls images based on the configured pull strategy, then relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus. If `startUnits` fails, the cleanup function removes all files, unregisters the project, and reloads the daemon to prevent a half-deployed state.
 
 ### Dry Run Mode (`--dry-run`)
@@ -73,13 +73,15 @@ Containers are sorted: running first (by name), then exited (by name), then othe
 
 ## 👁️ View Command
 
-The `view` command provides two modes of inspection:
+The `view` command (also available as `overview`) provides two modes of inspection:
 
-**Project view** (no service argument): queries systemd D-Bus for all units belonging to a project, computes aggregate health status, and displays a table of `UNIT`, `ACTIVE`, and `SUB` states. Status is `healthy` when all units are active, `down` when none are active, and `degraded` when only some are active.
+**Project view** (no service argument): displays a clean relational overview using `go-pretty/table` with auto-width columns. The output is split into two tables:
+- **SERVICES** — each container with its status, short image name, attached networks, and volumes. Image names are resolved through `.image` quadlet files when containers reference them, showing human-readable names (e.g. `mariadb:10.5` instead of `docker.io/library/mariadb:10.5`).
+- **RESOURCES** — all images, networks, and volumes with copy-pasteable names (e.g. `db.image`, `dbnet.network`). These names can be used directly as arguments to `comquad view <name>`.
 
-**Unit file view** (with service argument): resolves the quadlet file using five matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, `cq-myapp-web.container`, or `myapp-web`), reads the file, and prints its contents prefixed with a `── <filename> ──` header.
+The header shows Project, Source, and aggregate Status (`healthy` when all containers are running, `stopped` when none are, `degraded` when only some are).
 
-Unit resolution iterates over `state.Files` from `projects.json`, checking each pattern in order until a match is found.
+**Unit file view** (with service argument): resolves the quadlet file using five matching patterns (`web` → `cq-myapp-web.container`, `cq-myapp-web`, `cq-myapp-web.service`, `cq-myapp-web.container`, or `myapp-web`). Non-container resources support short-name matching (e.g. `db.image`, `dbnet`, `dbnet.network`, `cq-myapp-db-image.service`). Reads the file and prints its contents prefixed with a `── <filename> ──` header.
 
 ## ✏️ Edit Command
 
@@ -243,6 +245,8 @@ The following compose service fields are **explicitly processed** by comquad's p
 * `build` — explicitly rejected with an error; build support is not yet implemented
 * `container_name` — auto-generated if missing (`<project>-<service>`)
 * `image` — normalized to full registry path (`docker.io/library/`)
+* `pull_policy` — stripped from compose YAML; mapped to `.image` quadlet `Policy=` directive in the graft step
+* `platform` — stripped from compose YAML; mapped to `.image` quadlet `OS=`, `Arch=`, and `Variant=` directives in the graft step
 * `volumes` — bind mount host paths with `./` or `../` prefixes are resolved to absolute paths
 * `networks` — auto-attached to `cq-default` when a default bridge network is injected
 
@@ -279,6 +283,24 @@ services:
     # labels:                        # Also supported (list format):
     #   - comquad-no-autoupdate=true
 ```
+
+### Image Quadlet Generation
+
+comquad automatically generates `.image` quadlet files for every service container during the graft pipeline step. The handler extracts the following compose fields and maps them to `[Image]` section directives:
+
+| Compose field | `.image` directive | Notes |
+|---|---|---|
+| `image: nginx:latest` | `Image=` | Uses the normalized image from preprocessing |
+| `pull_policy: always` | `Policy=always` | `if_not_present` aliased to `missing` |
+| `pull_policy: missing` | `Policy=missing` | Default behavior |
+| `platform: linux/amd64` | `OS=linux`, `Arch=amd64` | |
+| `platform: linux/arm64/v8` | `OS=linux`, `Arch=arm64`, `Variant=v8` | |
+
+Unsupported `pull_policy` values (`build`, `daily`, `weekly`, `every_*`) are logged as a warning and omitted. Hardcoded defaults `Retry=3` and `RetryDelay=5s` are always applied.
+
+The `.container` file's `Image=` directive is updated to reference the `.image` file (e.g. `Image=cq-myapp-web.image`), which causes the quadlet generator to create a systemd dependency between the container unit and the image unit.
+
+`.image` files are written to the systemd target directory, registered in `projects.json`, and picked up by `collectProjectFiles()` in the deploy pipeline. During deployment, `startUnits()` starts `.image` units before `.container` units. If the system's quadlet generator does not support `.image` files, startup failures are logged as warnings and deployment proceeds — the manual pull via `handleImages()` provides a fallback.
 
 ## 🧪 Testing Architecture
 

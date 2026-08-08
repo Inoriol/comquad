@@ -22,8 +22,13 @@ var downCmd = &cobra.Command{
   comquad down --dry-run
   comquad down -y`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		o, err := orchestrator.NewOrchestrator(projectName)
+		if err != nil {
+			return err
+		}
+
 		if !downYes && !dryRun && isStdinTerminal() {
-			fmt.Printf("Are you sure you want to remove project %q? [y/N]: ", projectName)
+			fmt.Printf("Are you sure you want to remove project %q? [y/N]: ", o.ProjectName())
 			reader := bufio.NewReader(os.Stdin)
 			response, err := reader.ReadString('\n')
 			if err != nil {
@@ -35,10 +40,6 @@ var downCmd = &cobra.Command{
 			}
 		}
 
-		o, err := orchestrator.NewOrchestrator(projectName)
-		if err != nil {
-			return err
-		}
 		return o.Down(downRemoveVolumes, dryRun)
 	},
 }
