@@ -47,10 +47,11 @@ func (sm StringMap) MarshalYAML() (interface{}, error) {
 // Services and Volumes use generic maps to preserve all fields (including
 // unknown ones like depends_on, restart, etc.) through the unmarshal/marshal cycle.
 type ComposeFile struct {
-	Services map[string]map[string]interface{} `yaml:"services"`
+	Services map[string]map[string]interface{}  `yaml:"services"`
 	Networks map[string]interface{}             `yaml:"networks,omitempty"`
-	Volumes  map[string]map[string]interface{} `yaml:"volumes,omitempty"`
-	Config   *ProjectConfig                      `yaml:"-"` // Internal use
+	Volumes  map[string]map[string]interface{}  `yaml:"volumes,omitempty"`
+	Secrets  map[string]map[string]interface{}  `yaml:"secrets,omitempty"`
+	Config   *ProjectConfig                     `yaml:"-"` // Internal use
 }
 
 // ProjectConfig holds metadata injected during pre-processing
@@ -68,3 +69,22 @@ type ServiceImageSpec struct {
 	Arch        string // from platform field, e.g. "amd64"
 	Variant     string // from platform field, e.g. "v8"
 }
+
+// SecretDef holds a parsed top-level compose secret definition.
+type SecretDef struct {
+	Name         string // compose key name, e.g. "db_password"
+	File         string // absolute path for "file:" secrets
+	Environment  string // env var name for "environment:" secrets
+	Content      string // resolved value (from env var or .env file), for "environment:" secrets
+	External     bool   // true if "external: true"
+	ExternalName string // "name:" field for external secrets with alternate lookup
+}
+
+// SecretRef describes a service's reference to a top-level secret.
+type SecretRef struct {
+	Source string // secret name from the top-level secrets section
+	Target string // optional custom mount path (defaults to /run/secrets/<source>)
+}
+
+// ServiceSecretRefs maps a service name to the list of secrets it references.
+type ServiceSecretRefs map[string][]SecretRef

@@ -1,7 +1,9 @@
 package preprocess
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -39,7 +41,12 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		cf.Networks = make(map[string]interface{})
 	}
 
-	// 1. Inject Container Names, Absolute-ize Paths & Inject Labels
+	// 1. Strip secrets from services (they are handled by the graft step)
+	for _, service := range cf.Services {
+		delete(service, "secrets")
+	}
+
+	// 2. Inject Container Names, Absolute-ize Paths & Inject Labels
 	for serviceName, service := range cf.Services {
 		if _, hasBuild := service["build"]; hasBuild {
 			return nil, fmt.Errorf("service %q uses a build: block — builds are not supported yet", serviceName)
@@ -84,7 +91,7 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 2. Automatic Networking: Ensure a default bridge network exists.
+	// 3. Automatic Networking: Ensure a default bridge network exists.
 	// Only inject cq-default when the compose file defines no networks at all.
 	// Services are only auto-attached to cq-default if it was actually injected,
 	// preventing dangling network references when user-defined networks exist.
@@ -108,7 +115,7 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 3. Inject force-volume labels into top-level named volumes to ensure podlet generates .volume files.
+	// 4. Inject force-volume labels into top-level named volumes to ensure podlet generates .volume files.
 	for name, vol := range cf.Volumes {
 		if vol == nil {
 			cf.Volumes[name] = make(map[string]interface{})
@@ -144,7 +151,9 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 4. Marshal back to YAML
+	// 5. Strip top-level secrets and marshal back to YAML
+	cf.Secrets = nil
+
 	output, err := yaml.Marshal(&cf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal processed compose file: %w", err)
@@ -235,4 +244,135 @@ func ExtractServiceImageSpecs(composeData []byte) (map[string]ServiceImageSpec, 
 		specs[svcName] = spec
 	}
 	return specs, nil
+}
+
+// ExtractSecretSpecs parses raw compose YAML and extracts secret definitions
+// and per-service secret references before any preprocessing has been applied.
+func ExtractSecretSpecs(composeData []byte, workingDir string) (map[string]SecretDef, ServiceSecretRefs, error) {
+	var cf ComposeFile
+	if err := yaml.Unmarshal(composeData, &cf); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse compose file for secret specs: %w", err)
+	}
+
+	secretDefs := make(map[string]SecretDef, len(cf.Secrets))
+	for name, raw := range cf.Secrets {
+		def := SecretDef{Name: name}
+
+		if ext, ok := raw["external"]; ok {
+			if extBool, isBool := ext.(bool); isBool && extBool {
+				def.External = true
+			}
+		}
+
+		if nameVal, ok := raw["name"].(string); ok {
+			def.ExternalName = nameVal
+		}
+
+		if def.External {
+			for key := range raw {
+				if key != "external" && key != "name" {
+					return nil, nil, fmt.Errorf("secret %q: external=true requires no other attributes besides 'name' (found %q)", name, key)
+				}
+			}
+		}
+
+		if fileVal, ok := raw["file"].(string); ok && fileVal != "" {
+			absPath, err := filepath.Abs(filepath.Join(workingDir, fileVal))
+			if err != nil {
+				return nil, nil, fmt.Errorf("secret %q: failed to resolve file path %q: %w", name, fileVal, err)
+			}
+			def.File = absPath
+		}
+
+		if envVal, ok := raw["environment"].(string); ok && envVal != "" {
+			def.Environment = envVal
+			def.Content = resolveEnvironmentSecret(envVal, workingDir)
+		}
+
+		secretDefs[name] = def
+	}
+
+	serviceRefs := make(ServiceSecretRefs, len(cf.Services))
+	for svcName, svc := range cf.Services {
+		rawSecrets, hasSecrets := svc["secrets"]
+		if !hasSecrets {
+			continue
+		}
+
+		var refs []SecretRef
+
+		switch s := rawSecrets.(type) {
+		case []interface{}:
+			for _, item := range s {
+				switch v := item.(type) {
+				case string:
+					refs = append(refs, SecretRef{Source: v})
+				case map[string]interface{}:
+					ref := SecretRef{}
+					if src, ok := v["source"].(string); ok {
+						ref.Source = src
+					}
+					if tgt, ok := v["target"].(string); ok {
+						ref.Target = tgt
+					}
+					if ref.Source != "" {
+						refs = append(refs, ref)
+					}
+				}
+			}
+		}
+
+		if len(refs) > 0 {
+			serviceRefs[svcName] = refs
+		}
+	}
+
+	for svcName, refs := range serviceRefs {
+		for _, ref := range refs {
+			if _, ok := secretDefs[ref.Source]; !ok {
+				return nil, nil, fmt.Errorf("service %q references undefined secret %q", svcName, ref.Source)
+			}
+		}
+	}
+
+	return secretDefs, serviceRefs, nil
+}
+
+func resolveEnvironmentSecret(varName, workingDir string) string {
+	if val := os.Getenv(varName); val != "" {
+		return val
+	}
+
+	dotEnv := loadDotEnv(filepath.Join(workingDir, ".env"))
+	if val, ok := dotEnv[varName]; ok {
+		return val
+	}
+
+	return ""
+}
+
+func loadDotEnv(path string) map[string]string {
+	env := make(map[string]string)
+	f, err := os.Open(path)
+	if err != nil {
+		return env
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if idx := strings.Index(line, "="); idx >= 0 {
+			key := strings.TrimSpace(line[:idx])
+			val := strings.TrimSpace(line[idx+1:])
+			if len(val) >= 2 && (val[0] == '"' || val[0] == '\'') && val[0] == val[len(val)-1] {
+				val = val[1 : len(val)-1]
+			}
+			env[key] = val
+		}
+	}
+	return env
 }

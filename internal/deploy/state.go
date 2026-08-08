@@ -13,6 +13,8 @@ type ResourceInfo struct {
 	Containers []string `json:"containers"`
 	Networks   []string `json:"networks"`
 	Volumes    []string `json:"volumes"`
+	Images     []string `json:"images"`
+	Builds     []string `json:"builds"`
 }
 
 // ProjectState represents the state of a single managed project
@@ -120,13 +122,6 @@ func (sm *StateManager) RegisterProject(project ProjectState) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	// Preserve the existing Resources field if the caller didn't supply one.
-	// This prevents up from silently clearing resource info written by regenerate.
-	if project.Resources == nil {
-		if existing, ok := sm.Projects[project.ProjectName]; ok {
-			project.Resources = existing.Resources
-		}
-	}
 	sm.Projects[project.ProjectName] = project
 	return sm.save()
 }

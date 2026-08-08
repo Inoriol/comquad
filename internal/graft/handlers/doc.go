@@ -8,8 +8,11 @@
 //   - image: creates .image quadlet files for every .container, moving Image=, Policy=,
 //     OS=, Arch=, and Variant= directives into dedicated image units so systemd can
 //     manage image pulls separately.
+//   - secret: translates compose secrets into quadlet directives. External secrets
+//     produce Secret= for Podman's native secret store. File-based and environment-based
+//     secrets produce LoadCredential= in [Service] and Volume= in [Container], mounting
+//     secrets at /run/secrets/<name> via systemd credential directories.
 //
 // Planned handlers:
 //   - build: intercept build blocks to skip registry pulls on locally-built images
-//   - secrets: translate compose secrets into Podman Secret= quadlet keys
 package handlers

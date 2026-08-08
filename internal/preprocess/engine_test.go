@@ -719,3 +719,336 @@ func TestProcess_PreservesOtherFields(t *testing.T) {
 		t.Errorf("expected environment to be preserved, got:\n%s", resultStr)
 	}
 }
+
+func TestProcess_StripsSecrets(t *testing.T) {
+	input := []byte(`secrets:
+  db_password:
+    file: ./secrets/db.txt
+services:
+  web:
+    image: nginx
+    secrets:
+      - db_password
+`)
+
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	resultStr := string(result)
+	if contains(resultStr, "secrets:") {
+		t.Errorf("expected top-level secrets to be stripped, got:\n%s", resultStr)
+	}
+	if contains(resultStr, "db_password") && !contains(resultStr, "container_name") {
+		t.Errorf("expected per-service secrets to be stripped, got:\n%s", resultStr)
+	}
+}
+
+func TestProcess_StripsSecretsFromServices(t *testing.T) {
+	input := []byte(`services:
+  web:
+    image: nginx
+    secrets:
+      - app_key
+`)
+
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	resultStr := string(result)
+	if contains(resultStr, "secrets:") && !contains(resultStr, "networks:") {
+		t.Errorf("expected per-service secrets to be stripped, got:\n%s", resultStr)
+	}
+}
+
+func TestProcess_StripsSecretsPreservesOtherFields(t *testing.T) {
+	input := []byte(`secrets:
+  db_password:
+    file: ./secrets/db.txt
+services:
+  web:
+    image: nginx
+    environment:
+      FOO: bar
+    secrets:
+      - db_password
+`)
+
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	resultStr := string(result)
+	if contains(resultStr, "secrets:") {
+		t.Errorf("expected secrets to be stripped, got:\n%s", resultStr)
+	}
+	if !contains(resultStr, "FOO") || !contains(resultStr, "bar") {
+		t.Errorf("expected environment to be preserved, got:\n%s", resultStr)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ExtractSecretSpecs
+// ---------------------------------------------------------------------------
+
+func TestExtractSecretSpecs_FileSecret(t *testing.T) {
+	dir := t.TempDir()
+	input := []byte(`secrets:
+  db_password:
+    file: ./secrets/db.txt
+services:
+  web:
+    secrets:
+      - db_password
+`)
+
+	defs, refs, err := ExtractSecretSpecs(input, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	def, ok := defs["db_password"]
+	if !ok {
+		t.Fatal("expected secret 'db_password' in definitions")
+	}
+	if def.External {
+		t.Error("expected non-external secret")
+	}
+	if def.File != filepath.Join(dir, "secrets", "db.txt") {
+		t.Errorf("expected absolute file path, got %q", def.File)
+	}
+
+	if len(refs["web"]) != 1 || refs["web"][0].Source != "db_password" {
+		t.Errorf("expected web to reference db_password, got %v", refs["web"])
+	}
+}
+
+func TestExtractSecretSpecs_EnvironmentSecret(t *testing.T) {
+	os.Setenv("OAUTH_TOKEN", "my-secret-token")
+	defer os.Unsetenv("OAUTH_TOKEN")
+
+	input := []byte(`secrets:
+  token:
+    environment: "OAUTH_TOKEN"
+services:
+  api:
+    secrets:
+      - token
+`)
+
+	defs, refs, err := ExtractSecretSpecs(input, "/tmp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	def, ok := defs["token"]
+	if !ok {
+		t.Fatal("expected secret 'token' in definitions")
+	}
+	if def.Environment != "OAUTH_TOKEN" {
+		t.Errorf("expected Environment 'OAUTH_TOKEN', got %q", def.Environment)
+	}
+	if def.Content != "my-secret-token" {
+		t.Errorf("expected Content 'my-secret-token', got %q", def.Content)
+	}
+	if def.External {
+		t.Error("expected non-external secret")
+	}
+
+	if len(refs["api"]) != 1 || refs["api"][0].Source != "token" {
+		t.Errorf("expected api to reference token, got %v", refs["api"])
+	}
+}
+
+func TestExtractSecretSpecs_EnvironmentFromDotEnv(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, ".env"), []byte("DB_PASSWORD=SuperSecretFromDotEnv\n"), 0644)
+
+	input := []byte(`secrets:
+  db_password:
+    environment: "DB_PASSWORD"
+services:
+  db:
+    secrets:
+      - db_password
+`)
+
+	defs, _, err := ExtractSecretSpecs(input, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	def, ok := defs["db_password"]
+	if !ok {
+		t.Fatal("expected secret 'db_password' in definitions")
+	}
+	if def.Content != "SuperSecretFromDotEnv" {
+		t.Errorf("expected Content from .env, got %q", def.Content)
+	}
+}
+
+func TestExtractSecretSpecs_EnvironmentOsEnvTakesPrecedence(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, ".env"), []byte("DB_PASSWORD=FromDotEnv\n"), 0644)
+	os.Setenv("DB_PASSWORD", "FromOSEnv")
+	defer os.Unsetenv("DB_PASSWORD")
+
+	input := []byte(`secrets:
+  db_password:
+    environment: "DB_PASSWORD"
+`)
+
+	defs, _, err := ExtractSecretSpecs(input, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	def := defs["db_password"]
+	if def.Content != "FromOSEnv" {
+		t.Errorf("expected OS env to take precedence, got %q", def.Content)
+	}
+}
+
+func TestExtractSecretSpecs_ExternalSecret(t *testing.T) {
+	input := []byte(`secrets:
+  app_key:
+    external: true
+services:
+  web:
+    secrets:
+      - app_key
+`)
+
+	defs, _, err := ExtractSecretSpecs(input, "/tmp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	def, ok := defs["app_key"]
+	if !ok {
+		t.Fatal("expected secret 'app_key' in definitions")
+	}
+	if !def.External {
+		t.Error("expected external secret")
+	}
+}
+
+func TestExtractSecretSpecs_ExternalWithName(t *testing.T) {
+	input := []byte(`secrets:
+  server-certificate:
+    external: true
+    name: "CERTIFICATE_KEY"
+services:
+  web:
+    secrets:
+      - server-certificate
+`)
+
+	defs, _, err := ExtractSecretSpecs(input, "/tmp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	def, ok := defs["server-certificate"]
+	if !ok {
+		t.Fatal("expected secret 'server-certificate' in definitions")
+	}
+	if !def.External {
+		t.Error("expected external secret")
+	}
+	if def.ExternalName != "CERTIFICATE_KEY" {
+		t.Errorf("expected ExternalName 'CERTIFICATE_KEY', got %q", def.ExternalName)
+	}
+}
+
+func TestExtractSecretSpecs_ExternalRejectsOtherAttributes(t *testing.T) {
+	input := []byte(`secrets:
+  app_key:
+    external: true
+    file: ./some/path
+`)
+
+	_, _, err := ExtractSecretSpecs(input, "/tmp")
+	if err == nil {
+		t.Fatal("expected error for external secret with file attribute")
+	}
+}
+
+func TestExtractSecretSpecs_UnknownSecretReference(t *testing.T) {
+	input := []byte(`services:
+  web:
+    secrets:
+      - nonexistent
+`)
+
+	_, _, err := ExtractSecretSpecs(input, "/tmp")
+	if err == nil {
+		t.Fatal("expected error for undefined secret reference")
+	}
+}
+
+func TestExtractSecretSpecs_MultipleSecrets(t *testing.T) {
+	input := []byte(`secrets:
+  db_password:
+    file: ./secrets/db.txt
+  apikey:
+    external: true
+services:
+  web:
+    secrets:
+      - db_password
+      - apikey
+  api:
+    secrets:
+      - apikey
+`)
+
+	defs, refs, err := ExtractSecretSpecs(input, "/tmp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(defs) != 2 {
+		t.Fatalf("expected 2 secret definitions, got %d", len(defs))
+	}
+
+	if len(refs["web"]) != 2 {
+		t.Errorf("expected web to reference 2 secrets, got %d", len(refs["web"]))
+	}
+	if len(refs["api"]) != 1 {
+		t.Errorf("expected api to reference 1 secret, got %d", len(refs["api"]))
+	}
+}
+
+func TestExtractSecretSpecs_NoSecrets(t *testing.T) {
+	input := []byte(`services:
+  web:
+    image: nginx
+`)
+
+	defs, refs, err := ExtractSecretSpecs(input, "/tmp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(defs) != 0 {
+		t.Errorf("expected no secret definitions, got %d", len(defs))
+	}
+	if len(refs) != 0 {
+		t.Errorf("expected no service refs, got %d", len(refs))
+	}
+}
+
+func TestExtractSecretSpecs_InvalidYAML(t *testing.T) {
+	input := []byte(`not: valid: [yaml`)
+	_, _, err := ExtractSecretSpecs(input, "/tmp")
+	if err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+}
