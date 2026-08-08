@@ -4,6 +4,11 @@
 // that podlet does not support natively. Handlers are registered with the Grafter and executed
 // sequentially during the Process step.
 //
+// Implemented handlers:
+//   - image: creates .image quadlet files for every .container, moving Image=, Policy=,
+//     OS=, Arch=, and Variant= directives into dedicated image units so systemd can
+//     manage image pulls separately.
+//
 // Planned handlers:
 //   - build: intercept build blocks to skip registry pulls on locally-built images
 //   - secrets: translate compose secrets into Podman Secret= quadlet keys

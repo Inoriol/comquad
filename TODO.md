@@ -11,6 +11,8 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 - [ ] **No config file / global defaults** — no way to set project-level or user-level defaults
 - [x] **No `comquad ls` alias for `comquad list`** — Added: `Aliases: []string{"ls"}` on listCmd.
 - [x] **`.image` and `.build` quadlet file types** — Added: full support across cooker, lifecycle, resolve, down, view, edit, logs, and regenerate.
+- [x] **Image Quadlet Graft Handler** — Added: `handlers.ImageQuadletHandler` creates `.image` quadlet files for every `.container`, extracting `image` → `Image=`, `pull_policy` → `Policy=`, `platform` → `OS=`/`Arch=`/`Variant=`. Compose `pull_policy` and `platform` fields stripped from YAML before podlet. Includes `Retry=3`/`RetryDelay=5s` defaults.
+- [x] **View/overview relational display** — Added: `comquad overview` alias, two-table output (SERVICES with image/networks/volumes, RESOURCES with copy-pasteable names), uses `go-pretty/table` for auto-width columns.
 - [ ] **No project-level health status summary** (beyond `view` table)
 
 ---
@@ -20,7 +22,9 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 
 ### Missing Unit Tests
 
-- [ ] **`handleImages`** — Complex image-building logic with pull strategies has zero direct test coverage
+- [x] **`handleImages`** — Complex image-building logic with pull strategies has zero direct test coverage
+- [x] **graft `ImageQuadletHandler`** — Added: 16 direct unit tests (createsImageFile, updatesContainerReference, addsPolicyWhenPresent, mapsIfNotPresentToMissing, omitUnsupportedPullPolicy, addsPlatformFields, addsVariant, addsDefaults, noContainerLabelsInImage, addsInstallSection, skipsNonContainerFiles, multipleServices, noImageInContainer, unknownServiceSkips, containerOnDiskUpdated)
+- [x] **`ps` command table formatting** — Migrated to `go-pretty/table` for auto-width columns with COMMAND column capped at 30 chars with wrapping
 - [x] **`stopUnits` / `verifyUnitsStopped`** — Added: 5 direct unit tests for stopUnits with mock D-Bus (stopsOnlyContainers, noContainerFiles, multipleContainers, propagatesError, emptyProjectFiles). verifyUnitsStopped already had direct tests.
 - [ ] **`offsetPorts` in cooker** — Port offset resolution with conflict detection tested only indirectly
 - [ ] **`discoverResources` in dbus.go** — Podman JSON output parsing and resource grouping
@@ -43,6 +47,7 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 - [x] **No `go test -short` support** — Added: `make test-short` target
 - [x] **No `go test -race` or `go test -cover` in Makefile** — Added: `make test-race`, `make test-cover` targets
 - [x] **`captureStdout` in unit tests** — Fixed: added `sync.Mutex` serialization for goroutine safety
+- [x] **Race condition in `TestTranspile_ReturnsErrorOnNonZeroExit`** — Fixed: fake podlet scripts now consume stdin before exiting, preventing "broken pipe" race with `stdin.Write()`
 - [ ] **No fuzzing tests** for YAML or quadlet parsers
 - [ ] **No benchmark tests** for any performance-sensitive paths
 

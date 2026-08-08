@@ -58,3 +58,13 @@ type ProjectConfig struct {
 	ProjectName      string
 	WorkingDirectory string
 }
+
+// ServiceImageSpec holds the compose fields that map to a Podman .image quadlet.
+type ServiceImageSpec struct {
+	ServiceName string // compose service name, e.g. "web"
+	Image       string // normalized image, e.g. "docker.io/library/nginx:latest"
+	PullPolicy  string // pull_policy value: always, missing, never, if_not_present, etc.
+	OS          string // from platform field, e.g. "linux"
+	Arch        string // from platform field, e.g. "amd64"
+	Variant     string // from platform field, e.g. "v8"
+}

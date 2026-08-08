@@ -9,6 +9,25 @@ import (
 	"github.com/Inoriol/comquad/internal/logger"
 )
 
+func resolveContainerImage(imageValue string, fileContents map[string]string) string {
+	if !strings.HasSuffix(imageValue, ".image") {
+		return imageValue
+	}
+
+	for path, content := range fileContents {
+		if filepath.Base(path) == imageValue {
+			for _, line := range strings.Split(content, "\n") {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "Image=") {
+					return strings.TrimPrefix(trimmed, "Image=")
+				}
+			}
+		}
+	}
+
+	return imageValue
+}
+
 // handleImages pulls images based on the pull strategy.
 func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[string]string, pullStrategy string) error {
 	imagePullStrategy, err := graft.ParsePullStrategy(pullStrategy)
@@ -30,6 +49,8 @@ func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[stri
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "Image=") {
 				image := strings.TrimSpace(strings.TrimPrefix(line, "Image="))
+
+				image = resolveContainerImage(image, fileContents)
 
 				engine := &graft.Engine{
 					PullStrategy: imagePullStrategy,
@@ -78,6 +99,9 @@ func (o *Orchestrator) printDryRun(
 				continue
 			}
 			image := strings.TrimSpace(strings.TrimPrefix(line, "Image="))
+
+			image = resolveContainerImage(image, fileContents)
+
 			switch imagePullStrategy {
 			case graft.PullAlways:
 				logger.Printf("[image] %-12s %s  (would pull: always)\n", filepath.Base(f), image)

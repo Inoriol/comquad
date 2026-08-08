@@ -49,13 +49,16 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 			logger.Info(fmt.Sprintf("Injected container_name: %s-%s", e.ProjectName, serviceName))
 		}
 
-			if img, ok := service["image"].(string); ok {
+		if img, ok := service["image"].(string); ok {
 			originalImage := img
 			service["image"] = normalizeImage(img)
 			if service["image"] != originalImage {
 				logger.Info(fmt.Sprintf("Normalized image: %s → %s", originalImage, service["image"]))
 			}
 		}
+
+		delete(service, "pull_policy")
+		delete(service, "platform")
 
 		// Absolute-ize volumes
 		if vols, ok := service["volumes"].([]interface{}); ok {
@@ -191,4 +194,45 @@ func isRegistryWithPort(s string) bool {
 		}
 	}
 	return false
+}
+
+// ExtractServiceImageSpecs parses raw compose YAML and returns per-service
+// image metadata before any preprocessing has been applied. This allows the
+// graft step to populate .image quadlet files while the preprocessor strips
+// pull_policy and platform fields that podlet does not understand.
+func ExtractServiceImageSpecs(composeData []byte) (map[string]ServiceImageSpec, error) {
+	var cf ComposeFile
+	if err := yaml.Unmarshal(composeData, &cf); err != nil {
+		return nil, fmt.Errorf("failed to parse compose file for image specs: %w", err)
+	}
+
+	specs := make(map[string]ServiceImageSpec, len(cf.Services))
+	for svcName, svc := range cf.Services {
+		spec := ServiceImageSpec{ServiceName: svcName}
+
+		if img, ok := svc["image"].(string); ok && img != "" {
+			spec.Image = normalizeImage(img)
+		}
+
+		if pp, ok := svc["pull_policy"].(string); ok {
+			spec.PullPolicy = pp
+		}
+
+		if plat, ok := svc["platform"].(string); ok {
+			parts := strings.SplitN(plat, "/", 2)
+			spec.OS = parts[0]
+			if len(parts) > 1 {
+				archVariant := parts[1]
+				if idx := strings.Index(archVariant, "/"); idx >= 0 {
+					spec.Arch = archVariant[:idx]
+					spec.Variant = archVariant[idx+1:]
+				} else {
+					spec.Arch = archVariant
+				}
+			}
+		}
+
+		specs[svcName] = spec
+	}
+	return specs, nil
 }

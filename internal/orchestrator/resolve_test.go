@@ -289,6 +289,33 @@ func TestMatchQuadletResource_NoMatch(t *testing.T) {
 	}
 }
 
+func TestMatchQuadletResource_ImageByServiceName(t *testing.T) {
+	dir := t.TempDir()
+	state := stateWithFiles(dir, "cq-myapp-web.image")
+	got := MatchQuadletResource("myapp", state, "cq-myapp-web-image.service")
+	if got == "" {
+		t.Error("expected match for .image via service unit name")
+	}
+}
+
+func TestMatchQuadletResource_ImageByServiceNameWithoutExtension(t *testing.T) {
+	dir := t.TempDir()
+	state := stateWithFiles(dir, "cq-myapp-web.image")
+	got := MatchQuadletResource("myapp", state, "cq-myapp-web-image")
+	if got == "" {
+		t.Error("expected match for .image via service unit name without .service suffix")
+	}
+}
+
+func TestMatchQuadletResource_ImageByBaseName(t *testing.T) {
+	dir := t.TempDir()
+	state := stateWithFiles(dir, "cq-myapp-web.image")
+	got := MatchQuadletResource("myapp", state, "cq-myapp-web.image")
+	if got == "" {
+		t.Error("expected match for .image via base filename")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------

@@ -483,3 +483,239 @@ func parseYAMLNode(t *testing.T, yamlData string) *yaml.Node {
 	}
 	return doc.Content[0]
 }
+
+// ---------------------------------------------------------------------------
+// ExtractServiceImageSpecs
+// ---------------------------------------------------------------------------
+
+func TestExtractServiceImageSpecs_BasicImage(t *testing.T) {
+	input := []byte(`services:
+  web:
+    image: nginx
+`)
+
+	specs, err := ExtractServiceImageSpecs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	spec, ok := specs["web"]
+	if !ok {
+		t.Fatal("expected spec for 'web' service")
+	}
+	if spec.ServiceName != "web" {
+		t.Errorf("expected ServiceName 'web', got %q", spec.ServiceName)
+	}
+	if spec.Image != "docker.io/library/nginx" {
+		t.Errorf("expected image normalization, got %q", spec.Image)
+	}
+}
+
+func TestExtractServiceImageSpecs_PullPolicy(t *testing.T) {
+	input := []byte(`services:
+  app:
+    image: alpine
+    pull_policy: always
+`)
+
+	specs, err := ExtractServiceImageSpecs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	spec := specs["app"]
+	if spec.PullPolicy != "always" {
+		t.Errorf("expected PullPolicy 'always', got %q", spec.PullPolicy)
+	}
+}
+
+func TestExtractServiceImageSpecs_PlatformFull(t *testing.T) {
+	input := []byte(`services:
+  app:
+    image: nginx
+    platform: linux/arm64/v8
+`)
+
+	specs, err := ExtractServiceImageSpecs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	spec := specs["app"]
+	if spec.OS != "linux" {
+		t.Errorf("expected OS 'linux', got %q", spec.OS)
+	}
+	if spec.Arch != "arm64" {
+		t.Errorf("expected Arch 'arm64', got %q", spec.Arch)
+	}
+	if spec.Variant != "v8" {
+		t.Errorf("expected Variant 'v8', got %q", spec.Variant)
+	}
+}
+
+func TestExtractServiceImageSpecs_PlatformOSArchOnly(t *testing.T) {
+	input := []byte(`services:
+  app:
+    image: nginx
+    platform: windows/amd64
+`)
+
+	specs, err := ExtractServiceImageSpecs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	spec := specs["app"]
+	if spec.OS != "windows" {
+		t.Errorf("expected OS 'windows', got %q", spec.OS)
+	}
+	if spec.Arch != "amd64" {
+		t.Errorf("expected Arch 'amd64', got %q", spec.Arch)
+	}
+	if spec.Variant != "" {
+		t.Errorf("expected no Variant, got %q", spec.Variant)
+	}
+}
+
+func TestExtractServiceImageSpecs_PlatformOSOnly(t *testing.T) {
+	input := []byte(`services:
+  app:
+    image: nginx
+    platform: darwin
+`)
+
+	specs, err := ExtractServiceImageSpecs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	spec := specs["app"]
+	if spec.OS != "darwin" {
+		t.Errorf("expected OS 'darwin', got %q", spec.OS)
+	}
+	if spec.Arch != "" {
+		t.Errorf("expected no Arch, got %q", spec.Arch)
+	}
+}
+
+func TestExtractServiceImageSpecs_MultipleServices(t *testing.T) {
+	input := []byte(`services:
+  web:
+    image: nginx
+    pull_policy: always
+    platform: linux/amd64
+  db:
+    image: postgres:15
+    pull_policy: never
+`)
+
+	specs, err := ExtractServiceImageSpecs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(specs) != 2 {
+		t.Fatalf("expected 2 specs, got %d", len(specs))
+	}
+
+	web := specs["web"]
+	if web.Image != "docker.io/library/nginx" {
+		t.Errorf("web image: %q", web.Image)
+	}
+	if web.PullPolicy != "always" {
+		t.Errorf("web pull_policy: %q", web.PullPolicy)
+	}
+	if web.OS != "linux" || web.Arch != "amd64" {
+		t.Errorf("web platform: OS=%q Arch=%q", web.OS, web.Arch)
+	}
+
+	db := specs["db"]
+	if db.Image != "docker.io/library/postgres:15" {
+		t.Errorf("db image: %q", db.Image)
+	}
+	if db.PullPolicy != "never" {
+		t.Errorf("db pull_policy: %q", db.PullPolicy)
+	}
+}
+
+func TestExtractServiceImageSpecs_NoServices(t *testing.T) {
+	input := []byte(`version: "3"`)
+
+	specs, err := ExtractServiceImageSpecs(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(specs) != 0 {
+		t.Errorf("expected empty specs, got %d", len(specs))
+	}
+}
+
+func TestExtractServiceImageSpecs_InvalidYAML(t *testing.T) {
+	input := []byte(`not: valid: [yaml`)
+	_, err := ExtractServiceImageSpecs(input)
+	if err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Process strips pull_policy and platform
+// ---------------------------------------------------------------------------
+
+func TestProcess_StripsPullPolicy(t *testing.T) {
+	input := []byte(`services:
+  web:
+    image: nginx
+    pull_policy: always
+`)
+
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	if contains(string(result), "pull_policy") {
+		t.Errorf("expected pull_policy to be stripped, got:\n%s", string(result))
+	}
+}
+
+func TestProcess_StripsPlatform(t *testing.T) {
+	input := []byte(`services:
+  web:
+    image: nginx
+    platform: linux/amd64
+`)
+
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	if contains(string(result), "platform") {
+		t.Errorf("expected platform to be stripped, got:\n%s", string(result))
+	}
+}
+
+func TestProcess_PreservesOtherFields(t *testing.T) {
+	input := []byte(`services:
+  web:
+    image: nginx
+    pull_policy: always
+    platform: linux/amd64
+    environment:
+      FOO: bar
+`)
+
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	resultStr := string(result)
+	if !contains(resultStr, "FOO") || !contains(resultStr, "bar") {
+		t.Errorf("expected environment to be preserved, got:\n%s", resultStr)
+	}
+}

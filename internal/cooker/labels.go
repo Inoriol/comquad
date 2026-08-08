@@ -45,8 +45,6 @@ func (c *Cooker) addProjectLabels(content string, fileName string) string {
 		sectionHeader = "[Network]"
 	case strings.HasSuffix(fileName, ".volume"):
 		sectionHeader = "[Volume]"
-	case strings.HasSuffix(fileName, ".image"):
-		sectionHeader = "[Image]"
 	case strings.HasSuffix(fileName, ".build"):
 		sectionHeader = "[Build]"
 	default:
