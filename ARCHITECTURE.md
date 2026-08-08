@@ -9,18 +9,20 @@ When you run `comquad up`, the engine moves your configuration through a five-st
 1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels). `build:` blocks are explicitly rejected with an error — build support is not yet implemented.
 2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, `.volume`, `.image`, and `.build` quadlet files.
 3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed. Returns a `CookResult` containing the in-memory content of all written files (keyed by destination path) to avoid redundant disk I/O in subsequent steps.
-4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. The primary handler is `handlers.ImageQuadletHandler` which creates `.image` quadlet files for every `.container`, moving image-related directives (`Image=`, `Policy=`, `OS=`, `Arch=`, `Variant=`) into dedicated image units so systemd can manage image pulls separately. Also injects `Retry=3` and `RetryDelay=5s` defaults. Containers are updated to reference `<name>.image` instead of raw image names. Returns the updated in-memory file contents map.
+4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. Runs two handlers:
+   * `SecretHandler` — translates compose `secrets:` into quadlet directives. External secrets produce `Secret=` for Podman's native secret store. File-based and environment-based secrets produce `LoadCredential=` in `[Service]` sections and `Volume=` mounts in `[Container]` sections, mounting secrets at `/run/secrets/<name>` via systemd credential directories (`/run/credentials/<unit>.service/`). Managed secrets are written to `$XDG_DATA_HOME/comquad/secrets/<project>/` with `0600` permissions. Per-service `secrets:` and top-level `secrets:` are stripped from the compose YAML before podlet sees them.
+   * `ImageQuadletHandler` — creates `.image` quadlet files for every `.container`, moving image-related directives (`Image=`, `Policy=`, `OS=`, `Arch=`, `Variant=`) into dedicated image units so systemd can manage image pulls separately. Also injects `Retry=3` and `RetryDelay=5s` defaults. Containers are updated to reference `<name>.image` instead of raw image names.
 5. **Deploy** — Pulls images based on the configured pull strategy, then relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus. If `startUnits` fails, the cleanup function removes all files, unregisters the project, and reloads the daemon to prevent a half-deployed state.
 
 ### Dry Run Mode (`--dry-run`)
 
-When `comquad up --dry-run` is used, the pipeline runs steps 1–3 into a private temporary directory instead of the real systemd target. After cooking, `printDryRun` reads each generated file and prints:
+When `comquad up --dry-run` is used, the pipeline runs steps 1–4 into a private temporary directory instead of the real systemd target. After cooking and grafting, `printDryRun` reads each generated file and prints:
 
 - The **target path** it *would* be written to
 - The full **file content** of each quadlet
 - **Image pull actions** that *would* be taken per container, based on the pull strategy and whether images exist locally
 
-Steps 4–5 are skipped entirely: no graft processing, no files are written to the systemd directory, no state is registered, and no units are started. The temporary preview directory is cleaned up automatically.
+Step 5 (deploy) is skipped entirely: no files are written to the systemd directory, no state is registered, and no units are started. The temporary preview directory is cleaned up automatically. The graft step produces `.image` quadlet files and updates `.container` references, so dry-run output includes both file types.
 
 ## 📦 Project Directory Structure
 
@@ -29,7 +31,7 @@ The codebase is organized cleanly into domains matching the execution lifecycle 
 ```text
 cmd/comquad/           # CLI entry point: main.go + per-command files (up.go, down.go, logs.go, …)
 internal/graft/          # Post-processing engine for compose fields podlet doesn't handle
-                       #   (currently no-op; handlers/ will plug future gaps)
+                       #   handlers/image.go (image quadlets), handlers/secret.go (compose secrets)
 internal/cooker/       # Post-processes quadlet files: engine.go (core), references.go (rewriting),
                        #   ports.go (offsetting), labels.go (SELinux/aliases/systemd opts)
 internal/deploy/       # Systemd D-Bus communication, target directories, state tracking,
@@ -54,14 +56,20 @@ The `ps` command shows container runtime status in `docker compose ps` style. It
 
 **Output format:**
 
+Uses `go-pretty/table` for auto-width columns with `StyleLight` borders. The COMMAND column is capped at 30 characters with automatic text wrapping for long commands.
+
 ```
-NAME                 IMAGE                          COMMAND                   SERVICE      CREATED              STATUS               PORTS
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-my_nginx             docker.io/library/nginx:alpine nginx -g daemon off;      nginx        2 minutes ago        Up 2 minutes         0.0.0.0:2080->80/tcp
-2nginx               docker.io/library/nginx:alpine nginx -g daemon off;      nginx2       2 minutes ago        Up 2 minutes         0.0.0.0:2081->80/tcp
+┌────────────────┬────────────────────────────────────┬────────────────────────────────┬─────────┬─────────┬───────────────┬──────────────────────────────┐
+│ NAME           │ IMAGE                              │ COMMAND                        │ SERVICE │ CREATED │ STATUS        │ PORTS                        │
+├────────────────┼────────────────────────────────────┼────────────────────────────────┼─────────┼─────────┼───────────────┼──────────────────────────────┤
+│ nexcloud-db    │ docker.io/library/mariadb:10.5     │ --transaction-isolation=READ-C │ db      │ 17m ago │ Up 17 minutes │ 3306/tcp                     │
+│                │                                    │ OMMITTED --binlog-format=ROW   │         │         │               │                              │
+│ nexcloud-nc    │ docker.io/library/nextcloud:apache │ apache2-foreground             │ nc      │ 17m ago │ Up 17 minutes │ 80/tcp, 0.0.0.0:2080->80/tcp │
+│ nexcloud-redis │ docker.io/library/redis:alpine     │ redis-server                   │ redis   │ 17m ago │ Up 17 minutes │ 6379/tcp                     │
+└────────────────┴────────────────────────────────────┴────────────────────────────────┴─────────┴─────────┴───────────────┴──────────────────────────────┘
 ```
 
-Columns are auto-width based on content. Exited containers show `Exited (<code>) <time>` in the status column. Dead containers show `Dead`. Ports are formatted as `host_ip:host_port->container_port/protocol` for published ports, and `port/protocol` for exposed ports (container-only, no host binding). Exposed ports are listed first, followed by published ports. Created time uses relative format (`just now`, `5m ago`, `2d ago`, or `Jan 02 2006` for older entries).
+Exited containers show `Exited (<code>) <time>` in the status column. Dead containers show `Dead`. Ports are formatted as `host_ip:host_port->container_port/protocol` for published ports, and `port/protocol` for exposed ports (container-only, no host binding). Exposed ports are listed first, followed by published ports. Created time uses relative format (`just now`, `5m ago`, `2d ago`, or `Jan 02 2006` for older entries).
 
 Containers are sorted: running first (by name), then exited (by name), then other states (by name). This ensures `ps -a` groups exited containers together at the bottom of the table.
 
@@ -206,19 +214,25 @@ Each project entry contains:
 {
   "project_name": "myproject",
   "source_path": "/home/user/projects/myproject",
-  "files": ["/path/to/cq-myproject-web.container"],
+  "files": [
+    "/path/to/cq-myproject-web.container",
+    "/path/to/cq-myproject-web.image",
+    "/path/to/cq-myproject-default.network"
+  ],
   "resources": {
-    "containers": ["cq-myproject-web"],
-    "networks": ["cq-myproject-default-network"],
-    "volumes": []
+    "containers": ["myproject-web"],
+    "networks": ["myproject-default-network"],
+    "volumes": ["myproject-data"],
+    "images": ["myproject-web"],
+    "builds": []
   }
 }
 ```
 
 * **project_name** — The Comquad project name
 * **source_path** — Path to the compose file directory (empty when restored via `regenerate`)
-* **files** — List of quadlet file paths in the systemd target directory
-* **resources** — Podman resources discovered via labels (`containers`, `networks`, `volumes`). Populated by `regenerate`. When `up` re-registers an existing project, any previously stored resource info is preserved.
+* **files** — List of quadlet file paths in the systemd target directory. Includes `.container`, `.image`, `.network`, `.volume`, and `.build` files.
+* **resources** — Podman resources tracked for the project (`containers`, `networks`, `volumes`, `images`, `builds`). Populated by both `up` (derived from quadlet filenames) and `regenerate` (discovered from live Podman labels). When `up` re-registers, it overwrites resource info with the current file set.
 
 The state file is written atomically: comquad writes to a `.tmp` file in the same directory and renames it, so a crash mid-write never produces a corrupt state file.
 
@@ -249,6 +263,7 @@ The following compose service fields are **explicitly processed** by comquad's p
 * `platform` — stripped from compose YAML; mapped to `.image` quadlet `OS=`, `Arch=`, and `Variant=` directives in the graft step
 * `volumes` — bind mount host paths with `./` or `../` prefixes are resolved to absolute paths
 * `networks` — auto-attached to `cq-default` when a default bridge network is injected
+* `secrets` — top-level `secrets:` and per-service `secrets:` are stripped from compose YAML; resolved by `SecretHandler` in the graft step (see [Secrets Management](#secrets-management))
 
 All other compose fields (`entrypoint`, `command`, `expose`, `deploy`, `environment`, `depends_on`, `restart`, `working_dir`, `user`, `healthcheck`, `cap_add`/`cap_drop`, `tmpfs`, `read_only`, `extra_hosts`, `dns`, `hostname`, `privileged`, `mem_limit`, `cpus`, `volumes_from`, `links`, `tty`, `stdin_open`, `security_opt`, `shm_size`, `labels`, and `x-` extensions) are **passed through unchanged** to `podlet` via a schema-less YAML model.
 
@@ -301,6 +316,53 @@ Unsupported `pull_policy` values (`build`, `daily`, `weekly`, `every_*`) are log
 The `.container` file's `Image=` directive is updated to reference the `.image` file (e.g. `Image=cq-myapp-web.image`), which causes the quadlet generator to create a systemd dependency between the container unit and the image unit.
 
 `.image` files are written to the systemd target directory, registered in `projects.json`, and picked up by `collectProjectFiles()` in the deploy pipeline. During deployment, `startUnits()` starts `.image` units before `.container` units. If the system's quadlet generator does not support `.image` files, startup failures are logged as warnings and deployment proceeds — the manual pull via `handleImages()` provides a fallback.
+
+### Secrets Management
+
+comquad intercepts compose `secrets:` and translates them into quadlet-native directives. The extraction happens in `ExtractSecretSpecs()` (parallel to `ExtractServiceImageSpecs` for image metadata), which parses the raw compose YAML before preprocessing strips the relevant fields.
+
+**Resolution tree per compose secret type:**
+
+| Compose definition | Quadlet output | Source |
+|---|---|---|
+| `external: true` | `Secret=<name>` in `[Container]` | Podman native secret store |
+| `external: true` + `name: "ALT"` | `Secret=ALT` in `[Container]` | Podman native secret store (alternate name) |
+| `file: ./path/to/secret` | `Volume=<abs_path>:/run/secrets/<name>:ro` in `[Container]` | Direct host file |
+| `environment: "VAR_NAME"` | Same as `file:` above | `os.Getenv(VAR)` → managed file; falls back to `.env` in project dir → managed file at `$XDG_DATA/comquad/secrets/<project>/<name>` (0600) |
+
+**Key design decisions:**
+
+- Per-service `secrets:` lists and the top-level `secrets:` section are both stripped from the compose YAML during preprocessing so podlet never sees them.
+- `SecretRef.Target` supports the compose long syntax (`secrets: [{source: name, target: /custom/path}]`) for custom mount points — defaults to `/run/secrets/<name>`.
+- Managed secret files are stored at `$XDG_DATA_HOME/comquad/secrets/<project>/<name>` with strict `0600` permissions.
+- Secrets are bind-mounted directly from the source path into the container via `Volume=`. This avoids the complexity of systemd `LoadCredential=` + `/run/credentials/` indirection which doesn't integrate cleanly with quadlet's container lifecycle. A future improvement may generate standalone `.service` files that use tmpfs-backed `LoadCredential=` for enhanced security.
+- SELinux `:z` labels are automatically appended to secret `Volume=` directives when SELinux is active (same behavior as the cooker for regular volumes).
+- `environment:` secrets try `os.Getenv()` first, then fall back to parsing `.env` from the compose project directory. This matches `docker compose` behavior where `.env` files are auto-loaded.
+- Secrets are cleaned up on `comquad down` (the `$XDG_DATA_HOME/comquad/secrets/<project>/` directory is removed). External Podman secrets are never deleted.
+- Dry run (`--dry-run`) shows the injected directives but does not write managed secret files to disk.
+
+**Example generated `.container` file with both external and file-based secrets:**
+
+```ini
+[Container]
+Image=docker.io/library/postgres:15-alpine
+Secret=apikey
+Volume=/home/user/.local/share/comquad/secrets/myapp/db_password:/run/secrets/db_password:ro,z
+
+[Install]
+WantedBy=default.target
+```
+
+### Partial Deploy Coverage with Grafting
+
+The graft step can inject not only quadlet-specific directives (`Secret=`, `Volume=`) but also arbitrary systemd `[Service]` directives. This enables future features like:
+
+- `EnvironmentFile=` — injecting parsed `.env` files as container environment
+- `ExecStartPre=` / `ExecStartPost=` — pre/post-start hooks (e.g., waiting for dependencies, running migrations)
+- `TimeoutStartSec=` — adjusting service startup timeouts for slow-starting containers
+- `RestartSec=`, `Restart=on-failure` — custom restart policies beyond compose `restart:`
+
+These directives are passed through quadlet to the generated `.service` file's `[Service]` section, giving comquad the ability to graft systemd-native behaviors into compose-defined services without modifying podlet itself.
 
 ## 🧪 Testing Architecture
 

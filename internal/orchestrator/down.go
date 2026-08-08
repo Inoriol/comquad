@@ -107,6 +107,10 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 		return fmt.Errorf("failed to unregister project: %w", err)
 	}
 
+	if secretsDir, err := resolveSecretsDir(o.projectName); err == nil {
+		os.RemoveAll(secretsDir)
+	}
+
 	logger.Success("Successfully removed project: " + o.projectName)
 	return nil
 }

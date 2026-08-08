@@ -68,9 +68,21 @@ func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) (map[str
 	return result.FileContents, nil
 }
 
-func (o *Orchestrator) graft(fileContents map[string]string, services map[string]preprocess.ServiceImageSpec) map[string]string {
-	grafter := graft.Grafter{ProjectName: o.projectName}
-	return grafter.Process(fileContents, services)
+func (o *Orchestrator) graft(
+	fileContents map[string]string,
+	services map[string]preprocess.ServiceImageSpec,
+	secretDefs map[string]preprocess.SecretDef,
+	serviceSecretRefs preprocess.ServiceSecretRefs,
+	secretsDir string,
+	dryRun bool,
+) map[string]string {
+	grafter := graft.Grafter{
+		ProjectName:    o.projectName,
+		SecretsDir:     secretsDir,
+		DryRun:         dryRun,
+		SELinuxEnabled: preprocess.IsSELinuxEnabled(),
+	}
+	return grafter.Process(fileContents, services, secretDefs, serviceSecretRefs)
 }
 
 func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
@@ -96,10 +108,42 @@ func (o *Orchestrator) registerState(projectFiles []string) error {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
 	}
 
+	resources := &deploy.ResourceInfo{}
+	prefix := "cq-" + o.projectName + "-"
+	for _, f := range projectFiles {
+		base := filepath.Base(f)
+		if strings.HasSuffix(base, ".container") {
+			name := strings.TrimPrefix(base, prefix)
+			name = strings.TrimSuffix(name, ".container")
+			resources.Containers = append(resources.Containers, o.projectName+"-"+name)
+		}
+		if strings.HasSuffix(base, ".network") {
+			name := strings.TrimPrefix(base, prefix)
+			name = strings.TrimSuffix(name, ".network")
+			resources.Networks = append(resources.Networks, name)
+		}
+		if strings.HasSuffix(base, ".volume") {
+			name := strings.TrimPrefix(base, prefix)
+			name = strings.TrimSuffix(name, ".volume")
+			resources.Volumes = append(resources.Volumes, name)
+		}
+		if strings.HasSuffix(base, ".image") {
+			name := strings.TrimPrefix(base, prefix)
+			name = strings.TrimSuffix(name, ".image")
+			resources.Images = append(resources.Images, name)
+		}
+		if strings.HasSuffix(base, ".build") {
+			name := strings.TrimPrefix(base, prefix)
+			name = strings.TrimSuffix(name, ".build")
+			resources.Builds = append(resources.Builds, name)
+		}
+	}
+
 	return stateMgr.RegisterProject(deploy.ProjectState{
 		ProjectName: o.projectName,
 		SourcePath:  o.cwd,
 		Files:       projectFiles,
+		Resources:   resources,
 	})
 }
 

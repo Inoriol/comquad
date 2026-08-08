@@ -3,81 +3,45 @@
 For long term goals refer to [Roadmap](./ROADMAP.md).
 
 ---
+
 ## 🧩 Missing Features
 
-- [x] **No `--version` flag** on root command — Added: `version` variable set via ldflags, displayed in rootCmd.Version.
-- [x] **No shell completion generation** — Already wired up by default in Cobra v1.8.0. Works for bash/zsh/fish/powershell via `comquad completion`.
-- [ ] **No standalone `comquad build` command** — `build:` blocks are explicitly rejected for now. Infrastructure for `.image`/`.build` quadlet file handling is in place (cooker, resolve, lifecycle, down, regenerate, logs, edit, view).
-- [ ] **No config file / global defaults** — no way to set project-level or user-level defaults
-- [x] **No `comquad ls` alias for `comquad list`** — Added: `Aliases: []string{"ls"}` on listCmd.
-- [x] **`.image` and `.build` quadlet file types** — Added: full support across cooker, lifecycle, resolve, down, view, edit, logs, and regenerate.
-- [x] **Image Quadlet Graft Handler** — Added: `handlers.ImageQuadletHandler` creates `.image` quadlet files for every `.container`, extracting `image` → `Image=`, `pull_policy` → `Policy=`, `platform` → `OS=`/`Arch=`/`Variant=`. Compose `pull_policy` and `platform` fields stripped from YAML before podlet. Includes `Retry=3`/`RetryDelay=5s` defaults.
-- [x] **View/overview relational display** — Added: `comquad overview` alias, two-table output (SERVICES with image/networks/volumes, RESOURCES with copy-pasteable names), uses `go-pretty/table` for auto-width columns.
-- [ ] **No project-level health status summary** (beyond `view` table)
+### Build Processing
 
----
----
+Currently, `build:` blocks in compose files are explicitly rejected. Build support needs to:
 
-## 🧪 Testing Gaps
+1. **Anonymous builds** — Adjust build contexts and Dockerfile paths for podlet. Podlet expects `build:` context paths to be absolute or properly relative to the compose file directory. The preprocessor should normalize these paths (similar to volume path resolution).
 
-### Missing Unit Tests
+2. **Dockerfile patching** — Inject explicit `docker.io/` registry prefixes into `FROM` lines of user-provided Dockerfiles to ensure consistent image resolution. Patched Dockerfiles should be written to `$XDG_CACHE_HOME/comquad/builds/<project>/` and referenced from the generated `.build` quadlet files.
 
-- [x] **`handleImages`** — Complex image-building logic with pull strategies has zero direct test coverage
-- [x] **graft `ImageQuadletHandler`** — Added: 16 direct unit tests (createsImageFile, updatesContainerReference, addsPolicyWhenPresent, mapsIfNotPresentToMissing, omitUnsupportedPullPolicy, addsPlatformFields, addsVariant, addsDefaults, noContainerLabelsInImage, addsInstallSection, skipsNonContainerFiles, multipleServices, noImageInContainer, unknownServiceSkips, containerOnDiskUpdated)
-- [x] **`ps` command table formatting** — Migrated to `go-pretty/table` for auto-width columns with COMMAND column capped at 30 chars with wrapping
-- [x] **`stopUnits` / `verifyUnitsStopped`** — Added: 5 direct unit tests for stopUnits with mock D-Bus (stopsOnlyContainers, noContainerFiles, multipleContainers, propagatesError, emptyProjectFiles). verifyUnitsStopped already had direct tests.
-- [ ] **`offsetPorts` in cooker** — Port offset resolution with conflict detection tested only indirectly
-- [ ] **`discoverResources` in dbus.go** — Podman JSON output parsing and resource grouping
-- [ ] **`removePodmanResources` in dbus.go** — Network/volume removal and error handling
-- [ ] **`runJournalctlJSONFollow`** — Complex goroutine + buffered output logic (4 select cases) has zero test coverage
-- [ ] **`Regenerate` orchestrator command** — Entire state reconstruction pipeline
-- [ ] **`Build()` in build package** — Only tag generation and pull strategy parsing tested
-- [ ] **`PullImage()`** — No tests for pull with different strategies
-- [x] **`parseContainer` (podman JSON parsing)** — Added: 6 direct unit tests (basicFields, serviceNameDerivation, exitedContainer, nilInput, emptyName, noNamesField). Also 3 parsePorts + 4 parseStringSlice tests.
-- [x] **`formatTimeAgo`** — Added: 10 direct unit tests covering now, seconds, minutes, hours, days, 1+ weeks, future dates. Also 3 formatPorts, 3 formatCreated, 4 truncate tests.
-- [x] **`StringMap.UnmarshalYAML` / `MarshalYAML`** — Added: 8 direct unit tests (listFormat, mapFormat, emptyList, emptyMap, yamlNull, invalidFormat, marshalYAML, marshalYAML_empty).
-- [ ] **Main `Execute()` orchestrator pipeline** — No unit test for full preprocess→transpile→cook→deploy flow
+3. **Build image detection** — After podlet generates `.build` files, the graft step should detect which containers are built from these files and skip registry pulls for them. This avoids `podman pull` failures when the built image doesn't exist in a registry.
 
-### Test Infrastructure
+4. **Build-time secrets** — Support for compose `secrets:` used as build args (passed via `--secret` to podman build).
 
-- [x] **No CI pipeline** — Added: `.github/workflows/test.yml` with build, vet, short, race, and coverage steps
-- [x] **Integration tests build binary inside container** — Fixed: binary is now pre-built on host and mounted into container
-- [x] **Integration Containerfile uses `fedora:43`** — Fixed: changed to `fedora:41` (stable)
-- [x] **`loginctl enable-linger` may silently fail** — Fixed: replaced with direct file creation in `/var/lib/systemd/linger/`
-- [x] **No `go test -short` support** — Added: `make test-short` target
-- [x] **No `go test -race` or `go test -cover` in Makefile** — Added: `make test-race`, `make test-cover` targets
-- [x] **`captureStdout` in unit tests** — Fixed: added `sync.Mutex` serialization for goroutine safety
-- [x] **Race condition in `TestTranspile_ReturnsErrorOnNonZeroExit`** — Fixed: fake podlet scripts now consume stdin before exiting, preventing "broken pipe" race with `stdin.Write()`
-- [ ] **No fuzzing tests** for YAML or quadlet parsers
-- [ ] **No benchmark tests** for any performance-sensitive paths
+### Partial Deploy Coverage with Grafting (using systemd `[Service]` Directives)
 
-### Missing Integration Test Scenarios
+The graft step can inject systemd `[Service]` directives into `.container` quadlet files. Quadlet passes through unknown `[Service]` directives to the generated `.service` file. This enables:
 
-- [ ] `compose.yaml` with real `build:` blocks — ~~Added: TestUpDown_WithBuildBlocks in build_test.go~~ (test no longer applicable; build blocks are now rejected by preprocessor)
-- [x] `comquad ps` with real output verification — Added: TestPs_OutputFormat and TestPs_AllIncludesExitedContainers in ps_integration_test.go
-- [x] `comquad edit` with actual file modifications — Added: TestEdit_WithFileModifications in edit_modify_test.go (uses sed as EDITOR)
-- [ ] `comquad exec` with interactive TTY
-- [ ] `comquad follow-logs` (`--follow` flag)
-- [ ] Concurrent `comquad up` on same project
-- [x] Network isolation (services on different networks) — Added: TestNetworkIsolation_DifferentNetworks in network_test.go
-- [ ] Upgrading a project (deploy, modify compose, redeploy)
-- [x] `down` when systemd units are in `failed` state — Added: TestDown_WhenUnitsAreFailed in up_down_test.go
-- [ ] Behavior with unresponsive podman
-- [ ] Large/complex compose files (10+ services)
+1. **`EnvironmentFile=`** — Parse compose `env_file:` blocks and write them to managed files, then inject `EnvironmentFile=` in `[Service]`. This offloads environment variable management from quadlet to systemd, avoiding issues with large or sensitive environment blocks.
 
----
+2. **Healthcheck integration** — Compose `healthcheck:` could be translated into systemd health monitoring via `WatchdogSec=` and `ExecStartPost=` hooks, providing restart-on-unhealthy behavior natively.
 
-## 📄 Documentation Gaps
+3. **Dependency ordering** — `depends_on:` conditions (service_healthy, service_started, etc.) could be mapped to `ExecStartPre=` commands that poll dependent services before starting.
 
-- [x] **No `ROOTLESS_PORT_OFFSET` env var documentation** — Added to README.
-- [x] **No `NO_COLOR` env var documentation** — Added to README.
-- [ ] **No example compose files** in the repository — `tests/integration/testdata/` is minimal
-- [ ] **No CONTRIBUTING.md** or development setup guide
-- [ ] **No man page** or extended help beyond cobra `--help`
-- [ ] **`projects.json` format has no version field** — No forward compatibility guarantee for state file schema evolution
+4. **Startup timeout tuning** — Map compose `deploy.restart_policy` and `stop_grace_period` to systemd `TimeoutStartSec=`, `TimeoutStopSec=`, `RestartSec=`, and `Restart=` directives.
+
+### Other Gaps
+
+- **`configs:` compose section** — Similar to secrets but for non-sensitive configuration files. Could use the same direct bind mount pattern.
+- **Long syntax for secrets** — `target:` in service-level secret references (for custom mount paths) is partially supported via `SecretRef.Target`. Full implementation needs end-to-end testing.
+- **Swarm mode compatibility** — Swarm-specific compose extensions (deploy modes, constraints, replicas) are not supported.
+
+### Future Security Improvements
+
+- **Tmpfs-backed secrets via `LoadCredential`** — Currently secrets are bind-mounted directly from managed files on disk. Consider generating a companion `.service` service unit file (not a `.container` quadlet) that uses systemd `LoadCredential=` in `[Service]` combined with `Volume=%d/<name>` to mount secrets from systemd's RAM-backed credential directories (`/run/credentials/`). This would keep secret values in tmpfs memory rather than on persistent storage. Initial implementation attempted this using quadlet's `[Service]` pass-through, but `LoadCredential=` + `Volume=` with credential paths didn't integrate correctly with quadlet's container lifecycle. A standalone `.service` file could bypass quadlet entirely for credential setup.
 
 ---
 
 ## 🗺️ Long-Term Roadmap Goals
 
-For reference, these are tracked in [ROADMAP.md](./ROADMAP.md):
+For reference, these are tracked in [ROADMAP.md](./ROADMAP.md).

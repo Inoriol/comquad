@@ -78,6 +78,13 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
 	}
 
+	if !dryRun && !deploy.StateFileExists() {
+		logger.Action("First deployment detected — checking prerequisites...")
+		if err := deploy.ValidatePodmanVersion(); err != nil {
+			return fmt.Errorf("prerequisite check failed: %w", err)
+		}
+	}
+
 	targetDir, err := o.resolveTargetDir()
 	if err != nil {
 		return err
@@ -97,6 +104,16 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 	serviceSpecs, err := preprocess.ExtractServiceImageSpecs(composeData)
 	if err != nil {
 		return fmt.Errorf("failed to extract service image specs: %w", err)
+	}
+
+	secretDefs, serviceSecretRefs, err := preprocess.ExtractSecretSpecs(composeData, o.cwd)
+	if err != nil {
+		return fmt.Errorf("failed to extract secret specs: %w", err)
+	}
+
+	secretsDir, err := resolveSecretsDir(o.projectName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve secrets directory: %w", err)
 	}
 
 	logger.Action("Preprocessing compose configuration...")
@@ -125,6 +142,8 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 			return err
 		}
 
+		previewContents = o.graft(previewContents, serviceSpecs, secretDefs, serviceSecretRefs, secretsDir, true)
+
 		projectFiles, err := o.collectProjectFiles(previewDir)
 		if err != nil {
 			return err
@@ -139,7 +158,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		return err
 	}
 
-	fileContents = o.graft(fileContents, serviceSpecs)
+	fileContents = o.graft(fileContents, serviceSpecs, secretDefs, serviceSecretRefs, secretsDir, false)
 
 	projectFiles, err := o.collectProjectFiles(targetDir)
 	if err != nil {
@@ -153,6 +172,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		if sm, err := o.newState(); err == nil {
 			sm.UnregisterProject(o.projectName)
 		}
+		os.RemoveAll(secretsDir)
 		if dbusMgr, err := o.newSystemd(); err == nil {
 			defer dbusMgr.Close()
 			dbusMgr.ReloadDaemon(projectFiles...)
@@ -276,4 +296,16 @@ func findComposeFile(dir string) string {
 		}
 	}
 	return ""
+}
+
+func resolveSecretsDir(projectName string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dataDir := os.Getenv("XDG_DATA_HOME")
+	if dataDir == "" {
+		dataDir = filepath.Join(home, ".local", "share")
+	}
+	return filepath.Join(dataDir, "comquad", "secrets", projectName), nil
 }
