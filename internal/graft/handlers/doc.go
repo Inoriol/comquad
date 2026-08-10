@@ -5,14 +5,16 @@
 // sequentially during the Process step.
 //
 // Implemented handlers:
-//   - image: creates .image quadlet files for every .container, moving Image=, Policy=,
-//     OS=, Arch=, and Variant= directives into dedicated image units so systemd can
-//     manage image pulls separately.
+//   - build: generates .build quadlet files from compose build blocks, updates .container
+//     files to reference .build files via Image= directive (per quadlet spec)
+//   - image: creates .image quadlet files for every .container (skipped for built containers),
+//     moving Image=, Policy=, OS=, Arch=, and Variant= directives into dedicated image units
+//     so systemd can manage image pulls separately.
 //   - secret: translates compose secrets into quadlet directives. External secrets
 //     produce Secret= for Podman's native secret store. File-based and environment-based
 //     secrets produce LoadCredential= in [Service] and Volume= in [Container], mounting
 //     secrets at /run/secrets/<name> via systemd credential directories.
 //
 // Planned handlers:
-//   - build: intercept build blocks to skip registry pulls on locally-built images
+//   - deploy: translate compose deploy: section into systemd resource-control directives
 package handlers

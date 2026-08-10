@@ -111,11 +111,44 @@ func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
 		}
 		return line
 	default:
-		if strings.Contains(value, newRef) {
-			return line
+		if c.valueContainsRef(value, oldRef, newRef) {
+			return directive + "=" + strings.Replace(value, oldRef, newRef, 1)
 		}
-		return directive + "=" + strings.Replace(value, oldRef, newRef, 1)
+		return line
 	}
+}
+
+// valueContainsRef checks whether value contains oldRef as a standalone reference
+// (not as a substring within a longer name). This avoids corrupting already-prefixed
+// values like replacing "nginx" inside "cq-nginx-nodejs-redis-default".
+func (c *Cooker) valueContainsRef(value, oldRef, newRef string) bool {
+	if strings.Contains(value, newRef) {
+		return false
+	}
+
+	for _, suffix := range []string{".network", ".volume", ".pod", ".image", ".container", ".build", ".kube", ".service"} {
+		extValue := oldRef + suffix
+		if strings.HasSuffix(value, extValue) {
+			return true
+		}
+		if value == oldRef {
+			return true
+		}
+	}
+
+	parts := strings.Split(value, ":")
+	for _, part := range parts {
+		if part == oldRef {
+			return true
+		}
+		for _, suffix := range []string{".network", ".volume", ".pod", ".image", ".container", ".build", ".kube", ".service"} {
+			if part == oldRef+suffix {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // replaceUnitDirectives handles [Unit] section directives with multiple space-separated unit references.

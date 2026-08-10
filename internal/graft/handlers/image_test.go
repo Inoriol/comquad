@@ -45,7 +45,7 @@ func TestImageQuadletHandler_CreatesImageFile(t *testing.T) {
 		"web": {ServiceName: "web", Image: "docker.io/library/nginx:latest"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent, ok := result[imageFile]
@@ -77,7 +77,7 @@ func TestImageQuadletHandler_UpdatesContainerReference(t *testing.T) {
 		"web": {ServiceName: "web"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	containerContent, ok := result[containerPath]
 	if !ok {
@@ -105,7 +105,7 @@ func TestImageQuadletHandler_AddsPolicyWhenPresent(t *testing.T) {
 		"web": {ServiceName: "web", PullPolicy: "always"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -128,7 +128,7 @@ func TestImageQuadletHandler_MapsIfNotPresentToMissing(t *testing.T) {
 		"web": {ServiceName: "web", PullPolicy: "if_not_present"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -151,7 +151,7 @@ func TestImageQuadletHandler_OmitUnsupportedPullPolicy(t *testing.T) {
 		"web": {ServiceName: "web", PullPolicy: "build"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -174,7 +174,7 @@ func TestImageQuadletHandler_AddsPlatformFields(t *testing.T) {
 		"web": {ServiceName: "web", OS: "linux", Arch: "amd64"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -200,7 +200,7 @@ func TestImageQuadletHandler_AddsVariant(t *testing.T) {
 		"web": {ServiceName: "web", OS: "linux", Arch: "arm64", Variant: "v8"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -223,7 +223,7 @@ func TestImageQuadletHandler_AddsDefaults(t *testing.T) {
 		"web": {ServiceName: "web"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -252,7 +252,7 @@ func TestImageQuadletHandler_NoContainerLabelsInImage(t *testing.T) {
 		"web": {ServiceName: "web"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -278,7 +278,7 @@ func TestImageQuadletHandler_AddsInstallSection(t *testing.T) {
 		"web": {ServiceName: "web"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	imageContent := result[imageFile]
@@ -303,7 +303,7 @@ func TestImageQuadletHandler_SkipsNonContainerFiles(t *testing.T) {
 		"web": {ServiceName: "web"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	if len(result) != 1 {
 		t.Errorf("expected 1 file in result, got %d", len(result))
@@ -331,7 +331,7 @@ func TestImageQuadletHandler_MultipleServices(t *testing.T) {
 		"db":  {ServiceName: "db"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	if len(result) != 4 {
 		t.Errorf("expected 4 files (2 containers + 2 images), got %d", len(result))
@@ -371,7 +371,7 @@ func TestImageQuadletHandler_NoImageInContainer(t *testing.T) {
 		"web": {ServiceName: "web", Image: "docker.io/library/nginx:latest"},
 	}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	imageFile := filepath.Join(dir, "cq-myapp-web.image")
 	if _, ok := result[imageFile]; ok {
@@ -391,7 +391,7 @@ func TestImageQuadletHandler_UnknownServiceSkips(t *testing.T) {
 
 	services := map[string]preprocess.ServiceImageSpec{}
 
-	result := ImageQuadletHandler(files, "myapp", services)
+	result := ImageQuadletHandler(files, "myapp", services, nil)
 
 	if len(result) != 1 {
 		t.Errorf("expected 1 file (unchanged container), got %d", len(result))
@@ -412,7 +412,7 @@ func TestImageQuadletHandler_ContainerOnDiskUpdated(t *testing.T) {
 		"web": {ServiceName: "web"},
 	}
 
-	ImageQuadletHandler(files, "myapp", services)
+	ImageQuadletHandler(files, "myapp", services, nil)
 
 	diskContent := readFile(t, containerPath)
 	if !strings.Contains(diskContent, "Image=cq-myapp-web.image") {

@@ -53,6 +53,7 @@ func ImageQuadletHandler(
 	files map[string]string,
 	projectName string,
 	services map[string]preprocess.ServiceImageSpec,
+	buildSpecs map[string]*preprocess.ServiceBuildSpec,
 ) map[string]string {
 	prefix := "cq-" + projectName + "-"
 
@@ -63,6 +64,11 @@ func ImageQuadletHandler(
 
 		containerBase := filepath.Base(containerPath)
 		serviceName := extractServiceName(containerBase, prefix)
+
+		if _, isBuilt := buildSpecs[serviceName]; isBuilt {
+			continue
+		}
+
 		spec, ok := services[serviceName]
 		if !ok {
 			logger.Warn(fmt.Sprintf("no service spec for %s, skipping .image generation", containerBase))

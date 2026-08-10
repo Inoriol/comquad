@@ -111,6 +111,16 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		return fmt.Errorf("failed to extract secret specs: %w", err)
 	}
 
+	buildCacheDir, err := resolveBuildCacheDir(o.projectName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve build cache directory: %w", err)
+	}
+
+	buildSpecs, err := preprocess.ExtractServiceBuildSpecs(composeData, o.cwd, buildCacheDir, o.projectName)
+	if err != nil {
+		return fmt.Errorf("failed to extract build specs: %w", err)
+	}
+
 	secretsDir, err := resolveSecretsDir(o.projectName)
 	if err != nil {
 		return fmt.Errorf("failed to resolve secrets directory: %w", err)
@@ -142,7 +152,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 			return err
 		}
 
-		previewContents = o.graft(previewContents, serviceSpecs, secretDefs, serviceSecretRefs, secretsDir, true)
+		previewContents = o.graft(previewContents, serviceSpecs, buildSpecs, secretDefs, serviceSecretRefs, secretsDir, true)
 
 		projectFiles, err := o.collectProjectFiles(previewDir)
 		if err != nil {
@@ -158,7 +168,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		return err
 	}
 
-	fileContents = o.graft(fileContents, serviceSpecs, secretDefs, serviceSecretRefs, secretsDir, false)
+	fileContents = o.graft(fileContents, serviceSpecs, buildSpecs, secretDefs, serviceSecretRefs, secretsDir, false)
 
 	projectFiles, err := o.collectProjectFiles(targetDir)
 	if err != nil {
@@ -192,6 +202,25 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 
 	deployTime := time.Now().Format("2006-01-02 15:04:05")
 
+	if follow {
+		logger.Print("Following logs for project: " + o.projectName)
+		logErrCh := make(chan error, 1)
+		go func() {
+			logErrCh <- o.FollowLogs(deployTime, "", false)
+		}()
+
+		time.Sleep(500 * time.Millisecond)
+
+		logger.Action("Starting services...")
+		if err := o.startUnits(projectFiles); err != nil {
+			cleanup()
+			return fmt.Errorf("failed to start services: %w", err)
+		}
+
+		logger.Success("Successfully deployed project: " + o.projectName)
+		return <-logErrCh
+	}
+
 	logger.Action("Starting services...")
 	if err := o.startUnits(projectFiles); err != nil {
 		cleanup()
@@ -199,12 +228,6 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 	}
 
 	logger.Success("Successfully deployed project: " + o.projectName)
-
-	if follow {
-		logger.Print("Following logs for project: " + o.projectName)
-		return o.FollowLogs(deployTime, "", false)
-	}
-
 	return nil
 }
 
@@ -308,4 +331,16 @@ func resolveSecretsDir(projectName string) (string, error) {
 		dataDir = filepath.Join(home, ".local", "share")
 	}
 	return filepath.Join(dataDir, "comquad", "secrets", projectName), nil
+}
+
+func resolveBuildCacheDir(projectName string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	cacheDir := os.Getenv("XDG_CACHE_HOME")
+	if cacheDir == "" {
+		cacheDir = filepath.Join(home, ".cache")
+	}
+	return filepath.Join(cacheDir, "comquad", "builds", projectName), nil
 }

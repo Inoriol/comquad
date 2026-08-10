@@ -88,6 +88,8 @@ func printPsTable(containers []ContainerInfo) {
 	})
 	tw.AppendHeader(table.Row{"NAME", "IMAGE", "COMMAND", "SERVICE", "CREATED", "STATUS", "PORTS"})
 
+	cmdMaxLen := 30 * 2 // 2 lines at WidthMax
+
 	for _, c := range containers {
 		status := c.Status
 		if c.State == "exited" && c.ExitCode != 0 {
@@ -99,10 +101,15 @@ func printPsTable(containers []ContainerInfo) {
 		created := formatCreated(c.CreatedAt, c.ExitedAt, c.State)
 		portStr := formatPorts(c.Ports, c.ExposedPorts)
 
+		command := c.Command
+		if len(command) > cmdMaxLen {
+			command = command[:cmdMaxLen-3] + "..."
+		}
+
 		tw.AppendRow(table.Row{
 			c.Name,
 			c.Image,
-			c.Command,
+			command,
 			c.Service,
 			created,
 			status,

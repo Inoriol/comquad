@@ -18,7 +18,7 @@ type Engine struct {
 }
 
 // NewEngine creates a new pre-processing engine
-func NewEngine(projectName string, workingDir string) *Engine {
+func NewEngine(projectName, workingDir string) *Engine {
 	return &Engine{
 		ProjectName:      projectName,
 		WorkingDirectory: workingDir,
@@ -46,21 +46,28 @@ func (e *Engine) Process(input []byte) ([]byte, error) {
 		delete(service, "secrets")
 	}
 
-	// 2. Inject Container Names, Absolute-ize Paths & Inject Labels
+	// 2. Strip build blocks, inject Container Names, Normalize Images, Absolute-ize Paths
 	for serviceName, service := range cf.Services {
-		if _, hasBuild := service["build"]; hasBuild {
-			return nil, fmt.Errorf("service %q uses a build: block — builds are not supported yet", serviceName)
-		}
+		_, hasBuild := service["build"]
+		delete(service, "build")
+
 		if _, has := service["container_name"]; !has {
 			service["container_name"] = fmt.Sprintf("%s-%s", e.ProjectName, serviceName)
 			logger.Info(fmt.Sprintf("Injected container_name: %s-%s", e.ProjectName, serviceName))
 		}
 
-		if img, ok := service["image"].(string); ok {
+		if img, ok := service["image"].(string); ok && img != "" {
 			originalImage := img
 			service["image"] = normalizeImage(img)
 			if service["image"] != originalImage {
 				logger.Info(fmt.Sprintf("Normalized image: %s → %s", originalImage, service["image"]))
+			}
+		}
+
+		if hasBuild {
+			if _, hasImage := service["image"]; !hasImage {
+				service["image"] = fmt.Sprintf("%s-%s:latest", e.ProjectName, serviceName)
+				logger.Info(fmt.Sprintf("Injected image tag for build: %s-%s:latest", e.ProjectName, serviceName))
 			}
 		}
 

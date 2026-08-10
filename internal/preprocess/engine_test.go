@@ -3,6 +3,7 @@ package preprocess
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -1050,5 +1051,240 @@ func TestExtractSecretSpecs_InvalidYAML(t *testing.T) {
 	_, _, err := ExtractSecretSpecs(input, "/tmp")
 	if err == nil {
 		t.Error("expected error for invalid YAML")
+	}
+}
+
+func TestProcess_BuildStrippedFromOutput(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: .
+`)
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(string(result), "build") {
+		t.Error("expected build block to be stripped from output")
+	}
+}
+
+func TestProcess_BuildInjectsImageTag(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: .
+`)
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(result), "myapp-web:latest") {
+		t.Errorf("expected injected image tag 'myapp-web:latest', got:\n%s", string(result))
+	}
+}
+
+func TestProcess_BuildWithImagePreservesTag(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: .
+    image: mycustom:tag
+`)
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(result), "mycustom:tag") {
+		t.Errorf("expected user image tag 'mycustom:tag', got:\n%s", string(result))
+	}
+}
+
+func TestProcess_BuildInjectedTagNotNormalized(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    build: .
+`)
+	engine := NewEngine("myapp", "/tmp")
+	result, err := engine.Process(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(string(result), "docker.io/library/myapp-web") {
+		t.Error("injected build tag should not be normalized with registry prefix")
+	}
+}
+
+func TestExtractServiceBuildSpecs_Basic(t *testing.T) {
+	dir := t.TempDir()
+	cacheDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM alpine:latest\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	input := []byte(`
+services:
+  web:
+    build: .
+`)
+	specs, err := ExtractServiceBuildSpecs(input, dir, cacheDir, "myapp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	spec, ok := specs["web"]
+	if !ok {
+		t.Fatal("expected build spec for 'web'")
+	}
+	if !spec.HasBuild {
+		t.Error("expected HasBuild=true")
+	}
+	if spec.ImageTag != "myapp-web:latest" {
+		t.Errorf("expected default ImageTag 'myapp-web:latest', got %q", spec.ImageTag)
+	}
+	if spec.Context == "" {
+		t.Error("expected non-empty Context")
+	}
+}
+
+func TestExtractServiceBuildSpecs_WithImage(t *testing.T) {
+	dir := t.TempDir()
+	cacheDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM alpine:latest\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	input := []byte(`
+services:
+  web:
+    build: .
+    image: myimage:v1
+`)
+	specs, err := ExtractServiceBuildSpecs(input, dir, cacheDir, "myapp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	spec := specs["web"]
+	if spec.ImageTag != "docker.io/library/myimage:v1" {
+		t.Errorf("expected ImageTag from user image to be normalized, got %q", spec.ImageTag)
+	}
+}
+
+func TestExtractServiceBuildSpecs_DockerfilePatched(t *testing.T) {
+	dir := t.TempDir()
+	cacheDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM nginx:alpine\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	input := []byte(`
+services:
+  web:
+    build: .
+`)
+	_, err := ExtractServiceBuildSpecs(input, dir, cacheDir, "myapp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	patchedDf := filepath.Join(cacheDir, "web.Dockerfile")
+	data, err := os.ReadFile(patchedDf)
+	if err != nil {
+		t.Fatalf("failed to read patched Dockerfile: %v", err)
+	}
+	if !strings.Contains(string(data), "docker.io/library/nginx:alpine") {
+		t.Errorf("expected patched FROM line, got:\n%s", string(data))
+	}
+}
+
+func TestExtractServiceBuildSpecs_TargetNetwork(t *testing.T) {
+	dir := t.TempDir()
+	cacheDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM alpine:latest\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	input := []byte(`
+services:
+  web:
+    build:
+      context: .
+      target: production
+      network: host
+`)
+	specs, err := ExtractServiceBuildSpecs(input, dir, cacheDir, "myapp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	spec := specs["web"]
+	if spec.Target != "production" {
+		t.Errorf("expected Target='production', got %q", spec.Target)
+	}
+	if spec.Network != "host" {
+		t.Errorf("expected Network='host', got %q", spec.Network)
+	}
+}
+
+func TestExtractServiceBuildSpecs_StringForm(t *testing.T) {
+	dir := t.TempDir()
+	cacheDir := t.TempDir()
+
+	subDir := filepath.Join(dir, "subdir")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "Dockerfile"), []byte("FROM alpine\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	input := []byte(`
+services:
+  web:
+    build: ./subdir
+`)
+	specs, err := ExtractServiceBuildSpecs(input, dir, cacheDir, "myapp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	spec := specs["web"]
+	if !strings.Contains(spec.Context, subDir) {
+		t.Errorf("expected Context to contain absolute path, got %q", spec.Context)
+	}
+}
+
+func TestExtractServiceBuildSpecs_NoBuild(t *testing.T) {
+	input := []byte(`
+services:
+  web:
+    image: nginx
+`)
+	specs, err := ExtractServiceBuildSpecs(input, "/tmp", "/tmp/cache", "myapp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(specs) != 0 {
+		t.Errorf("expected no build specs, got %d", len(specs))
+	}
+}
+
+func TestExtractServiceBuildSpecs_MissingDockerfile(t *testing.T) {
+	dir := t.TempDir()
+	cacheDir := t.TempDir()
+
+	input := []byte(`
+services:
+  web:
+    build: .
+`)
+	_, err := ExtractServiceBuildSpecs(input, dir, cacheDir, "myapp")
+	if err == nil {
+		t.Fatal("expected error for missing Dockerfile")
 	}
 }
