@@ -88,3 +88,20 @@ type SecretRef struct {
 
 // ServiceSecretRefs maps a service name to the list of secrets it references.
 type ServiceSecretRefs map[string][]SecretRef
+
+// ServiceBuildSpec holds metadata about a service's build configuration.
+type ServiceBuildSpec struct {
+	ServiceName string
+	HasBuild    bool
+	ImageTag    string            // image tag for the build (injected or user-provided)
+	Context     string            // absolute build context path
+	Dockerfile  string            // absolute path to the patched Dockerfile
+	Target      string            // build target stage
+	Network     string            // build network mode
+	NoCache     bool              // --no-cache
+	Args        map[string]string // build args
+	Labels      map[string]string // build labels
+	PullPolicy  string            // build pull policy
+	Platform    string            // platform (e.g. "linux/amd64")
+	Extra       map[string]interface{} // other build fields preserved as-is
+}

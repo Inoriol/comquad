@@ -18,12 +18,16 @@ type Grafter struct {
 func (g *Grafter) Process(
 	files map[string]string,
 	services map[string]preprocess.ServiceImageSpec,
+	buildSpecs map[string]*preprocess.ServiceBuildSpec,
 	secretDefs map[string]preprocess.SecretDef,
 	serviceSecretRefs preprocess.ServiceSecretRefs,
 ) map[string]string {
+	if len(buildSpecs) > 0 {
+		files = handlers.BuildQuadletHandler(files, buildSpecs, g.ProjectName)
+	}
 	if len(secretDefs) > 0 {
 		files = handlers.SecretHandler(files, g.ProjectName, secretDefs, serviceSecretRefs, g.SecretsDir, g.DryRun, g.SELinuxEnabled)
 	}
-	files = handlers.ImageQuadletHandler(files, g.ProjectName, services)
+	files = handlers.ImageQuadletHandler(files, g.ProjectName, services, buildSpecs)
 	return files
 }

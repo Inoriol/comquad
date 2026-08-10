@@ -111,6 +111,10 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 		os.RemoveAll(secretsDir)
 	}
 
+	if buildCacheDir, err := resolveBuildCacheDir(o.projectName); err == nil {
+		os.RemoveAll(buildCacheDir)
+	}
+
 	logger.Success("Successfully removed project: " + o.projectName)
 	return nil
 }

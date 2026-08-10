@@ -40,6 +40,11 @@ func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[stri
 			continue
 		}
 
+		if hasBuildFile(projectFiles, f) {
+			logger.Action("Skipping pull for " + filepath.Base(f) + " (built from .build quadlet)")
+			continue
+		}
+
 		content, ok := fileContents[f]
 		if !ok {
 			return fmt.Errorf("content not found for %s", f)
@@ -66,6 +71,17 @@ func (o *Orchestrator) handleImages(projectFiles []string, fileContents map[stri
 	}
 
 	return nil
+}
+
+func hasBuildFile(projectFiles []string, containerPath string) bool {
+	containerBase := filepath.Base(containerPath)
+	buildBase := strings.TrimSuffix(containerBase, ".container") + ".build"
+	for _, f := range projectFiles {
+		if filepath.Base(f) == buildBase {
+			return true
+		}
+	}
+	return false
 }
 
 // printDryRun prints a preview of what `comquad up` would deploy without
@@ -101,6 +117,11 @@ func (o *Orchestrator) printDryRun(
 			image := strings.TrimSpace(strings.TrimPrefix(line, "Image="))
 
 			image = resolveContainerImage(image, fileContents)
+
+			if hasBuildFile(projectFiles, f) {
+				logger.Printf("[build] %-12s %s  (would be built locally, no pull)\n", filepath.Base(f), image)
+				break
+			}
 
 			switch imagePullStrategy {
 			case graft.PullAlways:

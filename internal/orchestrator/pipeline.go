@@ -71,6 +71,7 @@ func (o *Orchestrator) cook(tempDir, targetDir string, isRootless bool) (map[str
 func (o *Orchestrator) graft(
 	fileContents map[string]string,
 	services map[string]preprocess.ServiceImageSpec,
+	buildSpecs map[string]*preprocess.ServiceBuildSpec,
 	secretDefs map[string]preprocess.SecretDef,
 	serviceSecretRefs preprocess.ServiceSecretRefs,
 	secretsDir string,
@@ -82,7 +83,7 @@ func (o *Orchestrator) graft(
 		DryRun:         dryRun,
 		SELinuxEnabled: preprocess.IsSELinuxEnabled(),
 	}
-	return grafter.Process(fileContents, services, secretDefs, serviceSecretRefs)
+	return grafter.Process(fileContents, services, buildSpecs, secretDefs, serviceSecretRefs)
 }
 
 func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {

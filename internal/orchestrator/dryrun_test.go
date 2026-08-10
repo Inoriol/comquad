@@ -271,3 +271,125 @@ func TestUp_DryRun_NoComposeFileReturnsError(t *testing.T) {
 		t.Errorf("expected 'no compose file found', got %v", err)
 	}
 }
+
+func TestPrintDryRun_BuildContainerShowsBuildLabel(t *testing.T) {
+	previewDir := t.TempDir()
+
+	containerContent := "[Container]\nImage=myapp-web:latest\n\n[Install]\nWantedBy=default.target\n"
+	containerFile := filepath.Join(previewDir, "cq-myapp-web.container")
+	writeFile(t, containerFile, containerContent)
+
+	buildContent := "[Build]\nImageTag=myapp-web:latest\nFile=" + filepath.Join(previewDir, "Dockerfile") + "\n"
+	buildFile := filepath.Join(previewDir, "cq-myapp-web.build")
+	writeFile(t, buildFile, buildContent)
+
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	out := captureStdout(t, func() {
+		o.printDryRun(
+			[]string{containerFile, buildFile},
+			makeFileContentMap(containerFile, buildFile),
+			previewDir,
+			t.TempDir(),
+			"always",
+		)
+	})
+
+	if !strings.Contains(out, "[build]") {
+		t.Errorf("expected [build] label in output for built container, got:\n%s", out)
+	}
+	if !strings.Contains(out, "would be built locally") {
+		t.Errorf("expected 'would be built locally' in output, got:\n%s", out)
+	}
+}
+
+func TestPrintDryRun_BuildContainerSkipsPullLabels(t *testing.T) {
+	previewDir := t.TempDir()
+
+	containerContent := "[Container]\nImage=myapp-web:latest\n\n[Install]\nWantedBy=default.target\n"
+	containerFile := filepath.Join(previewDir, "cq-myapp-web.container")
+	writeFile(t, containerFile, containerContent)
+
+	buildFile := filepath.Join(previewDir, "cq-myapp-web.build")
+	writeFile(t, buildFile, "[Build]\nImageTag=myapp-web:latest\n")
+
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	out := captureStdout(t, func() {
+		o.printDryRun(
+			[]string{containerFile, buildFile},
+			makeFileContentMap(containerFile, buildFile),
+			previewDir,
+			t.TempDir(),
+			"always",
+		)
+	})
+
+	if strings.Contains(out, "[image]") {
+		t.Errorf("expected no [image] pull label for built container, got:\n%s", out)
+	}
+}
+
+func TestPrintDryRun_MixedBuildAndImageContainers(t *testing.T) {
+	previewDir := t.TempDir()
+
+	webContent := "[Container]\nImage=myapp-web:latest\n\n[Install]\nWantedBy=default.target\n"
+	webFile := filepath.Join(previewDir, "cq-myapp-web.container")
+	writeFile(t, webFile, webContent)
+
+	webBuild := filepath.Join(previewDir, "cq-myapp-web.build")
+	writeFile(t, webBuild, "[Build]\nImageTag=myapp-web:latest\n")
+
+	dbContent := "[Container]\nImage=docker.io/library/postgres:15\n\n[Install]\nWantedBy=default.target\n"
+	dbFile := filepath.Join(previewDir, "cq-myapp-db.container")
+	writeFile(t, dbFile, dbContent)
+
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	out := captureStdout(t, func() {
+		o.printDryRun(
+			[]string{webFile, webBuild, dbFile},
+			makeFileContentMap(webFile, webBuild, dbFile),
+			previewDir,
+			t.TempDir(),
+			"always",
+		)
+	})
+
+	if !strings.Contains(out, "[build]") {
+		t.Errorf("expected [build] label for built web container, got:\n%s", out)
+	}
+	if !strings.Contains(out, "[image]") {
+		t.Errorf("expected [image] label for db container, got:\n%s", out)
+	}
+}
+
+func TestHasBuildFile_Match(t *testing.T) {
+	files := []string{
+		"/path/to/cq-myapp-web.container",
+		"/path/to/cq-myapp-web.build",
+		"/path/to/cq-myapp-db.container",
+	}
+
+	if !hasBuildFile(files, "/path/to/cq-myapp-web.container") {
+		t.Error("expected true for container with matching .build file")
+	}
+}
+
+func TestHasBuildFile_NoMatch(t *testing.T) {
+	files := []string{
+		"/path/to/cq-myapp-web.container",
+		"/path/to/cq-myapp-db.container",
+	}
+
+	if hasBuildFile(files, "/path/to/cq-myapp-web.container") {
+		t.Error("expected false for container without .build file")
+	}
+}
+
+func TestHasBuildFile_EmptyList(t *testing.T) {
+	var files []string
+	if hasBuildFile(files, "/path/to/cq-myapp-web.container") {
+		t.Error("expected false for empty file list")
+	}
+}
