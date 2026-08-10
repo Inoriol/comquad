@@ -11,19 +11,10 @@ This document outlines the planned evolution of Comquad. Because I believe in th
 
 ## 🚀 Next Horizon: v0.1.x - v0.5.0 (Context & Secrets)
 *Focus: Eliminating friction points and handling advanced Compose features.*
-- [ ] **Graft Handlers:** Implement handlers in `internal/graft/handlers/` to safely strip, hold, and inject configuration blocks that upstream tools don't natively map yet (e.g. skipping registry pulls for podlet-generated build images).
-- [ ] **Native Secrets Management:** Intercept Compose `secrets:` and inject them cleanly as Podman `Secret=` systemd keys.
+- [x] **Graft Handlers:** Implement handlers in `internal/graft/handlers/` to safely strip, hold, and inject configuration blocks that upstream tools don't natively map yet (e.g. skipping registry pulls for podlet-generated build images).
+- [x] **Native Secrets Management:** Intercept Compose `secrets:` and inject them cleanly as Podman `Secret=` systemd keys.
+- [ ] **Native go implementation of podlet** As significant amount of code currently working around podlet limitations, clean, library-focused analogue of podlet need to be written.
 
 ## 🌎 Super long in future (possibly never)
 - **Have a swarm compatability** Implement support for Docker Swarm compose syntex, utilizing `Eclipse BlueChi`.
 
-
-## Regarding the Build Stage
-
-### Current Implementation
-
-`build:` blocks in compose files are passed through to podlet unchanged. Podlet handles `build:` natively by generating `.build` quadlet files. Comquad no longer intercepts, replaces, or pre-builds `build:` blocks.
-
-### The Future State: Pure Systemd-Driven Compilation
-
-Future `graft/handlers/` will address gaps between what podlet emits and what a smooth developer experience requires (e.g. detecting build-generated images and skipping registry pulls). The goal remains the same: comquad as a pure systemd context orchestrator, with podlet and systemd managing the build execution pipeline.
