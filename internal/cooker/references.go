@@ -99,10 +99,7 @@ func (c *Cooker) replaceDirectiveValue(line, oldRef, newRef string) string {
 		if len(parts) >= 2 && strings.Contains(parts[0], "/") {
 			return line
 		}
-		if strings.Contains(parts[0], oldRef) {
-			if strings.Contains(parts[0], newRef) {
-				return line
-			}
+		if c.valueContainsRef(parts[0], oldRef, newRef) {
 			replaced := strings.Replace(parts[0], oldRef, newRef, 1)
 			if len(parts) == 2 {
 				return directive + "=" + replaced + ":" + parts[1]
