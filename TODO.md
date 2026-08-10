@@ -80,8 +80,3 @@ The graft step can inject arbitrary systemd `[Service]` directives beyond deploy
 
 - **Tmpfs-backed secrets via `LoadCredential`** — Currently secrets are bind-mounted directly from managed files on disk. Consider generating a companion `.service` service unit file (not a `.container` quadlet) that uses systemd `LoadCredential=` in `[Service]` combined with `Volume=%d/<name>` to mount secrets from systemd's RAM-backed credential directories (`/run/credentials/`). This would keep secret values in tmpfs memory rather than on persistent storage. Initial implementation attempted this using quadlet's `[Service]` pass-through, but `LoadCredential=` + `Volume=` with credential paths didn't integrate correctly with quadlet's container lifecycle. A standalone `.service` file could bypass quadlet entirely for credential setup.
 
----
-
-## 🗺️ Long-Term Roadmap Goals
-
-For reference, these are tracked in [ROADMAP.md](./ROADMAP.md).
