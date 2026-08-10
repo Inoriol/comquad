@@ -6,17 +6,6 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 
 ## 🧩 Missing Features
 
-### Build Processing ✅ (Implemented)
-
-Build blocks are now fully supported. The implementation bypasses podlet's fragile build support entirely:
-
-1. ~~**Anonymous builds**~~ — Image tags (`<project>-<service>:latest`) are injected for services with `build:` and no explicit `image:`.
-2. ~~**Path fixing**~~ — Build contexts and Dockerfile paths are resolved to absolute paths in the preprocessor.
-3. ~~**Dockerfile patching**~~ — `FROM` lines are patched with `docker.io/library/` prefixes for consistent image resolution. Stage aliases are tracked and preserved. Patched Dockerfiles are written to `$XDG_CACHE_HOME/comquad/builds/<project>/`.
-4. ~~**Build image detection**~~ — `handleImages()` detects containers with matching `.build` files and skips registry pulls. `ImageQuadletHandler` skips `.image` generation for built containers.
-5. ~~**`.build` quadlet generation**~~ — `BuildQuadletHandler` in the graft step generates `.build` quadlet files directly. `.container` files reference `.build` files via `Image=cq-<project>-<service>.build`, creating proper systemd dependency chains. `AutoUpdate=registry` is stripped from built containers.
-6. **Containerfile support** — `$XDG_CACHE_HOME/comquad/builds/` is cleaned up on `comquad down`. `Containerfile` is checked before `Dockerfile` as default build file.
-
 ### Deploy
 
 The compose `deploy:` section is fully rejected by podlet (level 0). comquad must intercept and strip the entire `deploy:` block during preprocessing, then translate its sub-fields into native systemd resource-control directives and quadlet options via the graft step.
