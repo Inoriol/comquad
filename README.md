@@ -188,7 +188,7 @@ comquad exec --help    # Container exec examples
 
 ## 🏗️ Architecture & Automatic Behaviors
 
-`comquad` uses the [compose2quadlet](./compose2quadlet/) Go library (bundled in-tree) to map compose files directly into structured quadlet units in a single transpilation step. `pull_policy`, `platform`, `secrets`, and `build:` blocks are all handled natively by the library.
+`comquad` uses a schema-less YAML model to preserve all compose file fields through its preprocessing pipeline. `pull_policy`, `platform`, and `secrets` fields are intercepted and processed during the graft step. `pull_policy` and `platform` are moved into dedicated `.image` quadlet files; `secrets` are translated into bind-mounted `Volume=` directives for file/environment secrets, and `Secret=` for external Podman secrets. Most unhandled fields (like `depends_on`, `healthcheck`, or `x-` extensions) are passed through unchanged to `podlet`. However, `build:` blocks are currently explicitly rejected — build support is planned for a future release.
 
 For a deep dive into how `comquad` processes compose files, manages state, and maps directories, check out the [Architecture Guide](./ARCHITECTURE.md).
 
@@ -198,9 +198,9 @@ For a deep dive into how `comquad` processes compose files, manages state, and m
 * **SELinux Smart Patching:** When SELinux is active on the host, `Volume=` directives get `,z` appended and `Mount=` directives get `relabel=shared` safely and idempotently.
 * **Implicit Networks:** A default bridge network (`cq-default`) is injected if your compose file defines no networks.
 * **Image Quadlet Generation:** Every container gets a companion `.image` quadlet file. Compose `image`, `pull_policy`, and `platform` fields are extracted into dedicated image units so systemd can manage image pulls separately (enables `podman auto-update`).
-* **Secrets Management:** Compose `secrets:` are intercepted and translated into native quadlet directives. 
-* **Service Discovery:** `NetworkAlias=` are injected into every `.container` with `<project>-<service>` and `<service>` blueprints so services can resolve each other same way as in docker compose networks.
-* **Rootless Port Offsetting:** In rootless mode, privileged ports (≤ 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
+* **Secrets Management:** Compose `secrets:` are intercepted and translated into native quadlet directives. External secrets become `Secret=` (Podman native secret store). File-based and environment-based secrets are bind-mounted directly via `Volume=` into `/run/secrets/<name>` inside containers. `environment:` secrets resolve from OS env vars first, then fall back to `.env` files in the project directory. Managed secret files are stored at `$XDG_DATA_HOME/comquad/secrets/<project>/` with strict `0600` permissions.
+* **Service Discovery:** `NetworkAlias=` and unique `<project>-<service>` blueprints are injected into every `.container` file so systemd services can resolve each other.
+* **Rootless Port Offsetting:** In rootless mode, privileged ports (< 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
 
 ---
 
