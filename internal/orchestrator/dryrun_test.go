@@ -2,15 +2,14 @@ package orchestrator
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	c2q "github.com/Inoriol/comquad/compose2quadlet"
 	"github.com/Inoriol/comquad/internal/deploy"
 )
 
@@ -39,41 +38,157 @@ func captureStdout(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
-// makePreviewDir creates a temp directory with a minimal cooked quadlet file
-// and returns the dir path, the file's absolute path, and its content for the fileContents map.
-func makePreviewDir(t *testing.T) (previewDir string, containerFile string, fileContent string) {
-	t.Helper()
-	dir := t.TempDir()
-	content := "[Container]\nImage=docker.io/library/nginx\nLabel=com.comquad.project=myapp\n\n[Install]\nWantedBy=default.target\n"
-	path := filepath.Join(dir, "cq-myapp-web.container")
-	writeFile(t, path, content)
-	return dir, path, content
-}
-
-func makeFileContentMap(paths ...string) map[string]string {
-	m := make(map[string]string)
-	for _, p := range paths {
-		data, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		m[p] = string(data)
+func makeTestUnits() []c2q.QuadletUnit {
+	return []c2q.QuadletUnit{
+		{
+			Type: c2q.UnitContainer,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/nginx"}},
+					{Key: "Label", Values: []string{"com.comquad.project=myapp"}},
+				}},
+				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
+					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
 	}
-	return m
 }
 
-// ---------------------------------------------------------------------------
-// printDryRun — output structure
-// ---------------------------------------------------------------------------
+func makeBuildTestUnits() []c2q.QuadletUnit {
+	return []c2q.QuadletUnit{
+		{
+			Type: c2q.UnitContainer,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"myapp-web:latest"}},
+				}},
+				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
+					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitBuild,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionBuild, Directives: []c2q.Directive{
+					{Key: "ImageTag", Values: []string{"myapp-web:latest"}},
+				}},
+			},
+		},
+	}
+}
+
+func makeMixedTestUnits() []c2q.QuadletUnit {
+	return []c2q.QuadletUnit{
+		{
+			Type: c2q.UnitContainer,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"myapp-web:latest"}},
+				}},
+				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
+					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitBuild,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionBuild, Directives: []c2q.Directive{
+					{Key: "ImageTag", Values: []string{"myapp-web:latest"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitContainer,
+			Name: "cq-myapp-db",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/postgres:15"}},
+				}},
+				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
+					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+	}
+}
+
+func makeMultiTestUnits() []c2q.QuadletUnit {
+	return []c2q.QuadletUnit{
+		{
+			Type: c2q.UnitContainer,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/nginx"}},
+				}},
+				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
+					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitContainer,
+			Name: "cq-myapp-db",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/postgres:15"}},
+				}},
+				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
+					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitNetwork,
+			Name: "cq-myapp-default",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionNetwork, Directives: []c2q.Directive{}},
+			},
+		},
+	}
+}
+
+func makeImageRefTestUnits() []c2q.QuadletUnit {
+	return []c2q.QuadletUnit{
+		{
+			Type: c2q.UnitContainer,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"cq-myapp-web.image"}},
+				}},
+				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
+					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitImage,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionImage, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/nginx:latest"}},
+				}},
+			},
+		},
+	}
+}
 
 func TestPrintDryRun_PrintsProjectAndTargetDir(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
+	units := makeTestUnits()
 	targetDir := t.TempDir()
-
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		if err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, "missing"); err != nil {
+		if err := o.printDryRun(units, targetDir, "missing"); err != nil {
 			t.Errorf("printDryRun error: %v", err)
 		}
 	})
@@ -87,13 +202,12 @@ func TestPrintDryRun_PrintsProjectAndTargetDir(t *testing.T) {
 }
 
 func TestPrintDryRun_ShowsTargetPathForEachFile(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
+	units := makeTestUnits()
 	targetDir := "/fake/systemd/target"
-
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, targetDir, "missing")
+		o.printDryRun(units, targetDir, "missing")
 	})
 
 	expectedTarget := filepath.Join(targetDir, "cq-myapp-web.container")
@@ -103,12 +217,11 @@ func TestPrintDryRun_ShowsTargetPathForEachFile(t *testing.T) {
 }
 
 func TestPrintDryRun_ShowsFileContent(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
-
+	units := makeTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "missing")
+		o.printDryRun(units, t.TempDir(), "missing")
 	})
 
 	if !strings.Contains(out, "[Container]") {
@@ -120,30 +233,24 @@ func TestPrintDryRun_ShowsFileContent(t *testing.T) {
 }
 
 func TestPrintDryRun_PrintsFileCount(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
-
-	// Add a second file
-	networkFile := filepath.Join(previewDir, "cq-myapp-default.network")
-	writeFile(t, networkFile, "[Network]\n")
-
+	units := makeTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile, networkFile}, makeFileContentMap(containerFile, networkFile), previewDir, t.TempDir(), "missing")
+		o.printDryRun(units, t.TempDir(), "missing")
 	})
 
-	if !strings.Contains(out, "2 quadlet file(s)") {
-		t.Errorf("expected '2 quadlet file(s)' in output, got:\n%s", out)
+	if !strings.Contains(out, "1 quadlet file(s)") {
+		t.Errorf("expected '1 quadlet file(s)' in output, got:\n%s", out)
 	}
 }
 
 func TestPrintDryRun_PrintsDryRunCompleteSummary(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
-
+	units := makeTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "missing")
+		o.printDryRun(units, t.TempDir(), "missing")
 	})
 
 	if !strings.Contains(out, "Dry run complete") {
@@ -155,12 +262,11 @@ func TestPrintDryRun_PrintsDryRunCompleteSummary(t *testing.T) {
 }
 
 func TestPrintDryRun_ImagePullNeverReported(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
-
+	units := makeTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "never")
+		o.printDryRun(units, t.TempDir(), "never")
 	})
 
 	if !strings.Contains(out, "pull skipped: never") {
@@ -169,12 +275,11 @@ func TestPrintDryRun_ImagePullNeverReported(t *testing.T) {
 }
 
 func TestPrintDryRun_ImagePullAlwaysReported(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
-
+	units := makeTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "always")
+		o.printDryRun(units, t.TempDir(), "always")
 	})
 
 	if !strings.Contains(out, "would pull: always") {
@@ -183,23 +288,11 @@ func TestPrintDryRun_ImagePullAlwaysReported(t *testing.T) {
 }
 
 func TestPrintDryRun_MultipleFilesAllShown(t *testing.T) {
-	previewDir := t.TempDir()
-
-	files := []string{}
-	for _, name := range []string{
-		"cq-myapp-web.container",
-		"cq-myapp-db.container",
-		"cq-myapp-default.network",
-	} {
-		path := filepath.Join(previewDir, name)
-		writeFile(t, path, fmt.Sprintf("[Container]\nLabel=name=%s\n", name))
-		files = append(files, path)
-	}
-
+	units := makeMultiTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(files, makeFileContentMap(files...), previewDir, "/fake/target", "missing")
+		o.printDryRun(units, "/fake/target", "missing")
 	})
 
 	for _, name := range []string{"cq-myapp-web.container", "cq-myapp-db.container", "cq-myapp-default.network"} {
@@ -210,31 +303,21 @@ func TestPrintDryRun_MultipleFilesAllShown(t *testing.T) {
 }
 
 func TestPrintDryRun_InvalidPullStrategy(t *testing.T) {
-		previewDir, containerFile, _ := makePreviewDir(t)
+	units := makeTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
-	err := o.printDryRun([]string{containerFile}, makeFileContentMap(containerFile), previewDir, t.TempDir(), "badstrategy")
+	err := o.printDryRun(units, t.TempDir(), "badstrategy")
 	if err == nil {
 		t.Error("expected error for invalid pull strategy, got nil")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Up with dryRun=true — integration guard
-// ---------------------------------------------------------------------------
-
 func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
-	if _, err := exec.LookPath("podlet"); err != nil {
-		t.Skip("podlet not available")
-	}
-
 	dir := t.TempDir()
 	targetDir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "compose.yaml"), "services:\n  web:\n    image: nginx\n")
 
 	state := newMockStateStore(nil)
-	// Use manual Orchestrator construction so we can override newState/newSystemd
-	// while still hitting the real resolveTargetDir/transpile/cook paths.
 	o := &Orchestrator{
 		projectName: "myapp",
 		cwd:         dir,
@@ -248,12 +331,10 @@ func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
 		o.Up("missing", false, true)
 	})
 
-	// State must NOT have been registered
 	if len(state.projects) != 0 {
 		t.Errorf("dry-run must not register state, got %v", state.projects)
 	}
 
-	// Target dir must remain empty (nothing copied there)
 	entries, _ := os.ReadDir(targetDir)
 	if len(entries) != 0 {
 		t.Errorf("dry-run must not write to target dir, found %d files", len(entries))
@@ -261,7 +342,7 @@ func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
 }
 
 func TestUp_DryRun_NoComposeFileReturnsError(t *testing.T) {
-	dir := t.TempDir() // empty dir — no compose file
+	dir := t.TempDir()
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
@@ -273,26 +354,11 @@ func TestUp_DryRun_NoComposeFileReturnsError(t *testing.T) {
 }
 
 func TestPrintDryRun_BuildContainerShowsBuildLabel(t *testing.T) {
-	previewDir := t.TempDir()
-
-	containerContent := "[Container]\nImage=myapp-web:latest\n\n[Install]\nWantedBy=default.target\n"
-	containerFile := filepath.Join(previewDir, "cq-myapp-web.container")
-	writeFile(t, containerFile, containerContent)
-
-	buildContent := "[Build]\nImageTag=myapp-web:latest\nFile=" + filepath.Join(previewDir, "Dockerfile") + "\n"
-	buildFile := filepath.Join(previewDir, "cq-myapp-web.build")
-	writeFile(t, buildFile, buildContent)
-
+	units := makeBuildTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(
-			[]string{containerFile, buildFile},
-			makeFileContentMap(containerFile, buildFile),
-			previewDir,
-			t.TempDir(),
-			"always",
-		)
+		o.printDryRun(units, t.TempDir(), "always")
 	})
 
 	if !strings.Contains(out, "[build]") {
@@ -304,25 +370,11 @@ func TestPrintDryRun_BuildContainerShowsBuildLabel(t *testing.T) {
 }
 
 func TestPrintDryRun_BuildContainerSkipsPullLabels(t *testing.T) {
-	previewDir := t.TempDir()
-
-	containerContent := "[Container]\nImage=myapp-web:latest\n\n[Install]\nWantedBy=default.target\n"
-	containerFile := filepath.Join(previewDir, "cq-myapp-web.container")
-	writeFile(t, containerFile, containerContent)
-
-	buildFile := filepath.Join(previewDir, "cq-myapp-web.build")
-	writeFile(t, buildFile, "[Build]\nImageTag=myapp-web:latest\n")
-
+	units := makeBuildTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(
-			[]string{containerFile, buildFile},
-			makeFileContentMap(containerFile, buildFile),
-			previewDir,
-			t.TempDir(),
-			"always",
-		)
+		o.printDryRun(units, t.TempDir(), "always")
 	})
 
 	if strings.Contains(out, "[image]") {
@@ -331,29 +383,11 @@ func TestPrintDryRun_BuildContainerSkipsPullLabels(t *testing.T) {
 }
 
 func TestPrintDryRun_MixedBuildAndImageContainers(t *testing.T) {
-	previewDir := t.TempDir()
-
-	webContent := "[Container]\nImage=myapp-web:latest\n\n[Install]\nWantedBy=default.target\n"
-	webFile := filepath.Join(previewDir, "cq-myapp-web.container")
-	writeFile(t, webFile, webContent)
-
-	webBuild := filepath.Join(previewDir, "cq-myapp-web.build")
-	writeFile(t, webBuild, "[Build]\nImageTag=myapp-web:latest\n")
-
-	dbContent := "[Container]\nImage=docker.io/library/postgres:15\n\n[Install]\nWantedBy=default.target\n"
-	dbFile := filepath.Join(previewDir, "cq-myapp-db.container")
-	writeFile(t, dbFile, dbContent)
-
+	units := makeMixedTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(
-			[]string{webFile, webBuild, dbFile},
-			makeFileContentMap(webFile, webBuild, dbFile),
-			previewDir,
-			t.TempDir(),
-			"always",
-		)
+		o.printDryRun(units, t.TempDir(), "always")
 	})
 
 	if !strings.Contains(out, "[build]") {
@@ -361,6 +395,19 @@ func TestPrintDryRun_MixedBuildAndImageContainers(t *testing.T) {
 	}
 	if !strings.Contains(out, "[image]") {
 		t.Errorf("expected [image] label for db container, got:\n%s", out)
+	}
+}
+
+func TestPrintDryRun_ResolvesImageRef(t *testing.T) {
+	units := makeImageRefTestUnits()
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	out := captureStdout(t, func() {
+		o.printDryRun(units, t.TempDir(), "missing")
+	})
+
+	if !strings.Contains(out, "docker.io/library/nginx:latest") {
+		t.Errorf("expected resolved image name in output, got:\n%s", out)
 	}
 }
 

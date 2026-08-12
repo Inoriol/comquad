@@ -1,0 +1,5 @@
+[Build]
+SetWorkingDirectory=.
+File=Dockerfile
+Target=production
+ImageTag=myapp:latest

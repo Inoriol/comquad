@@ -17,7 +17,7 @@ var checkCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Check that required tools and services are available",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tools := []string{"podman", "podlet"}
+		tools := []string{"podman"}
 		var missing []string
 		var warnings []string
 

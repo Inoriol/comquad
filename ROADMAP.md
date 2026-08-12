@@ -13,7 +13,7 @@ This document outlines the planned evolution of Comquad. Because I believe in th
 *Focus: Eliminating friction points and handling advanced Compose features.*
 - [x] **Graft Handlers:** Implement handlers in `internal/graft/handlers/` to safely strip, hold, and inject configuration blocks that upstream tools don't natively map yet (e.g. skipping registry pulls for podlet-generated build images).
 - [x] **Native Secrets Management:** Intercept Compose `secrets:` and inject them cleanly as Podman `Secret=` systemd keys.
-- [ ] **Native go implementation of podlet** As significant amount of code currently working around podlet limitations, clean, library-focused analogue of podlet need to be written.
+- [x] **Native go implementation of compose2quadlet** Replaced podlet with the compose2quadlet Go library for all compose→quadlet transpilation.
 
 ## 🌎 Super long in future (possibly never)
 - **Have a swarm compatability** Implement support for Docker Swarm compose syntex, utilizing `Eclipse BlueChi`.

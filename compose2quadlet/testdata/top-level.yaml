@@ -1,0 +1,8 @@
+networks:
+  backend:
+    driver: bridge
+  frontend:
+    driver: overlay
+volumes:
+  db_data:
+    driver: local

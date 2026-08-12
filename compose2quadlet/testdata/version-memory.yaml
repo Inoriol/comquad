@@ -1,0 +1,4 @@
+services:
+  db:
+    image: postgres:16
+    mem_limit: 536870912

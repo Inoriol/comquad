@@ -1,0 +1,16 @@
+services:
+  app:
+    image: myapp:latest
+    networks:
+      frontend:
+        aliases: ["www", "api"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    extra_hosts:
+      - "host.internal:10.0.0.1"
+
+networks:
+  frontend:
+    driver: bridge

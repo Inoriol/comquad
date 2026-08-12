@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	unitStartTimeout     = 30 * time.Second
+	unitStartTimeout     = 5 * time.Minute
 	unitStopTimeout      = 30 * time.Second
 	unitRestartTimeout   = 30 * time.Second
 	waitForUnitTimeout   = 15 * time.Second

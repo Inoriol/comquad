@@ -57,11 +57,11 @@ func TestSELinux_QuadletFile_ZInjected_WhenSELinuxPresent(t *testing.T) {
  // Use dry-run so we can inspect the quadlet file content without deploying
  result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
- // All three bind mount variants must have ,z appended
+ // Bind mounts use Mount= with relabel=shared, named volumes use Volume= with ,z
  for _, expected := range []string{
-  "/data:z",
-  "/data-ro:ro,z",
-  "/data-rw:rw,z",
+  "destination=/data,relabel=shared",
+  "destination=/data-ro,relabel=shared",
+  "destination=/data-rw,relabel=shared",
  } {
   if !strings.Contains(result.Stdout, expected) {
    t.Fatalf("SELinux: expected %q in quadlet output, got:\n%s", expected, result.Stdout)
@@ -84,8 +84,8 @@ func TestSELinux_QuadletFile_ZNotInjected_WhenSELinuxAbsent(t *testing.T) {
 
  result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
- // Without SELinux, no ,z should be injected
- for _, unexpected := range []string{":z", ":ro,z", ":rw,z"} {
+ // Without SELinux, no selinux relabeling should be injected
+ for _, unexpected := range []string{":z", ":ro,z", ":rw,z", "relabel=shared", "relabel=private"} {
   if strings.Contains(result.Stdout, unexpected) {
    t.Fatalf("no SELinux: unexpected %q found in quadlet output:\n%s",
     unexpected, result.Stdout)
@@ -102,16 +102,16 @@ func TestSELinux_QuadletFile_ZIdempotent(t *testing.T) {
 
  result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run")
 
- // :z already present — must not become :z,z or :Z,z
- for _, bad := range []string{":z,z", ":Z,z", ":z,Z"} {
+ // relabel=shared / relabel=private already present — must not double-inject
+ for _, bad := range []string{"relabel=shared,relabel=shared", "relabel=private,relabel=private"} {
   if strings.Contains(result.Stdout, bad) {
-   t.Fatalf("SELinux z-injection is not idempotent, found %q in output:\n%s",
+   t.Fatalf("SELinux relabel injection is not idempotent, found %q in output:\n%s",
     bad, result.Stdout)
   }
  }
 
  // Original labels must still be present exactly once
- for _, expected := range []string{"/data:z", "/data-Z:Z"} {
+ for _, expected := range []string{"destination=/data,relabel=shared", "destination=/data-Z,relabel=private"} {
   count := strings.Count(result.Stdout, expected)
   if count != 1 {
    t.Fatalf("expected exactly one occurrence of %q, found %d:\n%s",
@@ -227,12 +227,12 @@ func TestSELinux_VerboseOutput_LogsInjection(t *testing.T) {
 
 	result := helpers.MustSucceed(t, dir, "up", "--name", project, "--dry-run", "-v")
 
-	// The Cook stage must log the SELinux z injection per the architecture
-	// and the quadlet file content must show :z on Volume= directives
-	hasInjectionLog := strings.Contains(result.Stdout, "Added SELinux")
-	hasZInContent := strings.Contains(result.Stdout, ":z") || strings.Contains(result.Stdout, ":ro,z") || strings.Contains(result.Stdout, ":rw,z")
+ // The Cook stage must log the SELinux z injection per the architecture
+ // and the quadlet file content must show relabel=shared on Mount= directives
+ hasInjectionLog := strings.Contains(result.Stdout, "SELinux detected")
+ hasZInContent := strings.Contains(result.Stdout, "relabel=shared") || strings.Contains(result.Stdout, ":z") || strings.Contains(result.Stdout, ":ro,z") || strings.Contains(result.Stdout, ":rw,z")
 
-	if !hasInjectionLog && !hasZInContent {
-		t.Fatalf("verbose dry-run missing SELinux injection log or :z labels:\n%s", result.Stdout)
-	}
+ if !hasInjectionLog && !hasZInContent {
+  t.Fatalf("verbose dry-run missing SELinux injection log or selinux labels:\n%s", result.Stdout)
+ }
 }

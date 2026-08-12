@@ -4,26 +4,20 @@ This document details the internal design, component mapping, and execution life
 
 ## 🔄 Execution Lifecycle
 
-When you run `comquad up`, the engine moves your configuration through a five-step pipeline:
+When you run `comquad up`, the engine moves your configuration through a two-step pipeline:
 
-1. **Preprocess** — Normalizes your `compose` yaml (resolves relative to absolute paths, sets default networks, injects project labels). `build:` blocks are stripped from the YAML and processed separately.
-2. **Transpile** — Executes the `podlet` binary under the hood to convert the compose YAML configuration into `.container`, `.network`, `.volume`, `.image`, and `.build` quadlet files.
-3. **Cook** — Post-processes the raw quadlet outputs. This stage prefixes files with `cq-<project>`, rewrites cross-unit references so services can communicate, injects `NetworkAlias=` for DNS resolution, injects `com.comquad.managed` and `com.comquad.project` labels on all files, and applies rootless port offsets where needed. Returns a `CookResult` containing the in-memory content of all written files (keyed by destination path) to avoid redundant disk I/O in subsequent steps.
-4. **Graft** — Post-processes quadlet file contents to handle compose fields that podlet does not support or supports with known flaws. Runs three handlers:
-   * `BuildQuadletHandler` — generates `.build` quadlet files from intercepted compose `build:` blocks, updates `.container` files to reference them
-   * `SecretHandler` — translates compose `secrets:` into quadlet directives. External secrets produce `Secret=` for Podman's native secret store. File-based and environment-based secrets produce `LoadCredential=` in `[Service]` sections and `Volume=` mounts in `[Container]` sections, mounting secrets at `/run/secrets/<name>` via systemd credential directories (`/run/credentials/<unit>.service/`). Managed secrets are written to `$XDG_DATA_HOME/comquad/secrets/<project>/` with `0600` permissions. Per-service `secrets:` and top-level `secrets:` are stripped from the compose YAML before podlet sees them.
-   * `ImageQuadletHandler` — creates `.image` quadlet files for every `.container`, moving image-related directives (`Image=`, `Policy=`, `OS=`, `Arch=`, `Variant=`) into dedicated image units so systemd can manage image pulls separately. Also injects `Retry=3` and `RetryDelay=5s` defaults. Containers are updated to reference `<name>.image` instead of raw image names.
-5. **Deploy** — Pulls images based on the configured pull strategy, then relocates the finalized files to the systemd configuration directory, registers the metadata in the centralized state file, and triggers the unit starts via D-Bus. If `startUnits` fails, the cleanup function removes all files, unregisters the project, and reloads the daemon to prevent a half-deployed state.
+1. **Transpile** — `compose2quadlet.TranspileFile()` loads the compose file via compose-go/v2, maps all fields to structured `QuadletUnit` objects, applies opinionated transforms (prefix, references, SELinux, labels, port offset, auto-update, install section, default network, network aliases), and resolves secrets, Dockerfile FROM lines, and volume paths.
+2. **Deploy** — Write units to the systemd target directory via `serialization.WriteUnits()`, register in state file, pull images per strategy, reload daemon, and start units via D-Bus.
 
 ### Dry Run Mode (`--dry-run`)
 
-When `comquad up --dry-run` is used, the pipeline runs steps 1–4 into a private temporary directory instead of the real systemd target. After cooking and grafting, `printDryRun` reads each generated file and prints:
+When `comquad up --dry-run` is used, `TranspileFile()` is called with `WithDryRun()` to prevent side effects (no secret files written to disk). After transpilation, `printDryRun` iterates over the returned `[]QuadletUnit` and prints:
 
 - The **target path** it *would* be written to
-- The full **file content** of each quadlet
+- The full **serialized file content** of each quadlet unit
 - **Image pull actions** that *would* be taken per container, based on the pull strategy and whether images exist locally
 
-Step 5 (deploy) is skipped entirely: no files are written to the systemd directory, no state is registered, and no units are started. The temporary preview directory is cleaned up automatically. The graft step produces `.image` quadlet files and updates `.container` references, so dry-run output includes both file types.
+The deploy step is skipped entirely: no files are written to the systemd directory, no state is registered, and no units are started.
 
 ## 📦 Project Directory Structure
 
@@ -31,23 +25,34 @@ The codebase is organized cleanly into domains matching the execution lifecycle 
 
 ```text
 cmd/comquad/           # CLI entry point: main.go + per-command files (up.go, down.go, logs.go, …)
-internal/graft/          # Post-processing engine for compose fields podlet doesn't handle
-                       #   handlers/image.go (image quadlets), handlers/secret.go (compose secrets),
-                       #   handlers/build.go (build quadlets)
-internal/cooker/       # Post-processes quadlet files: engine.go (core), references.go (rewriting),
-                       #   ports.go (offsetting), labels.go (SELinux/aliases/systemd opts)
+compose2quadlet/       # Compose → Quadlet transpilation library (in-tree sub-module)
 internal/deploy/       # Systemd D-Bus communication, target directories, state tracking,
                        # and the SystemdClient / StateStore interfaces used for testing
 internal/logger/       # Colorized logging with quiet/verbose tiers
 internal/orchestrator/ # The engine wiring all packages: orchestrator.go (core/Up), down.go,
-                       #   images.go (build/pull/printDryRun), pipeline.go (helpers), plus
+                       #   images.go (pull/dry-run), pipeline.go (helpers), plus
                        #   per-command files (lifecycle, logs, exec, view, edit, etc.)
-internal/preprocess/   # Pre-parser to normalize raw compose.yaml files
-                       #   engine.go (core), models.go (types), dockerfile.go (FROM patching),
-                       #   build.go (build spec extraction)
-internal/transpile/    # Wrapper executing the podlet binary
-
 ```
+
+## 🧩 compose2quadlet Library
+
+comquad's transpilation is powered by the in-tree [compose2quadlet](./compose2quadlet/) Go module. It loads compose files via compose-go/v2, maps services/networks/volumes/secrets/configs to structured `QuadletUnit` objects, applies opinionated transforms, and serializes to quadlet ini format.
+
+For its internal architecture and package layout, see:
+- [compose2quadlet/ARCHITECTURE.md](./compose2quadlet/ARCHITECTURE.md)
+- [compose2quadlet/README.md](./compose2quadlet/README.md)
+
+### Post-transpile Processing
+
+After `TranspileFile()` returns, comquad applies one fix before writing units to disk:
+
+- **`stripServiceName`** — Removes `ServiceName=` from container units. Without this, quadlet names the systemd unit after the compose service name (e.g. `db.service`) instead of the file-prefixed name (`cq-<project>-db.service`), breaking comquad's unit lookup.
+
+The library handles the rest through its opinionated transforms:
+- **`ApplyContainerName`** — Injects `ContainerName=<project>-<service>` into every container (e.g. `nextcloud-redis-mariadb-db`), matching Docker Compose's container naming convention.
+- **`ApplyNetworkAliases`** — Injects `NetworkAlias=<service>` and `NetworkAlias=<project>-<service>` so services can resolve each other by compose service name and project-qualified name within compose networks.
+- **`.image` references are kept** — Containers reference `.image` files via `Image=<name>.image` (not resolved). The quadlet generator follows the chain through to the `.image` unit's fully-qualified `Image=` directive, which satisfies `AutoUpdate=registry`'s requirement for fully-qualified references.
+- **`SECTION SPACING`** — Serialization now adds blank lines between non-empty sections for readability, matching the format produced by the previous podlet-based pipeline.
 
 ## 📊 Ps Command
 
@@ -253,56 +258,25 @@ Quadlet configurations are copied into paths dictated by your execution context:
 
 `comquad` accepts standard Docker Compose v3 files supporting `services`, `networks`, and `volumes`.
 
-The following fields accept both map (`KEY: value`) and list (`- KEY=value`) formats when passed to podlet:
-
-* `environment` — service environment variables
-* `labels` — service, network, and volume labels
-
-The following compose service fields are **explicitly processed** by comquad's preprocessor:
-
-* `build` — stripped from YAML before podlet; `.build` quadlet files generated by graft handler with normalized paths and patched Dockerfiles
-* `container_name` — auto-generated if missing (`<project>-<service>`)
-* `image` — normalized to full registry path (`docker.io/library/`)
-* `pull_policy` — stripped from compose YAML; mapped to `.image` quadlet `Policy=` directive in the graft step
-* `platform` — stripped from compose YAML; mapped to `.image` quadlet `OS=`, `Arch=`, and `Variant=` directives in the graft step
-* `volumes` — bind mount host paths with `./` or `../` prefixes are resolved to absolute paths
-* `networks` — auto-attached to `cq-default` when a default bridge network is injected
-* `secrets` — top-level `secrets:` and per-service `secrets:` are stripped from compose YAML; resolved by `SecretHandler` in the graft step (see [Secrets Management](#secrets-management))
-
-All other compose fields (`entrypoint`, `command`, `expose`, `deploy`, `environment`, `depends_on`, `restart`, `working_dir`, `user`, `healthcheck`, `cap_add`/`cap_drop`, `tmpfs`, `read_only`, `extra_hosts`, `dns`, `hostname`, `privileged`, `mem_limit`, `cpus`, `volumes_from`, `links`, `tty`, `stdin_open`, `security_opt`, `shm_size`, `labels`, and `x-` extensions) are **passed through unchanged** to `podlet` via a schema-less YAML model.
+All compose-to-quadlet mapping, Dockerfile normalization, secret resolution, and opinionated transforms (prefix, references, SELinux, labels, port offset, auto-update, install section, default network, network aliases) are handled by the [compose2quadlet](./compose2quadlet/) library (in-tree sub-module).
 
 ### Automatic Behaviors & Opinionated Transforms
 
 To ensure the transition to Quadlets is frictionless, the internal engine enforces several rules:
 
 * Relative volume host paths are automatically fully-qualified to absolute paths.
-* When SELinux is detected (via `/sys/fs/selinux/enforce`), all `Volume=` directives in generated `.container` files get `,z` appended to mount options (`:ro` → `:ro,z`, `:rw` → `:rw,z`, no option → `:z`). Idempotent — skips if `:z` or `:Z` already present.
+* When SELinux is detected (via `/sys/fs/selinux/enforce`), `Volume=` directives in generated `.container` files get `,z` appended and `Mount=` directives get `relabel=shared` appended (`Mount=type=bind,...` → `Mount=type=bind,...,relabel=shared`). Idempotent — skips if `:z`, `:Z`, or `relabel=` already present.
 * A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Services without an explicit `networks:` key are auto-attached to `cq-default` only when that network was injected — preventing dangling network references when user-defined networks exist.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
 * `NetworkAlias=` is injected into every `.container` file so services can resolve each other by service name and `ContainerName=` value within compose networks.
 * An identifying label (`com.comquad.project`) is attached to all generated units.
 * A `com.comquad.managed` label is attached to all files to indicate comquad management.
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
-* In rootless mode, privileged ports (< 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
+* In rootless mode, privileged ports (≤ 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
 
 ### Build Blocks
 
-`build:` blocks are intercepted by the preprocessor and stripped from the compose YAML before it reaches podlet. Comquad generates `.build` quadlet files directly during the graft step, giving full control over the build configuration.
-
-**Preprocessing** (`internal/preprocess/build.go`):
-- Build context and Dockerfile paths are resolved to absolute paths
-- Dockerfile `FROM` lines are patched to include `docker.io/library/` prefixes for consistent image resolution (stage aliases are preserved)
-- Patched Dockerfiles are written to `$XDG_CACHE_HOME/comquad/builds/<project>/`
-- For anonymous builds (no `image:` field), an image tag `<project>-<service>:latest` is injected
-
-**Build quadlet generation** (`internal/graft/handlers/build.go`):
-- `.build` quadlet files are generated with `ImageTag=`, `File=` (patched Dockerfile), and `SetWorkingDirectory=` (build context)
-- Build options (`Target=`, `Network=`, `BuildArg=`, `Label=`) are passed through from the compose `build:` block
-- The corresponding `.container` file's `Image=` is updated to reference the `.build` file (e.g. `Image=cq-myapp-web.build`), which per the quadlet spec creates a systemd dependency chain: `.container.service` depends on `.build.service`
-- `AutoUpdate=registry` is stripped from built containers (meaningless for local builds)
-- `.image` quadlet generation is skipped for built containers (no registry pull needed)
-
-**Image pull skipping** — `handleImages()` detects containers with matching `.build` files and skips registry pulls. Dry-run output shows `[build]` instead of `[image]` for built containers.
+`build:` blocks are handled natively by compose2quadlet which generates `.build` quadlet files, patches Dockerfile `FROM` lines for consistent image resolution, and updates the corresponding `.container` file's `Image=` to reference the `.build` file.
 
 ### Quadlet Feature Injections
 
@@ -320,11 +294,11 @@ services:
 
 ### Image Quadlet Generation
 
-comquad automatically generates `.image` quadlet files for every service container during the graft pipeline step. The handler extracts the following compose fields and maps them to `[Image]` section directives:
+comquad automatically generates `.image` quadlet files for every service container via compose2quadlet. The library maps compose `pull_policy`, `platform`, and `image` fields to the appropriate `[Image]` section directives.
 
 | Compose field | `.image` directive | Notes |
 |---|---|---|
-| `image: nginx:latest` | `Image=` | Uses the normalized image from preprocessing |
+| `image: nginx:latest` | `Image=` | Uses the compose-go/v2 normalized image |
 | `pull_policy: always` | `Policy=always` | `if_not_present` aliased to `missing` |
 | `pull_policy: missing` | `Policy=missing` | Default behavior |
 | `platform: linux/amd64` | `OS=linux`, `Arch=amd64` | |
@@ -338,50 +312,11 @@ The `.container` file's `Image=` directive is updated to reference the `.image` 
 
 ### Secrets Management
 
-comquad intercepts compose `secrets:` and translates them into quadlet-native directives. The extraction happens in `ExtractSecretSpecs()` (parallel to `ExtractServiceImageSpecs` for image metadata), which parses the raw compose YAML before preprocessing strips the relevant fields.
+comquad delegates compose `secrets:` processing to compose2quadlet, which translates them into quadlet-native directives. External secrets produce `Secret=` for Podman's native secret store. File-based and environment-based secrets produce `Volume=` mounts in `[Container]` at `/run/secrets/<name>`.
 
-**Resolution tree per compose secret type:**
+### Partial Deploy Coverage
 
-| Compose definition | Quadlet output | Source |
-|---|---|---|
-| `external: true` | `Secret=<name>` in `[Container]` | Podman native secret store |
-| `external: true` + `name: "ALT"` | `Secret=ALT` in `[Container]` | Podman native secret store (alternate name) |
-| `file: ./path/to/secret` | `Volume=<abs_path>:/run/secrets/<name>:ro` in `[Container]` | Direct host file |
-| `environment: "VAR_NAME"` | Same as `file:` above | `os.Getenv(VAR)` → managed file; falls back to `.env` in project dir → managed file at `$XDG_DATA/comquad/secrets/<project>/<name>` (0600) |
-
-**Key design decisions:**
-
-- Per-service `secrets:` lists and the top-level `secrets:` section are both stripped from the compose YAML during preprocessing so podlet never sees them.
-- `SecretRef.Target` supports the compose long syntax (`secrets: [{source: name, target: /custom/path}]`) for custom mount points — defaults to `/run/secrets/<name>`.
-- Managed secret files are stored at `$XDG_DATA_HOME/comquad/secrets/<project>/<name>` with strict `0600` permissions.
-- Secrets are bind-mounted directly from the source path into the container via `Volume=`. This avoids the complexity of systemd `LoadCredential=` + `/run/credentials/` indirection which doesn't integrate cleanly with quadlet's container lifecycle. A future improvement may generate standalone `.service` files that use tmpfs-backed `LoadCredential=` for enhanced security.
-- SELinux `:z` labels are automatically appended to secret `Volume=` directives when SELinux is active (same behavior as the cooker for regular volumes).
-- `environment:` secrets try `os.Getenv()` first, then fall back to parsing `.env` from the compose project directory. This matches `docker compose` behavior where `.env` files are auto-loaded.
-- Secrets are cleaned up on `comquad down` (the `$XDG_DATA_HOME/comquad/secrets/<project>/` directory is removed). External Podman secrets are never deleted.
-- Dry run (`--dry-run`) shows the injected directives but does not write managed secret files to disk.
-
-**Example generated `.container` file with both external and file-based secrets:**
-
-```ini
-[Container]
-Image=docker.io/library/postgres:15-alpine
-Secret=apikey
-Volume=/home/user/.local/share/comquad/secrets/myapp/db_password:/run/secrets/db_password:ro,z
-
-[Install]
-WantedBy=default.target
-```
-
-### Partial Deploy Coverage with Grafting
-
-The graft step can inject not only quadlet-specific directives (`Secret=`, `Volume=`) but also arbitrary systemd `[Service]` directives. This enables future features like:
-
-- `EnvironmentFile=` — injecting parsed `.env` files as container environment
-- `ExecStartPre=` / `ExecStartPost=` — pre/post-start hooks (e.g., waiting for dependencies, running migrations)
-- `TimeoutStartSec=` — adjusting service startup timeouts for slow-starting containers
-- `RestartSec=`, `Restart=on-failure` — custom restart policies beyond compose `restart:`
-
-These directives are passed through quadlet to the generated `.service` file's `[Service]` section, giving comquad the ability to graft systemd-native behaviors into compose-defined services without modifying podlet itself.
+compose2quadlet can inject not only quadlet-specific directives (`Secret=`, `Volume=`) but also arbitrary systemd `[Service]` directives. This enables future features including `EnvironmentFile=`, `ExecStartPre=/ExecStartPost=`, `TimeoutStartSec=`, and custom restart policies.
 
 ## 🧪 Testing Architecture
 
@@ -407,9 +342,7 @@ The `ensureProjectDeployed()` helper encapsulates the common pattern of creating
 
 ### Image Normalization
 
-The `normalizeImage()` function in `internal/preprocess/` ensures images have full registry paths. It distinguishes registry hostnames (containing `.` or `:port` where port is all digits) from image names with tags (e.g., `myapp:v1`). The `isRegistryWithPort()` helper checks if `:` is followed by only digits to avoid false positives with tagged image names.
-
-The `transpile` package is tested via a fake `podlet` shell script placed on a temp PATH entry, exercising the stdin pipe, argument passing, and error paths without requiring the real binary.
+Image normalization (e.g., `nginx` → `docker.io/library/nginx`) is handled natively by compose-go/v2, the canonical compose specification implementation used by compose2quadlet.
 
 ### CI Pipeline & Build
 
@@ -421,8 +354,7 @@ Automated testing runs via `.github/workflows/test.yml` on every push and PR to 
 - **Coverage** — `go test -cover` with per-package and total coverage report
 
 Makefile targets (`make test-unit`, `make test-race`, `make test-cover`, `make test-short`) provide
-the same commands locally. Coverage currently sits at ~60% overall, with `cooker` (89%), `transpile`
-(85%), and `preprocess` (82%) leading the way.
+the same commands locally.
 
 The `captureStdout` helper in `internal/orchestrator/dryrun_test.go` uses a `sync.Mutex` to serialize
 `os.Stdout` redirection, making it safe to use alongside `t.Parallel()` — only the capture window
@@ -446,10 +378,9 @@ comquad has three output modes, controlled by flags on the root command:
 | Verbose | `-v` / `--verbose` | All of the above plus every pipeline transformation |
 | Quiet | `-q` / `--quiet` | Errors only (stderr). All other output is suppressed. Useful in scripts. |
 
-The `Up` pipeline now prints progress indicators at each stage via `logger.Action()`:
+The `Up` pipeline prints progress indicators at each stage via `logger.Action()`:
 - "Reading compose file..."
-- "Preprocessing compose configuration..."
-- "Transpiling to quadlet files..."
+- "Transpiling compose configuration..."
 - "Generating quadlet files..."
 - "Handling images..."
 - "Starting services..."
@@ -468,22 +399,6 @@ Colors use ANSI codes (green=success, cyan=info, yellow=warning, red=error, blue
 
 When `-v` / `--verbose` is enabled, comquad additionally logs every transformation applied during the deployment pipeline:
 
-**Preprocess stage** logs:
-- `Injected container_name: <name>` — when a container name was auto-generated
-- `Normalized image: <original> → <normalized>` — image name normalization to full registry path
-- `Normalized volume path: <relative> → <absolute>` — relative volume path resolution
-- `Created default network: cq-default` — when a default bridge network was injected
-- `Auto-attached '<service>' to network 'cq-default'` — services auto-attached to default network
-
-**Cook stage** logs:
-- `Renamed <old> → <new>` — file renaming with `cq-<project>-` prefix
-- `Rewrote cross-unit references in <file>` — reference rewriting for Network=/Volume=/Pod= and [Unit] section (After=, Requires=, etc.) directives
-- `Added AutoUpdate=registry to <file>` — systemd auto-update optimization
-- `Added [Install] section to <file>` — systemd install section injection
-- `Added NetworkAlias=<name> to <file>` — DNS resolution for compose networks
-- `Added labels: Label=com.comquad.project=<name>, Label=com.comquad.managed=true` — label injection
-- `Offset port: PublishPort=<original> → PublishPort=<offset>` — rootless port offsetting
-
 **Deploy stage** logs:
 - `Removing network: <name>` — network removal
 - `Removing volume: <name>` — volume removal
@@ -495,7 +410,7 @@ Network and volume removal errors are always printed to stderr regardless of ver
 ## 🧪 Integration Testing
 
 Integration tests verify the full end-to-end lifecycle of comquad against a real
-systemd instance, real Podman daemon, and real podlet binary. They complement the
+systemd instance and real Podman daemon. They complement the
 unit tests (which mock D-Bus and state via interfaces) by exercising the complete
 pipeline from `compose` → quadlet files → running containers.
 
@@ -511,7 +426,6 @@ time (never installed at test runtime) with all required dependencies:
 - `golang` — to compile and run integration test binaries
 - `podman` — container runtime
 - `systemd` — PID 1, D-Bus, unit management
-- `podlet` — quadlet transpiler (Fedora package)
 - `sudo`, `shadow-utils`, `slirp4netns`, `fuse-overlayfs` — rootless support
 
 The `comquad` binary is pre-built on the host (`make build`) and mounted read-only

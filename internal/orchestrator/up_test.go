@@ -2,14 +2,11 @@ package orchestrator
 
 import (
 	"errors"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// makeMinimalCompose writes a minimal valid compose.yaml to dir and returns
-// the Orchestrator pointed at dir.
 func makeMinimalCompose(t *testing.T, dir string) {
 	t.Helper()
 	content := `services:
@@ -19,15 +16,10 @@ func makeMinimalCompose(t *testing.T, dir string) {
 	writeFile(t, filepath.Join(dir, "compose.yaml"), content)
 }
 
-// ---------------------------------------------------------------------------
-// Up — error paths that don't require a running podlet/systemd
-// ---------------------------------------------------------------------------
-
 func TestUp_NoComposeFileReturnsError(t *testing.T) {
-	dir := t.TempDir() // empty — no compose file
+	dir := t.TempDir()
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
-	// cwd must match the directory we're checking
 	o.cwd = dir
 
 	err := o.Up("missing", false, false)
@@ -46,18 +38,14 @@ func TestUp_InvalidYamlReturnsError(t *testing.T) {
 	err := o.Up("missing", false, false)
 	if err == nil {
 		t.Error("expected error for invalid YAML")
-	} else if !strings.Contains(err.Error(), "YAML") &&
-		!strings.Contains(err.Error(), "preprocess") &&
+	} else if !strings.Contains(err.Error(), "transpile") &&
 		!strings.Contains(err.Error(), "unmarshal") &&
 		!strings.Contains(err.Error(), "yaml") {
-		t.Errorf("expected YAML-related error, got: %v", err)
+		t.Errorf("expected transpile/yaml-related error, got: %v", err)
 	}
 }
 
 func TestUp_StateRegistrationError(t *testing.T) {
-	if _, err := exec.LookPath("podlet"); err != nil {
-		t.Skip("podlet not available")
-	}
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
 
@@ -71,10 +59,6 @@ func TestUp_StateRegistrationError(t *testing.T) {
 }
 
 func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
-	if _, err := exec.LookPath("podlet"); err != nil {
-		t.Skip("podlet not available")
-	}
-
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
 
@@ -87,10 +71,6 @@ func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
 		t.Errorf("expected 'unknown pull strategy' error, got %v", err)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// registerState (tested indirectly through the mock)
-// ---------------------------------------------------------------------------
 
 func TestRegisterState_PersistsToStateStore(t *testing.T) {
 	dir := t.TempDir()
@@ -134,14 +114,9 @@ func TestRegisterState_StateError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// collectProjectFiles
-// ---------------------------------------------------------------------------
-
 func TestCollectProjectFiles_ReturnsProjectFiles(t *testing.T) {
 	dir := t.TempDir()
 
-	// Write files for "myapp" and an unrelated project
 	for _, name := range []string{
 		"cq-myapp-web.container",
 		"cq-myapp-default.network",
