@@ -21,7 +21,6 @@ I am an infrastructure engineer, not a full-time software developer. I built **C
 ### Requirements
 
 * **Podman 4.8+** (quadlet support with .image units)
-* **podlet** (for transpiling `compose` yaml into quadlet files)
 * **systemd** with quadlet support
 * Go 1.23+ (if building from source)
 
@@ -45,7 +44,7 @@ comquad --version
 |----------|---------|-------------|
 | `EDITOR` | auto-detected | Editor for `comquad edit`. Falls back to `editor`, `nano`, `vim`, then `vi`. |
 | `NO_COLOR` | *(unset)* | Set to any value to disable ANSI color output. |
-| `ROOTLESS_PORT_OFFSET` | `2000` | In rootless mode, privileged ports (< 1024) are offset by this value. |
+| `ROOTLESS_PORT_OFFSET` | `2000` | In rootless mode, privileged ports (≤ 1024) are offset by this value. |
 | `XDG_DATA_HOME` | `~/.local/share` | Base directory for `comquad/projects.json` state file. |
 
 ---
@@ -156,7 +155,7 @@ If your local state gets out of sync, `comquad` can rebuild its tracking from Po
 ```bash
 comquad regenerate --force           # Reconstruct state file from live labels
 comquad regenerate --force --dry-run # Preview what would be reconstructed
-comquad check                        # Check prerequisites (tools, podman >= 4.4, D-Bus, target dir)
+  comquad check                        # Check prerequisites (tools, podman >= 4.8, D-Bus, target dir)
 
 ```
 
@@ -189,19 +188,19 @@ comquad exec --help    # Container exec examples
 
 ## 🏗️ Architecture & Automatic Behaviors
 
-`comquad` uses a schema-less YAML model to preserve all compose file fields through its preprocessing pipeline. `pull_policy`, `platform`, and `secrets` fields are intercepted and processed during the graft step. `pull_policy` and `platform` are moved into dedicated `.image` quadlet files; `secrets` are translated into bind-mounted `Volume=` directives for file/environment secrets, and `Secret=` for external Podman secrets. `build:` blocks are intercepted by the preprocessor, stripped from the YAML before podlet sees them, and `.build` quadlet files are generated directly during the graft step — bypassing podlet's fragile build support entirely.
+`comquad` uses the [compose2quadlet](./compose2quadlet/) Go library (bundled in-tree) to map compose files directly into structured quadlet units in a single transpilation step. `pull_policy`, `platform`, `secrets`, and `build:` blocks are all handled natively by the library.
 
 For a deep dive into how `comquad` processes compose files, manages state, and maps directories, check out the [Architecture Guide](./ARCHITECTURE.md).
 
 ### Behind-the-Scenes Automations:
 
 * **Path Fixing:** Relative volume host paths are automatically fully qualified to absolute paths.
-* **SELinux Smart Patching:** When SELinux is active on the host, all `Volume=` directives automatically get `,z` or `:z` flags appended safely and idempotently.
+* **SELinux Smart Patching:** When SELinux is active on the host, `Volume=` directives get `,z` appended and `Mount=` directives get `relabel=shared` safely and idempotently.
 * **Implicit Networks:** A default bridge network (`cq-default`) is injected if your compose file defines no networks.
 * **Image Quadlet Generation:** Every container gets a companion `.image` quadlet file. Compose `image`, `pull_policy`, and `platform` fields are extracted into dedicated image units so systemd can manage image pulls separately (enables `podman auto-update`).
 * **Secrets Management:** Compose `secrets:` are intercepted and translated into native quadlet directives. 
 * **Service Discovery:** `NetworkAlias=` are injected into every `.container` with `<project>-<service>` and `<service>` blueprints so services can resolve each other same way as in docker compose networks.
-* **Rootless Port Offsetting:** In rootless mode, privileged ports (< 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
+* **Rootless Port Offsetting:** In rootless mode, privileged ports (≤ 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
 
 ---
 

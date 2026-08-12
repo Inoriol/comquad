@@ -5,13 +5,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	c2q "github.com/Inoriol/comquad/compose2quadlet"
+	"github.com/Inoriol/comquad/compose2quadlet/serialization"
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
-	"github.com/Inoriol/comquad/internal/preprocess"
 )
 
 const (
@@ -19,8 +21,6 @@ const (
 	startUnitWaitTime = 10 * time.Second
 )
 
-// Orchestrator wires all internal packages together and drives
-// the lifecycle of a comquad project.
 type Orchestrator struct {
 	projectName string
 	cwd         string
@@ -31,7 +31,6 @@ type Orchestrator struct {
 	newJournalCmd  func(name string, args ...string) *exec.Cmd
 }
 
-// NewOrchestrator creates a new Orchestrator for the current working directory.
 func NewOrchestrator(projectName string) (*Orchestrator, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -64,13 +63,10 @@ func NewOrchestrator(projectName string) (*Orchestrator, error) {
 	}, nil
 }
 
-// ProjectName returns the resolved project name.
 func (o *Orchestrator) ProjectName() string {
 	return o.projectName
 }
 
-// Up preprocesses, transpiles, cooks and deploys the project
-// defined in the compose.yaml in the current working directory.
 func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 	logger.Action("Reading compose file...")
 	composeFile := findComposeFile(o.cwd)
@@ -90,35 +86,21 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		return err
 	}
 
-	tempDir, err := os.MkdirTemp("", "comquad-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
+	isRootless := deploy.IsRootless()
+	selinuxEnabled := deploy.IsSELinuxEnabled()
 
-	composeData, err := os.ReadFile(composeFile)
-	if err != nil {
-		return fmt.Errorf("failed to read compose file: %w", err)
-	}
-
-	serviceSpecs, err := preprocess.ExtractServiceImageSpecs(composeData)
-	if err != nil {
-		return fmt.Errorf("failed to extract service image specs: %w", err)
+	portOffset := 0
+	if isRootless {
+		portOffset = defaultPortOffset
+		if envOffset := os.Getenv("ROOTLESS_PORT_OFFSET"); envOffset != "" {
+			if parsed, err := strconv.Atoi(envOffset); err == nil && parsed > 0 {
+				portOffset = parsed
+			}
+		}
 	}
 
-	secretDefs, serviceSecretRefs, err := preprocess.ExtractSecretSpecs(composeData, o.cwd)
-	if err != nil {
-		return fmt.Errorf("failed to extract secret specs: %w", err)
-	}
-
-	buildCacheDir, err := resolveBuildCacheDir(o.projectName)
-	if err != nil {
-		return fmt.Errorf("failed to resolve build cache directory: %w", err)
-	}
-
-	buildSpecs, err := preprocess.ExtractServiceBuildSpecs(composeData, o.cwd, buildCacheDir, o.projectName)
-	if err != nil {
-		return fmt.Errorf("failed to extract build specs: %w", err)
+	if selinuxEnabled {
+		logger.Action(fmt.Sprintf("SELinux detected, adding :z labels to all volumes"))
 	}
 
 	secretsDir, err := resolveSecretsDir(o.projectName)
@@ -126,49 +108,51 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 		return fmt.Errorf("failed to resolve secrets directory: %w", err)
 	}
 
-	logger.Action("Preprocessing compose configuration...")
-	processedYaml, err := o.preprocess(composeData)
+	buildCacheDir, err := resolveBuildCacheDir(o.projectName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve build cache directory: %w", err)
 	}
 
-	logger.Action("Transpiling to quadlet files...")
-	if err := o.transpile(processedYaml, tempDir); err != nil {
-		return err
+	opts := []c2q.TranspileOption{
+		c2q.WithProjectName(o.projectName),
+		c2q.WithLabels(map[string]string{
+			"com.comquad.managed": "true",
+			"com.comquad.project":  o.projectName,
+		}),
+		c2q.WithAutoUpdate(),
+		c2q.WithSecretsDirectory(secretsDir),
+		c2q.WithBuildCacheDir(buildCacheDir),
+		c2q.WithDockerfileNormalization(),
 	}
 
-	isRootless := deploy.IsRootless()
+	if portOffset > 0 {
+		opts = append(opts, c2q.WithPortOffset(portOffset))
+		logger.Action(fmt.Sprintf("Applied port offset %d for rootless mode", portOffset))
+	}
+	opts = append(opts, c2q.WithInfo(logger.Action))
+	if !selinuxEnabled {
+		opts = append(opts, c2q.WithoutSELinux())
+	}
+	if dryRun {
+		opts = append(opts, c2q.WithDryRun())
+	}
+
+	logger.Action("Transpiling compose configuration...")
+	units, err := c2q.TranspileFile(composeFile, opts...)
+	if err != nil {
+		return fmt.Errorf("transpilation failed: %w", err)
+	}
+
+	stripServiceName(units)
 
 	if dryRun {
-		previewDir, err := os.MkdirTemp("", "comquad-preview-*")
-		if err != nil {
-			return fmt.Errorf("failed to create preview directory: %w", err)
-		}
-		defer os.RemoveAll(previewDir)
-
-		logger.Action("Generating quadlet files (dry run)...")
-		previewContents, err := o.cook(tempDir, previewDir, isRootless)
-		if err != nil {
-			return err
-		}
-
-		previewContents = o.graft(previewContents, serviceSpecs, buildSpecs, secretDefs, serviceSecretRefs, secretsDir, true)
-
-		projectFiles, err := o.collectProjectFiles(previewDir)
-		if err != nil {
-			return err
-		}
-
-		return o.printDryRun(projectFiles, previewContents, previewDir, targetDir, pullStrategy)
+		return o.printDryRun(units, targetDir, pullStrategy)
 	}
 
 	logger.Action("Generating quadlet files...")
-	fileContents, err := o.cook(tempDir, targetDir, isRootless)
-	if err != nil {
-		return err
+	if err := serialization.WriteUnits(targetDir, units); err != nil {
+		return fmt.Errorf("writing quadlet files: %w", err)
 	}
-
-	fileContents = o.graft(fileContents, serviceSpecs, buildSpecs, secretDefs, serviceSecretRefs, secretsDir, false)
 
 	projectFiles, err := o.collectProjectFiles(targetDir)
 	if err != nil {
@@ -195,7 +179,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 	}
 
 	logger.Action("Handling images...")
-	if err := o.handleImages(projectFiles, fileContents, pullStrategy); err != nil {
+	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
 		cleanup()
 		return err
 	}
@@ -231,8 +215,6 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool) error {
 	return nil
 }
 
-// ensureProjectDeployed returns the state store and project state, or an error
-// if the project is not deployed.
 func (o *Orchestrator) ensureProjectDeployed() (deploy.StateStore, deploy.ProjectState, error) {
 	stateMgr, err := o.newState()
 	if err != nil {
@@ -247,39 +229,29 @@ func (o *Orchestrator) ensureProjectDeployed() (deploy.StateStore, deploy.Projec
 	return stateMgr, state, nil
 }
 
-// ContainerFileToUnitName derives the systemd unit name from a quadlet file path.
-// e.g. /path/to/cq-myapp-web.container -> cq-myapp-web.service
 func ContainerFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	return strings.TrimSuffix(base, ".container") + ".service"
 }
 
-// NetworkFileToUnitName derives the systemd unit name from a network quadlet file path.
-// e.g. /path/to/cq-myapp-default.network -> cq-myapp-default-network.service
 func NetworkFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(base, ".network")
 	return nameWithoutExt + "-network.service"
 }
 
-// VolumeFileToUnitName derives the systemd unit name from a volume quadlet file path.
-// e.g. /path/to/cq-myapp-data.volume -> cq-myapp-data-volume.service
 func VolumeFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(base, ".volume")
 	return nameWithoutExt + "-volume.service"
 }
 
-// ImageFileToUnitName derives the systemd unit name from an image quadlet file path.
-// e.g. /path/to/cq-myapp-app.image -> cq-myapp-app-image.service
 func ImageFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(base, ".image")
 	return nameWithoutExt + "-image.service"
 }
 
-// BuildFileToUnitName derives the systemd unit name from a build quadlet file path.
-// e.g. /path/to/cq-myapp-app.build -> cq-myapp-app-build.service
 func BuildFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(base, ".build")

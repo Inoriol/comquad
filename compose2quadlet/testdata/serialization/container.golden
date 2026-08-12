@@ -1,0 +1,16 @@
+[Unit]
+Requires=db.service
+After=db.service
+
+[Container]
+Image=nginx.image
+PublishPort=8080:80
+PublishPort=8443:443
+NoNewPrivileges=
+Environment=NODE_ENV=production
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

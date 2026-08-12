@@ -62,6 +62,22 @@ func displayImage(containerImage string, imageFiles map[string]string) string {
 	return shortenImage(containerImage)
 }
 
+func mountDestination(mountVal string) string {
+	var src, dst string
+	for _, part := range strings.Split(mountVal, ",") {
+		if strings.HasPrefix(part, "source=") {
+			src = strings.TrimPrefix(part, "source=")
+		}
+		if strings.HasPrefix(part, "destination=") {
+			dst = strings.TrimPrefix(part, "destination=")
+		}
+	}
+	if src == "" || dst == "" {
+		return "?"
+	}
+	return src + ":" + dst
+}
+
 func shortenImage(img string) string {
 	img = strings.TrimPrefix(img, "docker.io/library/")
 	img = strings.TrimPrefix(img, "docker.io/")
@@ -160,6 +176,10 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 					volName := strings.TrimSuffix(parts[0], ".volume")
 					volShort := strings.TrimPrefix(volName, prefix)
 					row.vols = append(row.vols, volShort)
+				}
+				if strings.HasPrefix(trimmed, "Mount=") {
+					mountVal := strings.TrimPrefix(trimmed, "Mount=")
+					row.vols = append(row.vols, mountDestination(mountVal))
 				}
 			}
 			services = append(services, row)

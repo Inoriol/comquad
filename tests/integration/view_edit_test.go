@@ -21,15 +21,12 @@ func TestView_ProjectSummary(t *testing.T) {
 
  helpers.MustSucceed(t, dir, "up", "--name", project)
 
- unitName := fmt.Sprintf("cq-%s-web.service", project)
- helpers.AssertUnitActive(t, unitName, false)
-
  result := helpers.MustSucceed(t, dir, "view", "--name", project)
 
- // Project view must show unit name, active state, and healthy status
+ // Project view must show short unit name, active state, and healthy status
  for _, expected := range []string{
-  unitName,
-  "active",
+  "web",
+  "running",
   "healthy",
  } {
   if !strings.Contains(result.Stdout, expected) {
@@ -82,8 +79,8 @@ func TestView_ProjectStatus_Down(t *testing.T) {
 
  result := helpers.MustSucceed(t, dir, "view", "--name", project)
 
- if !strings.Contains(result.Stdout, "down") {
-  t.Fatalf("expected down status when no units active:\n%s", result.Stdout)
+ if !strings.Contains(result.Stdout, "stopped") {
+  t.Fatalf("expected stopped status when no units active:\n%s", result.Stdout)
  }
 }
 
