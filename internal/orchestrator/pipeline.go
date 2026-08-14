@@ -8,6 +8,7 @@ import (
 
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
 func (o *Orchestrator) resolveTargetDir() (string, error) {
@@ -81,26 +82,53 @@ func (o *Orchestrator) registerState(projectFiles []string) error {
 	})
 }
 
-func (o *Orchestrator) startUnits(projectFiles []string) error {
+func (o *Orchestrator) startUnits(projectFiles []string, res reconcile.Result) error {
 	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}
 	defer dbusMgr.Close()
 
-	if err := dbusMgr.ReloadDaemon(projectFiles...); err != nil {
+	// Stop units whose quadlet files were removed (services dropped from compose),
+	// before daemon-reload forgets them.
+	for _, f := range res.Removed {
+		unitName := fileToUnitName(f)
+		if unitName == "" {
+			continue
+		}
+		logger.Action("Stopping removed unit: " + unitName)
+		if err := dbusMgr.StopUnit(unitName); err != nil {
+			logger.Warn(fmt.Sprintf("failed to stop removed unit %s: %v", unitName, err))
+		}
+	}
+
+	changed := stringSet(res.Changed)
+	created := stringSet(res.Created)
+
+	var reloadFiles []string
+	reloadFiles = append(reloadFiles, res.Created...)
+	reloadFiles = append(reloadFiles, res.Changed...)
+
+	if err := dbusMgr.ReloadDaemon(reloadFiles...); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
 
 	for _, f := range projectFiles {
 		if strings.HasSuffix(f, ".image") {
+			if !created[f] && !changed[f] {
+				continue
+			}
 			unitName := ImageFileToUnitName(f)
 			logger.Action("Starting unit: " + unitName)
 			if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
 				logger.Warn(fmt.Sprintf("image unit %s not produced by quadlet generator, skipping: %v", unitName, err))
 				continue
 			}
-			if err := dbusMgr.StartUnit(unitName); err != nil {
+			if changed[f] {
+				if err := dbusMgr.RestartUnit(unitName); err != nil {
+					logger.Warn(fmt.Sprintf("failed to restart image unit %s: %v", unitName, err))
+				}
+			} else if err := dbusMgr.StartUnit(unitName); err != nil {
 				logger.Warn(fmt.Sprintf("failed to start image unit %s: %v", unitName, err))
 			}
 		}
@@ -115,11 +143,32 @@ func (o *Orchestrator) startUnits(projectFiles []string) error {
 				return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
 			}
 
-			if err := dbusMgr.StartUnit(unitName); err != nil {
+			if changed[f] {
+				if err := dbusMgr.RestartUnit(unitName); err != nil {
+					return fmt.Errorf("failed to restart unit %s: %w", unitName, err)
+				}
+			} else if err := dbusMgr.StartUnit(unitName); err != nil {
 				return fmt.Errorf("failed to start unit %s: %w", unitName, err)
 			}
 		}
 	}
 
 	return nil
+}
+
+func (o *Orchestrator) reportReconcile(res reconcile.Result) {
+	for _, c := range res.Conflicts {
+		logger.Warn(fmt.Sprintf("conflict in %s [%s] %s: keeping your edit %q, generated %q", c.Unit, c.Section, c.Key, c.User, c.Generated))
+	}
+	for _, f := range res.NoBaseline {
+		logger.Warn(fmt.Sprintf("no baseline for %s — overwriting with generated content", filepath.Base(f)))
+	}
+}
+
+func stringSet(s []string) map[string]bool {
+	m := make(map[string]bool, len(s))
+	for _, v := range s {
+		m[v] = true
+	}
+	return m
 }

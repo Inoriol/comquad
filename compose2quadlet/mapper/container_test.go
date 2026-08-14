@@ -520,6 +520,32 @@ func TestContainer_Networks(t *testing.T) {
 	assertDirective(t, dirs, "Network", "backend.network")
 }
 
+func TestContainer_NetworksSortedOrder(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Networks: map[string]*types.ServiceNetworkConfig{
+		"znet":   {},
+		"anet":   {},
+		"midnet": {},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+
+	var networks []string
+	for _, d := range dirs {
+		if d.Key == "Network" {
+			networks = append(networks, d.Values...)
+		}
+	}
+	want := []string{"anet.network", "midnet.network", "znet.network"}
+	if len(networks) != len(want) {
+		t.Fatalf("expected %d networks, got %v", len(want), networks)
+	}
+	for i := range want {
+		if networks[i] != want[i] {
+			t.Fatalf("expected sorted networks %v, got %v", want, networks)
+		}
+	}
+}
+
 func TestContainer_NetworkAliases(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Networks: map[string]*types.ServiceNetworkConfig{"frontend": {Aliases: []string{"app", "www"}}}}
 	cfg := c2qtypes.DefaultConfig()

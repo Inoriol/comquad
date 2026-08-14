@@ -11,6 +11,7 @@ import (
 
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
 	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
 var captureStdoutMu sync.Mutex
@@ -36,6 +37,15 @@ func captureStdout(t *testing.T, fn func()) string {
 	io.Copy(&buf, r)
 	r.Close()
 	return buf.String()
+}
+
+func dryRunPlan(t *testing.T, targetDir string, units []c2q.QuadletUnit) reconcile.Plan {
+	t.Helper()
+	plan, err := reconcile.Compute(targetDir, t.TempDir(), "cq-myapp-", units)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
 }
 
 func makeTestUnits() []c2q.QuadletUnit {
@@ -188,7 +198,7 @@ func TestPrintDryRun_PrintsProjectAndTargetDir(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		if err := o.printDryRun(units, targetDir, "missing"); err != nil {
+		if err := o.printDryRun(units, targetDir, "missing", dryRunPlan(t, targetDir, units)); err != nil {
 			t.Errorf("printDryRun error: %v", err)
 		}
 	})
@@ -207,7 +217,7 @@ func TestPrintDryRun_ShowsTargetPathForEachFile(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, targetDir, "missing")
+		o.printDryRun(units, targetDir, "missing", dryRunPlan(t, targetDir, units))
 	})
 
 	expectedTarget := filepath.Join(targetDir, "cq-myapp-web.container")
@@ -221,7 +231,7 @@ func TestPrintDryRun_ShowsFileContent(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "missing")
+		o.printDryRun(units, t.TempDir(), "missing", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if !strings.Contains(out, "[Container]") {
@@ -237,11 +247,11 @@ func TestPrintDryRun_PrintsFileCount(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "missing")
+		o.printDryRun(units, t.TempDir(), "missing", dryRunPlan(t, t.TempDir(), units))
 	})
 
-	if !strings.Contains(out, "1 quadlet file(s)") {
-		t.Errorf("expected '1 quadlet file(s)' in output, got:\n%s", out)
+	if !strings.Contains(out, "1 file(s) to write, 0 to change, 0 to remove") {
+		t.Errorf("expected '1 file(s) to write, 0 to change, 0 to remove' in output, got:\n%s", out)
 	}
 }
 
@@ -250,7 +260,7 @@ func TestPrintDryRun_PrintsDryRunCompleteSummary(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "missing")
+		o.printDryRun(units, t.TempDir(), "missing", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if !strings.Contains(out, "Dry run complete") {
@@ -266,7 +276,7 @@ func TestPrintDryRun_ImagePullNeverReported(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "never")
+		o.printDryRun(units, t.TempDir(), "never", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if !strings.Contains(out, "pull skipped: never") {
@@ -279,7 +289,7 @@ func TestPrintDryRun_ImagePullAlwaysReported(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "always")
+		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if !strings.Contains(out, "would pull: always") {
@@ -292,7 +302,7 @@ func TestPrintDryRun_MultipleFilesAllShown(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, "/fake/target", "missing")
+		o.printDryRun(units, "/fake/target", "missing", dryRunPlan(t, "/fake/target", units))
 	})
 
 	for _, name := range []string{"cq-myapp-web.container", "cq-myapp-db.container", "cq-myapp-default.network"} {
@@ -306,7 +316,7 @@ func TestPrintDryRun_InvalidPullStrategy(t *testing.T) {
 	units := makeTestUnits()
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
-	err := o.printDryRun(units, t.TempDir(), "badstrategy")
+	err := o.printDryRun(units, t.TempDir(), "badstrategy", dryRunPlan(t, t.TempDir(), units))
 	if err == nil {
 		t.Error("expected error for invalid pull strategy, got nil")
 	}
@@ -321,14 +331,14 @@ func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
 	o := &Orchestrator{
 		projectName: "myapp",
 		cwd:         dir,
-		newState: func() (deploy.StateStore, error) { return state, nil },
+		newState:    func() (deploy.StateStore, error) { return state, nil },
 		newSystemd: func() (deploy.SystemdClient, error) {
 			return newMockSystemdClient(), nil
 		},
 	}
 
 	captureStdout(t, func() {
-		o.Up("missing", false, true)
+		o.Up("missing", false, true, true)
 	})
 
 	if len(state.projects) != 0 {
@@ -347,7 +357,7 @@ func TestUp_DryRun_NoComposeFileReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("missing", false, true)
+	err := o.Up("missing", false, true, true)
 	if err == nil || !strings.Contains(err.Error(), "no compose file found") {
 		t.Errorf("expected 'no compose file found', got %v", err)
 	}
@@ -358,7 +368,7 @@ func TestPrintDryRun_BuildContainerShowsBuildLabel(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "always")
+		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if !strings.Contains(out, "[build]") {
@@ -374,7 +384,7 @@ func TestPrintDryRun_BuildContainerSkipsPullLabels(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "always")
+		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if strings.Contains(out, "[image]") {
@@ -387,7 +397,7 @@ func TestPrintDryRun_MixedBuildAndImageContainers(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "always")
+		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if !strings.Contains(out, "[build]") {
@@ -403,7 +413,7 @@ func TestPrintDryRun_ResolvesImageRef(t *testing.T) {
 	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
 
 	out := captureStdout(t, func() {
-		o.printDryRun(units, t.TempDir(), "missing")
+		o.printDryRun(units, t.TempDir(), "missing", dryRunPlan(t, t.TempDir(), units))
 	})
 
 	if !strings.Contains(out, "docker.io/library/nginx:latest") {

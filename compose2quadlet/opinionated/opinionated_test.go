@@ -257,6 +257,41 @@ func TestApplyLabels_NoDuplication(t *testing.T) {
 	}
 }
 
+func TestApplyLabels_SortedOrder(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Image", "nginx.image"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.Labels = map[string]string{
+		"com.comquad.project": "myapp",
+		"com.comquad.managed": "true",
+	}
+
+	result := ApplyLabels(units, cfg)
+	sec := result[0].Sections[0]
+
+	var labels []string
+	for _, d := range sec.Directives {
+		if d.Key == "Label" {
+			labels = append(labels, d.Values...)
+		}
+	}
+
+	want := []string{"com.comquad.managed=true", "com.comquad.project=myapp"}
+	if len(labels) != len(want) {
+		t.Fatalf("expected labels %v, got %v", want, labels)
+	}
+	for i := range want {
+		if labels[i] != want[i] {
+			t.Fatalf("expected sorted labels %v, got %v", want, labels)
+		}
+	}
+}
+
 func TestApplyDefaultNetwork(t *testing.T) {
 	units := []c2qtypes.QuadletUnit{
 		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{

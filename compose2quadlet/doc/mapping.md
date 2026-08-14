@@ -74,7 +74,6 @@ The **Since** column tracks the minimum version required for each mapping:
 | `entrypoint` (string/list) | 1 | `Entrypoint=` | `[Container]` | 5.0.0 |
 | `working_dir` | 1 | `WorkingDir=` | `[Container]` | 4.6.0 |
 | `user` | 1 | `User=` | `[Container]` | 4.4.0 |
-| `group` (uid:gid extra gid) | | | | |
 | `init` | 1 | `RunInit=` | `[Container]` | 4.4.0 |
 | `stop_signal` | 1 | `StopSignal=` | `[Container]` | 5.2.0 |
 | `stop_grace_period` | 1 | `StopTimeout=` | `[Container]` | 5.0.0 |
@@ -82,13 +81,11 @@ The **Since** column tracks the minimum version required for each mapping:
 | `stdin_open` | 3 | `PodmanArgs=--attach stdin` | `[Container]` | 4.6.0 |
 | `pull_policy` | 1 | `Pull=` | `[Container]` | 4.6.0 |
 | `read_only` | 1 | `ReadOnly=` | `[Container]` | 4.4.0 |
-| `read_only` (tmpfs) | | | | |
 | `runtime` | 3 | `GlobalArgs=--runtime <name>` | `[Container]` | 4.6.0 |
 | `platform` | — | `OS=` / `Arch=` / `Variant=` | `[Image]` | 4.8.0 |
 | `domainname` | 4 | — | — | — |
 | `attach` | 4 | — | — | — |
 | `develop` | 4 | — | — | — |
-| `rootfs` | | | | |
 
 ---
 
@@ -139,7 +136,6 @@ The **Since** column tracks the minimum version required for each mapping:
 | `tmpfs` (string/long) | 1 | `Tmpfs=` | `[Container]` | 4.5.0 |
 | `shm_size` | 1 | `ShmSize=` | `[Container]` | 4.7.0 |
 | `storage_opt` | 3 | `GlobalArgs=--storage-opt ...` | `[Container]` | 4.6.0 |
-| `image_volume` | | | | |
 
 ---
 
@@ -153,7 +149,6 @@ The **Since** column tracks the minimum version required for each mapping:
 | `env_file` (string) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
 | `env_file` (list) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
 | `env_file` (`required: false`) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
-| `environment_host` | | | | |
 
 ---
 
@@ -176,10 +171,6 @@ The **Since** column tracks the minimum version required for each mapping:
 | `security_opt: unmask=<path>` | 1 | `Unmask=` | `[Container]` | 4.6.0 |
 | `userns_mode` | 1 | `UserNS=` | `[Container]` | 4.5.0 |
 | `group_add` | 1 | `GroupAdd=` | `[Container]` | 5.1.0 |
-| `uid_map` | | | | |
-| `gid_map` | | | | |
-| `sub_uid_map` | | | | |
-| `sub_gid_map` | | | | |
 | `secrets` (short syntax) | — | *(handled pre-mapping)* | — | — |
 | `secrets` (long, external) | 1 | `Secret=` | `[Container]` | 4.5.0 |
 | `secrets` (long, file) | 1 | `Volume=<path>:/run/secrets/<name>:ro` | `[Container]` | 4.4.0 |
@@ -276,13 +267,6 @@ The **Since** column tracks the minimum version required for each mapping:
 | `healthcheck.retries` | 1 | `HealthRetries=` | `[Container]` | 4.5.0 |
 | `healthcheck.start_period` | 1 | `HealthStartPeriod=` | `[Container]` | 4.5.0 |
 | `healthcheck.start_interval` | 1 | `HealthStartupInterval=` | `[Container]` | 4.5.0 |
-| `healthcheck.on_failure` | | | | |
-| `healthcheck.log_destination` | | | | |
-| `healthcheck.max_log_count` | | | | |
-| `healthcheck.max_log_size` | | | | |
-| `notify` (sd_notify) | | | | |
-| `reload_cmd` | | | | |
-| `reload_signal` | | | | |
 
 ---
 
@@ -418,9 +402,6 @@ Generated as companion unit for every service with `image:`.
 | `sysctls` (map/list) | 1 | `Sysctl=` | `[Container]` | 4.6.0 |
 | `ulimits` | 2 | `Limit*= ` | `[Service]` | sd 208 |
 | `ulimits` (alt) | 1 | `Ulimit=` | `[Container]` | 4.7.0 |
-| `timezone` | | | | |
-| `http_proxy` | | | | |
-| `containers_conf_module` | | | | |
 
 ---
 

@@ -404,7 +404,8 @@ func warnP4Container(svc types.ServiceConfig, cfg *c2qtypes.Config) {
 		}
 	}
 
-	for name, net := range svc.Networks {
+	for _, name := range sortedKeys(svc.Networks) {
+		net := svc.Networks[name]
 		if net == nil {
 			continue
 		}
@@ -567,7 +568,8 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 			})
 		}
 	} else if svc.NetworkMode == "" || svc.NetworkMode == "bridge" {
-		for name, net := range svc.Networks {
+		for _, name := range sortedKeys(svc.Networks) {
+			net := svc.Networks[name]
 			dirs = append(dirs, c2qtypes.Directive{Key: "Network", Values: []string{name + ".network"}})
 			if net == nil {
 				continue
@@ -661,7 +663,8 @@ func t3Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	if svc.MacAddress != "" {
 		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--mac-address " + svc.MacAddress}})
 	}
-	for _, net := range svc.Networks {
+	for _, name := range sortedKeys(svc.Networks) {
+		net := svc.Networks[name]
 		if net != nil && net.MacAddress != "" {
 			dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--mac-address " + net.MacAddress}})
 		}

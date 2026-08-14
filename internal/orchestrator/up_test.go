@@ -22,7 +22,7 @@ func TestUp_NoComposeFileReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("missing", false, false)
+	err := o.Up("missing", false, false, true)
 	if err == nil || !strings.Contains(err.Error(), "no compose file found") {
 		t.Errorf("expected 'no compose file found' error, got %v", err)
 	}
@@ -35,7 +35,7 @@ func TestUp_InvalidYamlReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("missing", false, false)
+	err := o.Up("missing", false, false, true)
 	if err == nil {
 		t.Error("expected error for invalid YAML")
 	} else if !strings.Contains(err.Error(), "transpile") &&
@@ -52,7 +52,7 @@ func TestUp_StateRegistrationError(t *testing.T) {
 	o := newTestOrchestratorWithStateErr("myapp", dir, errors.New("cannot write state"))
 	o.cwd = dir
 
-	err := o.Up("missing", false, false)
+	err := o.Up("missing", false, false, true)
 	if err == nil || !strings.Contains(err.Error(), "cannot write state") {
 		t.Errorf("expected 'cannot write state' error, got %v", err)
 	}
@@ -66,7 +66,7 @@ func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("badstrategy", false, false)
+	err := o.Up("badstrategy", false, false, true)
 	if err == nil || !strings.Contains(err.Error(), "invalid pull strategy") {
 		t.Errorf("expected 'unknown pull strategy' error, got %v", err)
 	}
