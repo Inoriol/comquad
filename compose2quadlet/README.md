@@ -92,6 +92,10 @@ func main() {
 - `github.com/compose-spec/compose-go/v2` — canonical compose parsing
 - Standard library only otherwise
 
+## Determinism
+
+Directive ordering is deterministic: all map iteration (labels, annotations, environment, sysctls, service networks, `depends_on`, logging options, driver opts, etc.) is sorted, so transpiling the same compose file always produces byte-identical output. This makes the library safe for golden-file testing and reproducible deploys.
+
 ## License
 
 MIT

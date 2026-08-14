@@ -17,6 +17,31 @@ func TestUnit_DependsOn(t *testing.T) {
 	assertDirective(t, dirs, "After", "redis.container")
 }
 
+func TestUnit_DependsOnSortedOrder(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{
+		"zdb": {Condition: "service_started", Required: true},
+		"adb": {Condition: "service_started", Required: true},
+		"mdb": {Condition: "service_started", Required: false},
+	}}
+	dirs := Unit(svc)
+
+	var after []string
+	for _, d := range dirs {
+		if d.Key == "After" {
+			after = append(after, d.Values...)
+		}
+	}
+	want := []string{"adb.container", "mdb.container", "zdb.container"}
+	if len(after) != len(want) {
+		t.Fatalf("expected %d After values, got %v", len(want), after)
+	}
+	for i := range want {
+		if after[i] != want[i] {
+			t.Fatalf("expected sorted After %v, got %v", want, after)
+		}
+	}
+}
+
 func TestUnit_DependsOn_Restart(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true, Restart: true}}}
 	dirs := Unit(svc)

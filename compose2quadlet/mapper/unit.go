@@ -20,7 +20,8 @@ func dependsOn(serviceName string, deps types.DependsOnConfig) []c2qtypes.Direct
 		return nil
 	}
 	var requires, wants, after, bindsTo []string
-	for name, dep := range deps {
+	for _, name := range sortedKeys(deps) {
+		dep := deps[name]
 		after = append(after, name+".container")
 		if dep.Required {
 			requires = append(requires, name+".container")
@@ -49,7 +50,8 @@ func dependsOn(serviceName string, deps types.DependsOnConfig) []c2qtypes.Direct
 
 func dependsOnHealth(deps types.DependsOnConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
 	var dirs []c2qtypes.Directive
-	for name, dep := range deps {
+	for _, name := range sortedKeys(deps) {
+		dep := deps[name]
 		if dep.Condition != "service_healthy" {
 			continue
 		}

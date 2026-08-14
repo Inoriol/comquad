@@ -10,7 +10,6 @@ It lets you define your services in a standard `compose.yaml` file and deploy th
 
 I am an infrastructure engineer, not a full-time software developer. I built **Comquad** to solve a specific problem for my own workflow.
 
-* **Philosophy:** This tool is intentionally small, simple, and transparent. It is not trying to become Kubernetes. It's not trying to become podman compose 2.0 either.
 * **Contributions:** I am currently not accepting complex feature pull requests because I do not have the bandwidth or Go expertise to maintain them. But I'm very open to suggestions.
 * **Bugs:** Feel free to open issues if a specific Docker Compose file breaks, but fixes will happen on a "best effort" timeline.
 
@@ -22,7 +21,7 @@ I am an infrastructure engineer, not a full-time software developer. I built **C
 
 * **Podman 4.8+** (quadlet support with .image units)
 * **systemd** with quadlet support
-* Go 1.23+ (if building from source)
+* Go 1.25+ (if building from source)
 
 ### Installation
 
@@ -64,6 +63,8 @@ comquad up
 * **Image Pull Control:** `comquad up --pull [always|missing|never]` *(default: missing)*.
 * **Override name:** `comquad up -n my-service` overrides the default project name.
 * **Progress indication:** Pipeline stages are reported during deployment (`--verbose`/`-v` for full detail).
+* **Re-deploying with a diff:** Running `comquad up` on an already-deployed project shows a color-coded diff of the pending changes and asks for confirmation before applying. Use `comquad up --no-diff` to skip the diff and prompt.
+* **Manual edits are preserved:** Changes made with `comquad edit` are three-way merged with new `compose.yaml` changes. If both touch the same directive, your edit wins and a warning is logged.
 
 ### 2. Monitoring & Lifecycle (`ps`, `start`, `stop`, `logs`)
 
@@ -129,6 +130,8 @@ comquad down -v     # Also works with all subcommands
 comquad ps -v
 
 ```
+
+`comquad up --dry-run` shows a diff rather than full files: new files as full content, changed files as a color-coded unified diff, and removed files (services dropped from `compose.yaml`) as a removal diff.
 
 ### Direct Unit Editing & Viewing
 
@@ -201,6 +204,7 @@ For a deep dive into how `comquad` processes compose files, manages state, and m
 * **Secrets Management:** Compose `secrets:` are intercepted and translated into native quadlet directives. 
 * **Service Discovery:** `NetworkAlias=` are injected into every `.container` with `<project>-<service>` and `<service>` blueprints so services can resolve each other same way as in docker compose networks.
 * **Rootless Port Offsetting:** In rootless mode, privileged ports (≤ 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
+* **Change Detection & Reconcile:** On re-deploy, comquad diffs the freshly generated quadlet files against the deployed ones (tracked via a baseline in `$XDG_DATA_HOME/comquad/baseline/`), preserves manual `edit` changes through a three-way merge, restarts only changed units, and removes units for services dropped from the compose file.
 
 ---
 

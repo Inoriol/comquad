@@ -7,17 +7,28 @@ This document details the internal design, component mapping, and execution life
 When you run `comquad up`, the engine moves your configuration through a two-step pipeline:
 
 1. **Transpile** — `compose2quadlet.TranspileFile()` loads the compose file via compose-go/v2, maps all fields to structured `QuadletUnit` objects, applies opinionated transforms (prefix, references, SELinux, labels, port offset, auto-update, install section, default network, network aliases), and resolves secrets, Dockerfile FROM lines, and volume paths.
-2. **Deploy** — Write units to the systemd target directory via `serialization.WriteUnits()`, register in state file, pull images per strategy, reload daemon, and start units via D-Bus.
+2. **Reconcile & Deploy** — compute a change plan (`reconcile.Compute`), optionally show a diff and ask for confirmation, apply changes (`reconcile.Apply`), register in state file, pull images per strategy, reload daemon, and start/restart only affected units via D-Bus.
 
 ### Dry Run Mode (`--dry-run`)
 
-When `comquad up --dry-run` is used, `TranspileFile()` is called with `WithDryRun()` to prevent side effects (no secret files written to disk). After transpilation, `printDryRun` iterates over the returned `[]QuadletUnit` and prints:
+When `comquad up --dry-run` is used, `TranspileFile()` is called with `WithDryRun()` to prevent side effects (no secret files written to disk). After transpilation, comquad builds a change plan via `reconcile.Compute` (read-only, no writes) and prints:
 
-- The **target path** it *would* be written to
-- The full **serialized file content** of each quadlet unit
 - **Image pull actions** that *would* be taken per container, based on the pull strategy and whether images exist locally
+- For each file, a **color-coded diff** — new files as full content, changed files as a unified diff, and removed files (services dropped from `compose.yaml`) as a removal diff
 
-The deploy step is skipped entirely: no files are written to the systemd directory, no state is registered, and no units are started.
+The deploy step is skipped entirely: no files are written to the systemd directory, no baseline is updated, no state is registered, and no units are started.
+
+## 🔄 Reconcile & Change Detection
+
+On every `up`, comquad reconciles the freshly generated quadlet units against what is already deployed instead of blindly overwriting. The `internal/reconcile` package powers this:
+
+- **Baseline** — each successful deploy stores the *pure generated* content of every quadlet file under `$XDG_DATA_HOME/comquad/baseline/<project>/`. The baseline is what `compose.yaml` produced last time, never the merged result.
+- **Three-way merge** — `MergeUnit(base, disk, new)` does a directive-level merge. `disk` is the on-disk file (baseline + manual `edit` changes), `new` is the fresh generation. Per directive key it resolves: unchanged / user-changed / compose-changed / both-changed (conflict → user wins + warning) / added / removed.
+- **Plan / Apply split** — `Compute(...)` builds a read-only `Plan` (per-file status, old/new content, conflicts); `Apply(...)` writes files atomically, updates the baseline, and removes stale files. `Up` shows `Plan.Diff()` (a color-coded unified diff) and asks for confirmation before calling `Apply`.
+- **Selective restart** — only created units are started and only changed containers/images are restarted; units for dropped services are stopped before `daemon-reload` forgets them.
+- **Baseline lifecycle** — rewritten on each successful `up`, removed on `down`, cleared by `regenerate`, and rolled back (removed) on a failed `up`.
+
+`--no-diff` skips the diff and confirmation. On a first deploy (or after `regenerate`) there is no baseline, so reconciliation falls back to a 2-way comparison (overwrite + warning) that cannot distinguish manual edits.
 
 ## 📦 Project Directory Structure
 
@@ -29,6 +40,8 @@ compose2quadlet/       # Compose → Quadlet transpilation library (in-tree sub-
 internal/deploy/       # Systemd D-Bus communication, target directories, state tracking,
                        # and the SystemdClient / StateStore interfaces used for testing
 internal/logger/       # Colorized logging with quiet/verbose tiers
+internal/reconcile/    # Change detection: 3-way merge (MergeUnit), plan/apply split,
+                       # baseline storage, and unified-diff rendering
 internal/orchestrator/ # The engine wiring all packages: orchestrator.go (core/Up), down.go,
                        #   images.go (pull/dry-run), pipeline.go (helpers), plus
                        #   per-command files (lifecycle, logs, exec, view, edit, etc.)
@@ -148,14 +161,15 @@ All three commands require the project to exist in `projects.json` state. They s
 
 ## 🗑️ Down Command
 
-The `down` command performs a complete teardown of a deployed project in six steps:
+The `down` command performs a complete teardown of a deployed project in seven steps:
 
-1. **Stop units** — Stops all container, image, and build units via systemd D-Bus `StopUnit`, then verifies all units are no longer active. Network and volume units are also stopped.
+1. **Stop units** — Stops all container, image, and build units via systemd D-Bus `StopUnit`, then verifies all container units are no longer active (aborting if any remain). Network and volume units are also stopped.
 2. **Remove quadlet files** — Deletes all `.container`, `.network`, `.volume`, `.image`, and `.build` files from the systemd target directory.
 3. **Reload daemon** — Triggers `daemon-reload` via D-Bus so systemd forgets the removed units and releases its references to networks and volumes.
-4. **Remove networks** — Lists all Podman networks with label `com.comquad.managed=true` and project label matching the current project, then removes them via `podman network rm`.
-5. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes with label `com.comquad.managed=true` and project label matching the current project, then removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
+4. **Remove networks** — Lists all Podman networks with the `com.comquad.project` label matching the current project, then removes them via `podman network rm`.
+5. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes with the `com.comquad.project` label matching the current project, then removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
 6. **Unregister project** — Removes the project entry from `projects.json` state file.
+7. **Remove auxiliary state** — Deletes the project's baseline (`$XDG_DATA_HOME/comquad/baseline/<project>`), secrets, and build-cache directories.
 
 **Usage:**
 
@@ -193,6 +207,7 @@ The `regenerate` command restores the state file by scanning Podman for managed 
 4. Groups all resources by their `com.comquad.project` label value
 5. Resolves quadlet files in the systemd target directory matching `cq-<project>-*.container`, `*.network`, `*.volume`, `*.image`, `*.build`
 6. Writes the reconstructed state to `projects.json`
+7. Clears the baseline directory for each discovered project — the reconstructed state has no baseline, so the next `up` falls back to a 2-way reconcile (compose wins + warning)
 
 **Flags:**
 

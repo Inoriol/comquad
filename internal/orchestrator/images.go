@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
-	"github.com/Inoriol/comquad/compose2quadlet/serialization"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
 func normalizeImageRef(ref string) string {
@@ -193,7 +193,7 @@ func hasBuildFile(projectFiles []string, containerPath string) bool {
 	return false
 }
 
-func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pullStrategy string) error {
+func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pullStrategy string, plan reconcile.Plan) error {
 	logger.Printf("Dry run — project: %s\n", o.projectName)
 	logger.Printf("Target directory: %s\n\n", targetDir)
 
@@ -233,20 +233,45 @@ func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pu
 		}
 	}
 
-	if len(units) > 0 {
-		logger.Print("")
+	var created, changed, removed []reconcile.FilePlan
+	for _, fp := range plan.Files {
+		switch fp.Status {
+		case reconcile.StatusCreated:
+			created = append(created, fp)
+		case reconcile.StatusChanged:
+			changed = append(changed, fp)
+		case reconcile.StatusRemoved:
+			removed = append(removed, fp)
+		}
 	}
 
-	logger.Printf("%d quadlet file(s) would be written:\n\n", len(units))
+	if len(created)+len(changed)+len(removed) == 0 {
+		logger.Print("\nNo changes — quadlet files are up to date.\n")
+	} else {
+		logger.Printf("\n%d file(s) to write, %d to change, %d to remove:\n\n", len(created), len(changed), len(removed))
+	}
+
 	separator := strings.Repeat("─", 60)
 
-	for _, unit := range units {
-		targetPath := filepath.Join(targetDir, unit.Name+"."+string(unit.Type))
-
+	for _, fp := range created {
 		logger.Print(separator)
-		logger.Printf("  %s\n", targetPath)
+		logger.Printf("  %s  (new)\n", fp.TargetPath)
 		logger.Print(separator)
-		logger.Print(strings.TrimRight(serialization.Marshal(unit), "\n"))
+		logger.Print(strings.TrimRight(fp.NewContent, "\n"))
+		logger.Print("")
+	}
+	for _, fp := range changed {
+		logger.Print(separator)
+		logger.Printf("  %s  (changed)\n", fp.TargetPath)
+		logger.Print(separator)
+		fmt.Print(colorizeDiff(fp.Diff()))
+		logger.Print("")
+	}
+	for _, fp := range removed {
+		logger.Print(separator)
+		logger.Printf("  %s  (removed)\n", fp.TargetPath)
+		logger.Print(separator)
+		fmt.Print(colorizeDiff(fp.Diff()))
 		logger.Print("")
 	}
 

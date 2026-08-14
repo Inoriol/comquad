@@ -8,6 +8,7 @@ import (
 
 var pullStrategy string
 var upFollow bool
+var upNoDiff bool
 
 var upCmd = &cobra.Command{
 	Use:   "up",
@@ -16,6 +17,7 @@ var upCmd = &cobra.Command{
   comquad up -f                                  # Follow logs after deployment
   comquad up --pull always                       # Always pull images from registry
   comquad up --dry-run                           # Preview without deploying
+  comquad up --no-diff                           # Apply changes without showing a diff
   comquad up -n my-project                       # Override project name`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		o, err := orchestrator.NewOrchestrator(projectName)
@@ -28,7 +30,7 @@ var upCmd = &cobra.Command{
 			pullStr = "missing"
 		}
 
-		return o.Up(pullStr, upFollow, dryRun)
+		return o.Up(pullStr, upFollow, dryRun, upNoDiff)
 	},
 }
 
@@ -37,4 +39,5 @@ func init() {
 	upCmd.Flags().StringVarP(&pullStrategy, "pull", "p", "missing", "Image pull strategy: 'always', 'missing' (default), or 'never'")
 	upCmd.Flags().BoolVarP(&upFollow, "follow", "f", false, "Follow logs after deployment")
 	upCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview generated quadlet files without writing or starting anything")
+	upCmd.Flags().BoolVar(&upNoDiff, "no-diff", false, "Apply changes without showing a diff or asking for confirmation")
 }

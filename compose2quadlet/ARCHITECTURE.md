@@ -353,7 +353,7 @@ When `WithSecretsDirectory(path)` is set, `PremapSecrets()` resolves `secrets:` 
 Directives within a section should follow the order from the quadlet spec where possible. Systemd `[Service]` directives go after all `[Container]` directives. `[Unit]` goes before `[Container]`, `[Install]` goes last.
 
 ### Deterministic Map Iteration
-All map iteration (labels, annotations, environment, sysctls, logging options, extra hosts, ulimits, build args, driver opts, storage opts) must use the `sortedKeys()` helper from `mapper/helpers.go`. This ensures reproducible directive ordering and stable golden file tests.
+All map iteration must use the `sortedKeys()` helper from `mapper/helpers.go` (or sort keys explicitly). This includes labels, annotations, environment, sysctls, logging options, extra hosts, ulimits, build args, driver opts, storage opts, service networks (`svc.Networks`), and `depends_on`. The `opinionated.ApplyLabels` transform sorts injected label keys the same way. This ensures reproducible directive ordering and stable golden file tests.
 
 ## Testing Strategy
 
