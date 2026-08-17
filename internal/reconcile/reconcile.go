@@ -47,6 +47,7 @@ type FilePlan struct {
 	BasePath        string
 	Status          FileStatus
 	OldContent      string
+	OldBaseline     string
 	NewContent      string
 	BaselineContent string
 	NoBaseline      bool
@@ -124,6 +125,7 @@ func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Pl
 			return plan, err
 		}
 		fp.OldContent = diskContent
+		fp.OldBaseline = baseContent
 
 		switch {
 		case !diskExists:
@@ -160,12 +162,17 @@ func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Pl
 		if err != nil {
 			return plan, err
 		}
+		oldBaseline, _, err := readFile(filepath.Join(baselineDir, name))
+		if err != nil {
+			return plan, err
+		}
 		plan.Files = append(plan.Files, FilePlan{
-			Name:       name,
-			TargetPath: filepath.Join(targetDir, name),
-			BasePath:   filepath.Join(baselineDir, name),
-			Status:     StatusRemoved,
-			OldContent: old,
+			Name:        name,
+			TargetPath:  filepath.Join(targetDir, name),
+			BasePath:    filepath.Join(baselineDir, name),
+			Status:      StatusRemoved,
+			OldContent:  old,
+			OldBaseline: oldBaseline,
 		})
 	}
 

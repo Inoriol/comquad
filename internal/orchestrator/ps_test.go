@@ -24,22 +24,22 @@ func TestPs_HappyPathWithRunningContainers(t *testing.T) {
 	o.listContainers = func(projectName string, all bool) ([]ContainerInfo, error) {
 		return []ContainerInfo{
 			{
-				Name:    "myapp-web",
-				Image:   "docker.io/library/nginx:alpine",
-				Command: "nginx -g daemon off;",
-				Service: "web",
-				State:   "running",
-				Status:  "Up 2 minutes",
+				Name:       "myapp-web",
+				Image:      "docker.io/library/nginx:alpine",
+				Command:    "nginx -g daemon off;",
+				Service:    "web",
+				State:      "running",
+				Status:     "Up 2 minutes",
 				DBusActive: "active",
 				DBusSub:    "running",
 			},
 			{
-				Name:    "myapp-db",
-				Image:   "docker.io/library/postgres:15",
-				Command: "postgres",
-				Service: "db",
-				State:   "running",
-				Status:  "Up 2 minutes",
+				Name:       "myapp-db",
+				Image:      "docker.io/library/postgres:15",
+				Command:    "postgres",
+				Service:    "db",
+				State:      "running",
+				Status:     "Up 2 minutes",
 				DBusActive: "active",
 				DBusSub:    "running",
 			},
@@ -73,6 +73,35 @@ func TestPs_HappyPathWithRunningContainers(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(output), []byte("docker.io/library/nginx:alpine")) {
 		t.Errorf("expected output to contain image, got:\n%s", output)
+	}
+}
+
+func TestPs_MergesSystemdState(t *testing.T) {
+	dir := t.TempDir()
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, nil),
+	})
+	sys := newMockSystemdClient()
+	sys.units = []unitRecord{
+		{name: "cq-myapp-web.service", activeState: "active", subState: "running"},
+	}
+	o := newTestOrchestrator("myapp", dir, state, sys)
+
+	var returned []ContainerInfo
+	o.listContainers = func(projectName string, all bool) ([]ContainerInfo, error) {
+		returned = []ContainerInfo{{Name: "myapp-web", Image: "nginx:latest", State: "running", Status: "Up 1m"}}
+		return returned, nil
+	}
+
+	if err := o.Ps(false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(returned) != 1 {
+		t.Fatalf("expected 1 container, got %d", len(returned))
+	}
+	if returned[0].DBusActive != "active" || returned[0].DBusSub != "running" {
+		t.Errorf("expected systemd state merged, got active=%q sub=%q", returned[0].DBusActive, returned[0].DBusSub)
 	}
 }
 
@@ -174,8 +203,8 @@ func TestPs_ContainersWithPortsNetworksMounts(t *testing.T) {
 					{Protocol: "tcp", ContainerPort: 80, HostIP: "", HostPort: 2080},
 					{Protocol: "tcp", ContainerPort: 443, HostIP: "", HostPort: 2443},
 				},
-				Networks: []string{"systemd-cq-myapp-default"},
-				Mounts:   []string{"/etc/nginx/nginx.conf", "/usr/share/nginx/html"},
+				Networks:   []string{"systemd-cq-myapp-default"},
+				Mounts:     []string{"/etc/nginx/nginx.conf", "/usr/share/nginx/html"},
 				DBusActive: "active",
 				DBusSub:    "running",
 			},
@@ -441,34 +470,6 @@ func TestFormatCreated_ExitedNoExitTime(t *testing.T) {
 	expected := formatTimeAgo(created)
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
-	}
-}
-
-func TestTruncate_ShortEnough(t *testing.T) {
-	result := truncate("hello", 10)
-	if result != "hello" {
-		t.Errorf("expected 'hello', got %q", result)
-	}
-}
-
-func TestTruncate_ExactLen(t *testing.T) {
-	result := truncate("hello", 5)
-	if result != "hello" {
-		t.Errorf("expected 'hello', got %q", result)
-	}
-}
-
-func TestTruncate_Truncates(t *testing.T) {
-	result := truncate("hello world", 8)
-	if result != "hello..." {
-		t.Errorf("expected 'hello...', got %q", result)
-	}
-}
-
-func TestTruncate_VeryShort(t *testing.T) {
-	result := truncate("hello", 3)
-	if result != "hel" {
-		t.Errorf("expected 'hel', got %q", result)
 	}
 }
 

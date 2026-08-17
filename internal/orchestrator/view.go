@@ -113,7 +113,7 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 	prefix := "cq-" + o.projectName + "-"
 	unitMap := make(map[string]unitStatus)
 	for _, u := range allUnits {
-		if strings.HasPrefix(u.Name, "cq-"+o.projectName) {
+		if strings.HasPrefix(u.Name, prefix) {
 			unitMap[u.Name] = unitStatus{active: u.ActiveState, sub: u.SubState}
 		}
 	}

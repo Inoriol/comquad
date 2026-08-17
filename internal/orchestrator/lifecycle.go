@@ -48,7 +48,8 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 			servicePrefix := "cq-" + o.projectName + "-"
 			if base == svc ||
 				nameWithoutExt == svc ||
-				strings.TrimSuffix(svc, ".service") == nameWithoutExt+"-"+ext[1:]+".service" ||
+				svc == nameWithoutExt+"-"+ext[1:]+".service" ||
+				strings.TrimSuffix(svc, ".service") == nameWithoutExt+"-"+ext[1:] ||
 				strings.TrimPrefix(nameWithoutExt, servicePrefix) == svc ||
 				strings.TrimPrefix(nameWithoutExt, "cq-") == svc {
 				matches = append(matches, f)

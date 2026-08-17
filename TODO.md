@@ -30,10 +30,25 @@ For long term goals refer to [Roadmap](./ROADMAP.md).
 ### Follow-ups
 
 - **Value-level merge** — multi-value directives (`Environment=`, `Volume=`, `PublishPort=`) merge at key granularity; independent additions to the same key currently conflict instead of merging per-line.
-- **Baseline rollback on failed `up`** — a failed deploy removes the baseline entirely (next `up` degrades to 2-way); consider restoring the previous baseline instead.
+- [x] **Baseline rollback on failed `up`** — resolved: a failed deploy now restores the previous files and baseline (`rollbackDeploy`) instead of removing the baseline entirely.
 - **Diff rendering** — homegrown unified diff; could swap for `go-udiff` if richer output is ever needed.
 
 ### Future Security Improvements
 
 - **Tmpfs-backed secrets via `LoadCredential`** — Currently secrets are bind-mounted directly from managed files on disk. Consider generating a companion `.service` service unit file (not a `.container` quadlet) that uses systemd `LoadCredential=` in `[Service]` combined with `Volume=%d/<name>` to mount secrets from systemd's RAM-backed credential directories (`/run/credentials/`). This would keep secret values in tmpfs memory rather than on persistent storage. Initial implementation attempted this using quadlet's `[Service]` pass-through, but `LoadCredential=` + `Volume=` with credential paths didn't integrate correctly with quadlet's container lifecycle. A standalone `.service` file could bypass quadlet entirely for credential setup.
+
+### Code Review Findings (2026-08-16) — resolved
+
+Bugs and correctness issues found and fixed while analyzing the codebase:
+
+- [x] **`comquad list` filters by cwd instead of listing everything** — `List()` now takes an explicit `filter` argument; the `list` command passes the raw `-n` value (empty when absent) instead of the cwd-derived project name.
+- [x] **Prefix collision in file/unit discovery** — `collectProjectFiles`, `RegenerateState`, and `viewProject` now use the `"cq-" + projectName + "-"` prefix (with trailing `-`), matching `reconcile.Compute`/`registerState`.
+- [x] **Podman version is never passed to compose2quadlet** — `Up` now calls `deploy.DetectPodmanVersion()` and passes `WithPodmanVersion()`, so version gates reflect the installed podman instead of defaulting to "latest". `ValidatePodmanVersion` was refactored to reuse the same detection.
+- [x] **`comquad logs -f` only follows the first unit group** — follow mode now starts every `journalctl -f` group concurrently and merges the parsed streams into a single timestamp-ordered flush loop.
+- [x] **`ps` D-Bus merge uses the wrong unit name** — `Ps` now queries `cq-<project>-<service>.service` instead of `<project>-<service>.service`.
+- [x] **`resolveUnits` image/build match condition is broken** — the image/build match now mirrors `MatchQuadletResource` (both `name-<type>.service` and `name-<type>` forms).
+- [x] **Destructive rollback on failed `up`** — `cleanup()` is now a `rollback()` that reverts only the files/baselines this deploy touched (using `plan` old contents) and restores the prior state, leaving the previous deployment intact.
+- [x] **`regenerate` omits `Resources.Images`/`Builds`** — `RegenerateState` now populates `images`/`builds` from `.image`/`.build` filenames.
+- [x] **Dead code** — removed `hasBuildFile`, `resolveContainerImages`, `normalizeImageRef`, `isRegistryWithPort` (orchestrator copy), and `truncate`, plus their tests.
+- [x] **Doc** — corrected the ARCHITECTURE.md label claim: `.image` units carry no `Label=` directive and are identified by filename. (`restart: unless-stopped` was reviewed and left as-is: systemd `Restart=always` respects a manual `systemctl stop`, so the mapping is a reasonable approximation; `processConfig`'s `%04o` mode formatting is correct.)
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sort"
@@ -206,19 +207,16 @@ func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, 
 		}
 	}
 
-	// --- Follow mode: process each group separately (can't sort live stream) ---
+	// --- Follow mode: run every group concurrently, merging the streams ---
 	if follow {
+		var cmds []*exec.Cmd
 		for invocationID, units := range invocationGroups {
-			if err := o.runJournalctlJSONFollowForGroup(units, invocationID, tail, since, showTime); err != nil {
-				return err
-			}
+			cmds = append(cmds, o.buildJournalctlFollowCmd(units, invocationID, tail, since))
 		}
 		if len(nonRunningUnits) > 0 {
-			if err := o.runJournalctlJSONFollowForGroup(nonRunningUnits, "", tail, since, showTime); err != nil {
-				return err
-			}
+			cmds = append(cmds, o.buildJournalctlFollowCmd(nonRunningUnits, "", tail, since))
 		}
-		return nil
+		return o.runJournalctlFollow(cmds, showTime)
 	}
 
 	// --- Batch mode: collect ALL entries, sort together, render once ---
@@ -301,8 +299,9 @@ func (o *Orchestrator) collectJournalEntries(unitNames []string, invocationID, t
 	return entries, nil
 }
 
-// runJournalctlJSONFollowForGroup runs journalctl for a single group in follow mode.
-func (o *Orchestrator) runJournalctlJSONFollowForGroup(unitNames []string, invocationID, tail, since string, showTime bool) error {
+// buildJournalctlFollowCmd constructs a journalctl -f command for the given
+// units and optional invocation ID.
+func (o *Orchestrator) buildJournalctlFollowCmd(unitNames []string, invocationID, tail, since string) *exec.Cmd {
 	args := []string{"--no-pager", "--since=" + since, "-f", "--output=json"}
 
 	if os.Getuid() == 0 {
@@ -320,72 +319,61 @@ func (o *Orchestrator) runJournalctlJSONFollowForGroup(unitNames []string, invoc
 		args = append(args, "--invocation="+invocationID)
 	}
 
-	cmd := o.newJournalCmd("journalctl", args...)
-	cmd.Stderr = os.Stderr
-
-	return o.runJournalctlJSONFollow(cmd, showTime)
+	return o.newJournalCmd("journalctl", args...)
 }
 
-// runJournalctlJSONFollow streams JSON output, buffers entries, and flushes them in timestamp order.
-func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) error {
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start journalctl: %w", err)
+// runJournalctlFollow starts every journalctl -f command concurrently, buffers
+// their parsed entries, and flushes them in timestamp order every
+// logFlushInterval. It returns once all commands have exited (e.g. Ctrl+C).
+func (o *Orchestrator) runJournalctlFollow(cmds []*exec.Cmd, showTime bool) error {
+	if len(cmds) == 0 {
+		return nil
 	}
 
 	var mu sync.Mutex
 	var entries []journalEntry
+	errCh := make(chan error, len(cmds))
 
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		scanner := bufio.NewScanner(stdout)
-		scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if line == "" {
-				continue
-			}
-			if entry, ok := parseJournalEntry(line); ok {
-				mu.Lock()
-				entries = append(entries, entry)
-				mu.Unlock()
-			}
+	for _, cmd := range cmds {
+		cmd.Stderr = os.Stderr
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to create stdout pipe: %w", err)
 		}
-	}()
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("failed to start journalctl: %w", err)
+		}
 
-	waitErr := make(chan error, 1)
-	go func() {
-		waitErr <- cmd.Wait()
-	}()
+		go func(cmd *exec.Cmd, stdout io.Reader) {
+			scanner := bufio.NewScanner(stdout)
+			scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if line == "" {
+					continue
+				}
+				if entry, ok := parseJournalEntry(line); ok {
+					mu.Lock()
+					entries = append(entries, entry)
+					mu.Unlock()
+				}
+			}
+			errCh <- cmd.Wait()
+		}(cmd, stdout)
+	}
 
 	ticker := time.NewTicker(logFlushInterval)
 	defer ticker.Stop()
 
-	for {
+	var firstErr error
+	remaining := len(cmds)
+	for remaining > 0 {
 		select {
-		case err := <-waitErr:
-			<-done
-			mu.Lock()
-			flushEntries(entries, showTime)
-			mu.Unlock()
-			if err != nil {
-				return fmt.Errorf("journalctl failed: %w", err)
+		case err := <-errCh:
+			remaining--
+			if err != nil && firstErr == nil {
+				firstErr = err
 			}
-			return nil
-		case <-done:
-			err := <-waitErr
-			mu.Lock()
-			flushEntries(entries, showTime)
-			mu.Unlock()
-			if err != nil {
-				return fmt.Errorf("journalctl failed: %w", err)
-			}
-			return nil
 		case <-ticker.C:
 			mu.Lock()
 			if len(entries) > 0 {
@@ -395,6 +383,15 @@ func (o *Orchestrator) runJournalctlJSONFollow(cmd *exec.Cmd, showTime bool) err
 			mu.Unlock()
 		}
 	}
+
+	mu.Lock()
+	flushEntries(entries, showTime)
+	mu.Unlock()
+
+	if firstErr != nil {
+		return fmt.Errorf("journalctl failed: %w", firstErr)
+	}
+	return nil
 }
 
 // FollowLogs streams all journalctl logs for every unit in the project
@@ -435,24 +432,8 @@ func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 		return fmt.Errorf("no units found for project %s", o.projectName)
 	}
 
-	args := []string{"--no-pager", "--since=" + since, "-f", "--output=json"}
-
-	if os.Getuid() == 0 {
-		args = append(args, "--system")
-	} else {
-		args = append(args, "--user")
-	}
-	if tail != "" {
-		args = append(args, "-n", tail)
-	}
-	for _, unit := range unitNames {
-		args = append(args, "-u", unit)
-	}
-
-	cmd := o.newJournalCmd("journalctl", args...)
-	cmd.Stderr = os.Stderr
-
-	return o.runJournalctlJSONFollow(cmd, showTime)
+	cmd := o.buildJournalctlFollowCmd(unitNames, "", tail, since)
+	return o.runJournalctlFollow([]*exec.Cmd{cmd}, showTime)
 }
 
 // validateSince checks that the --since argument is plausibly valid.

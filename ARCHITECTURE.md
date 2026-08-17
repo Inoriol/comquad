@@ -26,7 +26,7 @@ On every `up`, comquad reconciles the freshly generated quadlet units against wh
 - **Three-way merge** — `MergeUnit(base, disk, new)` does a directive-level merge. `disk` is the on-disk file (baseline + manual `edit` changes), `new` is the fresh generation. Per directive key it resolves: unchanged / user-changed / compose-changed / both-changed (conflict → user wins + warning) / added / removed.
 - **Plan / Apply split** — `Compute(...)` builds a read-only `Plan` (per-file status, old/new content, conflicts); `Apply(...)` writes files atomically, updates the baseline, and removes stale files. `Up` shows `Plan.Diff()` (a color-coded unified diff) and asks for confirmation before calling `Apply`.
 - **Selective restart** — only created units are started and only changed containers/images are restarted; units for dropped services are stopped before `daemon-reload` forgets them.
-- **Baseline lifecycle** — rewritten on each successful `up`, removed on `down`, cleared by `regenerate`, and rolled back (removed) on a failed `up`.
+- **Baseline lifecycle** — rewritten on each successful `up`, removed on `down`, cleared by `regenerate`, and restored to its previous content on a failed `up` (`rollbackDeploy` reverts the files and baseline touched by the failed reconcile instead of deleting the whole project).
 
 `--no-diff` skips the diff and confirmation. On a first deploy (or after `regenerate`) there is no baseline, so reconciliation falls back to a 2-way comparison (overwrite + warning) that cannot distinguish manual edits.
 
@@ -284,8 +284,8 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 * A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Services without an explicit `networks:` key are auto-attached to `cq-default` only when that network was injected — preventing dangling network references when user-defined networks exist.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
 * `NetworkAlias=` is injected into every `.container` file so services can resolve each other by service name and `ContainerName=` value within compose networks.
-* An identifying label (`com.comquad.project`) is attached to all generated units.
-* A `com.comquad.managed` label is attached to all files to indicate comquad management.
+* An identifying label (`com.comquad.project`) is attached to all generated units that support labels (`.container`, `.network`, `.volume`, `.build`).
+* A `com.comquad.managed` label is attached to those same units to indicate comquad management. `.image` units have no `[Container]`-style `Label=` directive, so they are identified by filename rather than label.
 * Unprefixed public images default seamlessly to standard Docker Hub (`docker.io/library/`).
 * In rootless mode, privileged ports (≤ 1024) are automatically offset by `ROOTLESS_PORT_OFFSET` (default 2000). Internal port conflicts within a project are resolved by incrementing.
 

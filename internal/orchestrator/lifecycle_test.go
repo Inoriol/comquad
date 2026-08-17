@@ -114,6 +114,27 @@ func TestResolveUnits_DeduplicatesResults(t *testing.T) {
 	}
 }
 
+func TestResolveUnits_ImageServiceUnitName(t *testing.T) {
+	dir := t.TempDir()
+	files := []string{
+		filepath.Join(dir, "cq-myapp-web.container"),
+		filepath.Join(dir, "cq-myapp-web.image"),
+		filepath.Join(dir, "cq-myapp-web.build"),
+	}
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, files),
+	})
+	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
+
+	units, err := o.resolveUnits([]string{"cq-myapp-web-image.service"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(units) != 1 || units[0] != "cq-myapp-web-image.service" {
+		t.Errorf("expected image unit resolved, got %v", units)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
