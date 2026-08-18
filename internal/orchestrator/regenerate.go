@@ -34,7 +34,7 @@ func (o *Orchestrator) Regenerate(dryRun bool) error {
 			resources = &deploy.ResourceInfo{}
 		}
 
-		total := len(resources.Containers) + len(resources.Networks) + len(resources.Volumes)
+		total := len(resources.Containers) + len(resources.Networks) + len(resources.Volumes) + len(resources.Images) + len(resources.Builds)
 		logger.Printf("  %s (%d resource%s)\n", p.ProjectName, total, pluralize(total))
 
 		for _, c := range resources.Containers {

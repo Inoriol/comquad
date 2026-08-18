@@ -302,7 +302,11 @@ func (o *Orchestrator) collectJournalEntries(unitNames []string, invocationID, t
 // buildJournalctlFollowCmd constructs a journalctl -f command for the given
 // units and optional invocation ID.
 func (o *Orchestrator) buildJournalctlFollowCmd(unitNames []string, invocationID, tail, since string) *exec.Cmd {
-	args := []string{"--no-pager", "--since=" + since, "-f", "--output=json"}
+	args := []string{"--no-pager", "-f", "--output=json"}
+
+	if since != "" {
+		args = append(args, "--since="+since)
+	}
 
 	if os.Getuid() == 0 {
 		args = append(args, "--system")

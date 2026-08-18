@@ -90,7 +90,8 @@ func parseContainer(raw map[string]interface{}) *ContainerInfo {
 	networks := parseStringSlice(raw["Networks"])
 	mounts := parseStringSlice(raw["Mounts"])
 
-	// Derive service name from container name by stripping cq-<project>- prefix
+	// Derive service name from container name by stripping <project>- prefix
+	// (Podman container names are <project>-<service>, without the cq- file prefix)
 	service := name
 	if idx := strings.Index(name, "-"); idx > 0 {
 		service = name[idx+1:]

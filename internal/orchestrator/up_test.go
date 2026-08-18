@@ -226,7 +226,7 @@ func TestRollbackDeploy_RestoresPreviousState(t *testing.T) {
 	state := newMockStateStore(map[string]deploy.ProjectState{"myapp": priorState})
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	o.rollbackDeploy(plan, priorState, true, t.TempDir())
+	o.rollbackDeploy(plan, priorState, true)
 
 	data, err = os.ReadFile(targetWeb)
 	if err != nil {
