@@ -3,14 +3,13 @@ module github.com/Inoriol/comquad
 go 1.25.10
 
 require (
-	github.com/Inoriol/comquad/compose2quadlet v0.0.0
+	github.com/compose-spec/compose-go/v2 v2.14.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/spf13/cobra v1.8.0
 )
 
 require (
-	github.com/compose-spec/compose-go/v2 v2.14.0 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -30,5 +29,3 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )
-
-replace github.com/Inoriol/comquad/compose2quadlet => ./compose2quadlet

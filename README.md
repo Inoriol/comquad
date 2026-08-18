@@ -4,16 +4,14 @@
 
 It lets you define your services in a standard `compose.yaml` file and deploy them as individual systemd units using Podman's Quadlet technology. Instead of running its own orchestrator, `comquad` prepares the quadlet files and delegates lifecycle management entirely to systemd.
 
----
+## 🎯 Design & Architecture Goals
 
-## 🚧 Project Status: Infra-Built Utility
+`comquad` is designed to bridge the developer experience of Docker Compose with the operational guarantees of native systemd process management.
 
-I am an infrastructure engineer, not a full-time software developer. I built **Comquad** to solve a specific problem for my own workflow.
-
-* **Contributions:** I am currently not accepting complex feature pull requests because I do not have the bandwidth or Go expertise to maintain them. But I'm very open to suggestions.
-* **Bugs:** Feel free to open issues if a specific Docker Compose file breaks, but fixes will happen on a "best effort" timeline.
-
----
+* **State-Aware Reconciliation:** Tracks baseline deployment state in `$XDG_DATA_HOME/comquad/` to perform unified color-coded diffs and 3-way merges on re-deployments (`comquad up`).
+* **Preserved Manual Adjustments:** Direct edits made to generated units via `comquad edit` are merged with incoming `compose.yaml` changes rather than blindly overwritten.
+* **Label-Based State Recovery:** Uses runtime Podman labels to reconstruct local project tracking (`comquad regenerate`) if the local state file is lost or corrupted.
+* **Deterministic Previews:** All lifecycle operations support `--dry-run` and `-v` to inspect generated quadlet diffs, port offset adjustments, and systemd actions before applying them.
 
 ## 🛠️ Requirements & Installation
 
@@ -205,6 +203,14 @@ For a deep dive into how `comquad` processes compose files, manages state, and m
 * **Service Discovery:** `NetworkAlias=` are injected into every `.container` with `<project>-<service>` and `<service>` blueprints so services can resolve each other same way as in docker compose networks.
 * **Rootless Port Offsetting:** In rootless mode, privileged ports (≤ 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
 * **Change Detection & Reconcile:** On re-deploy, comquad diffs the freshly generated quadlet files against the deployed ones (tracked via a baseline in `$XDG_DATA_HOME/comquad/baseline/`), preserves manual `edit` changes through a three-way merge, restarts only changed units, and removes units for services dropped from the compose file.
+
+---
+
+## 🚧 Project Status: Infra-Built Utility
+
+I am an infrastructure engineer, not a full-time software developer. I built **Comquad** to solve a specific problem for my own workflow.
+
+* **Bugs:** Feel free to open issues if a specific Docker Compose file breaks, but fixes will happen on a "best effort" timeline. I would also appreciate if you include `--dry-run` and `-v` outputs!
 
 ---
 

@@ -44,7 +44,7 @@ footer of each option in `systemd.resource-control`.
 compose2quadlet/
 ├── ARCHITECTURE.md           # This file
 ├── README.md                 # End-user documentation
-├── go.mod                    # module github.com/Inoriol/comquad/compose2quadlet
+├── (module metadata is in the repository root go.mod)
 │
 ├── TODO.md                   # Known issues and planned improvements
 ├── types.go                  # Type aliases re-exporting from internal/types/

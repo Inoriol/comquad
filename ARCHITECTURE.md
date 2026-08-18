@@ -49,7 +49,7 @@ internal/orchestrator/ # The engine wiring all packages: orchestrator.go (core/U
 
 ## 🧩 compose2quadlet Library
 
-comquad's transpilation is powered by the in-tree [compose2quadlet](./compose2quadlet/) Go module. It loads compose files via compose-go/v2, maps services/networks/volumes/secrets/configs to structured `QuadletUnit` objects, applies opinionated transforms, and serializes to quadlet ini format.
+comquad's transpilation is powered by the in-tree [compose2quadlet](./compose2quadlet/) Go package. It loads compose files via compose-go/v2, maps services/networks/volumes/secrets/configs to structured `QuadletUnit` objects, applies opinionated transforms, and serializes to quadlet ini format.
 
 For its internal architecture and package layout, see:
 - [compose2quadlet/ARCHITECTURE.md](./compose2quadlet/ARCHITECTURE.md)
