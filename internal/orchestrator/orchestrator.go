@@ -82,6 +82,13 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		}
 	}
 
+	podmanVersion, versionErr := deploy.DetectPodmanVersion()
+	if versionErr != nil {
+		if !dryRun {
+			logger.Warn("could not detect podman version, assuming latest: " + versionErr.Error())
+		}
+	}
+
 	targetDir, err := o.resolveTargetDir()
 	if err != nil {
 		return err
@@ -124,6 +131,10 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		c2q.WithSecretsDirectory(secretsDir),
 		c2q.WithBuildCacheDir(buildCacheDir),
 		c2q.WithDockerfileNormalization(),
+	}
+
+	if versionErr == nil {
+		opts = append(opts, c2q.WithPodmanVersion(podmanVersion))
 	}
 
 	if portOffset > 0 {
@@ -187,29 +198,16 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		return err
 	}
 
-	cleanup := func() {
-		for _, f := range projectFiles {
-			os.Remove(f)
-		}
-		if sm, err := o.newState(); err == nil {
-			sm.UnregisterProject(o.projectName)
-		}
-		os.RemoveAll(secretsDir)
-		os.RemoveAll(baselineDir)
-		if dbusMgr, err := o.newSystemd(); err == nil {
-			defer dbusMgr.Close()
-			dbusMgr.ReloadDaemon(projectFiles...)
-		}
-	}
+	priorState, hadPriorState := o.getProjectState()
 
 	if err := o.registerState(projectFiles); err != nil {
-		cleanup()
+		o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
 		return err
 	}
 
 	logger.Action("Handling images...")
 	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
-		cleanup()
+		o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
 		return err
 	}
 
@@ -226,7 +224,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 		logger.Action("Starting services...")
 		if err := o.startUnits(projectFiles, result); err != nil {
-			cleanup()
+			o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
 			return fmt.Errorf("failed to start services: %w", err)
 		}
 
@@ -236,12 +234,58 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	logger.Action("Starting services...")
 	if err := o.startUnits(projectFiles, result); err != nil {
-		cleanup()
+		o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
 		return fmt.Errorf("failed to start services: %w", err)
 	}
 
 	logger.Success("Successfully deployed project: " + o.projectName)
 	return nil
+}
+
+func (o *Orchestrator) getProjectState() (deploy.ProjectState, bool) {
+	sm, err := o.newState()
+	if err != nil {
+		return deploy.ProjectState{}, false
+	}
+	return sm.GetProject(o.projectName)
+}
+
+// rollbackDeploy reverts the quadlet files and baseline touched by a reconcile
+// back to their pre-deploy state, so a failed deploy leaves the previous
+// deployment intact instead of tearing it down.
+func (o *Orchestrator) rollbackDeploy(plan reconcile.Plan, priorState deploy.ProjectState, hadPriorState bool, secretsDir string) {
+	for _, fp := range plan.Files {
+		if fp.Status == reconcile.StatusUnchanged {
+			continue
+		}
+		switch fp.Status {
+		case reconcile.StatusCreated:
+			os.Remove(fp.TargetPath)
+		case reconcile.StatusChanged:
+			os.WriteFile(fp.TargetPath, []byte(fp.OldContent), 0644)
+		case reconcile.StatusRemoved:
+			if fp.OldContent != "" {
+				os.WriteFile(fp.TargetPath, []byte(fp.OldContent), 0644)
+			}
+		}
+		if fp.OldBaseline != "" {
+			os.WriteFile(fp.BasePath, []byte(fp.OldBaseline), 0644)
+		} else {
+			os.Remove(fp.BasePath)
+		}
+	}
+	if sm, err := o.newState(); err == nil {
+		if hadPriorState {
+			sm.RegisterProject(priorState)
+		} else {
+			sm.UnregisterProject(o.projectName)
+		}
+	}
+	os.RemoveAll(secretsDir)
+	if dbusMgr, err := o.newSystemd(); err == nil {
+		defer dbusMgr.Close()
+		dbusMgr.ReloadDaemon()
+	}
 }
 
 func (o *Orchestrator) ensureProjectDeployed() (deploy.StateStore, deploy.ProjectState, error) {

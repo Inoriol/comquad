@@ -27,7 +27,7 @@ func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
 	}
 
 	var projectFiles []string
-	prefix := "cq-" + o.projectName
+	prefix := "cq-" + o.projectName + "-"
 	for _, f := range entries {
 		if strings.HasPrefix(f.Name(), prefix) {
 			projectFiles = append(projectFiles, filepath.Join(targetDir, f.Name()))

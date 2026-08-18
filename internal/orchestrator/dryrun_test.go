@@ -420,33 +420,3 @@ func TestPrintDryRun_ResolvesImageRef(t *testing.T) {
 		t.Errorf("expected resolved image name in output, got:\n%s", out)
 	}
 }
-
-func TestHasBuildFile_Match(t *testing.T) {
-	files := []string{
-		"/path/to/cq-myapp-web.container",
-		"/path/to/cq-myapp-web.build",
-		"/path/to/cq-myapp-db.container",
-	}
-
-	if !hasBuildFile(files, "/path/to/cq-myapp-web.container") {
-		t.Error("expected true for container with matching .build file")
-	}
-}
-
-func TestHasBuildFile_NoMatch(t *testing.T) {
-	files := []string{
-		"/path/to/cq-myapp-web.container",
-		"/path/to/cq-myapp-db.container",
-	}
-
-	if hasBuildFile(files, "/path/to/cq-myapp-web.container") {
-		t.Error("expected false for container without .build file")
-	}
-}
-
-func TestHasBuildFile_EmptyList(t *testing.T) {
-	var files []string
-	if hasBuildFile(files, "/path/to/cq-myapp-web.container") {
-		t.Error("expected false for empty file list")
-	}
-}

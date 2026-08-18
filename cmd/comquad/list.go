@@ -15,7 +15,7 @@ var listCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return o.List()
+		return o.List(projectName)
 	},
 }
 

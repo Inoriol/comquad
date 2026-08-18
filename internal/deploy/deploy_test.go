@@ -150,3 +150,20 @@ func TestTargetDirResolver_ReturnsValidPath(t *testing.T) {
 		t.Errorf("expected absolute path, got %q", path)
 	}
 }
+
+func TestDetectPodmanVersion(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "podman")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho 5.6.2\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	v, err := DetectPodmanVersion()
+	if err != nil {
+		t.Fatalf("DetectPodmanVersion failed: %v", err)
+	}
+	if v.Major != 5 || v.Minor != 6 || v.Patch != 2 {
+		t.Errorf("expected 5.6.2, got %d.%d.%d", v.Major, v.Minor, v.Patch)
+	}
+}

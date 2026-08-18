@@ -36,7 +36,7 @@ func (o *Orchestrator) Ps(all bool) error {
 
 	var unitNames []string
 	for _, c := range containers {
-		unitNames = append(unitNames, c.Name+".service")
+		unitNames = append(unitNames, "cq-"+c.Name+".service")
 	}
 
 	if len(unitNames) > 0 {
@@ -51,7 +51,7 @@ func (o *Orchestrator) Ps(all bool) error {
 		}
 
 		for i := range containers {
-			unitName := containers[i].Name + ".service"
+			unitName := "cq-" + containers[i].Name + ".service"
 			if u, ok := unitStateMap[unitName]; ok {
 				containers[i].DBusActive = u.ActiveState
 				containers[i].DBusSub = u.SubState
@@ -176,14 +176,4 @@ func formatTimeAgo(t time.Time) string {
 		return fmt.Sprintf("%dd ago", days)
 	}
 	return t.Format("Jan 02 2006")
-}
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
 }

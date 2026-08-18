@@ -13,41 +13,6 @@ import (
 	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
-func normalizeImageRef(ref string) string {
-	if ref == "" || strings.Contains(ref, "${") {
-		return ref
-	}
-	if !strings.Contains(ref, "/") {
-		return "docker.io/library/" + ref
-	}
-	parts := strings.SplitN(ref, "/", 2)
-	first := parts[0]
-	if first == "docker.io" {
-		return ref
-	}
-	if strings.Contains(first, ".") || isRegistryWithPort(first) || first == "localhost" {
-		return ref
-	}
-	return "docker.io/" + ref
-}
-
-func isRegistryWithPort(s string) bool {
-	idx := strings.LastIndex(s, ":")
-	if idx < 0 {
-		return false
-	}
-	port := s[idx+1:]
-	if len(port) == 0 || len(port) > 5 {
-		return false
-	}
-	for _, c := range port {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
-}
-
 type PullStrategy string
 
 const (
@@ -182,17 +147,6 @@ func hasBuildUnit(units []c2q.QuadletUnit, containerName string) bool {
 	return false
 }
 
-func hasBuildFile(projectFiles []string, containerPath string) bool {
-	containerBase := filepath.Base(containerPath)
-	buildBase := strings.TrimSuffix(containerBase, ".container") + ".build"
-	for _, f := range projectFiles {
-		if filepath.Base(f) == buildBase {
-			return true
-		}
-	}
-	return false
-}
-
 func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pullStrategy string, plan reconcile.Plan) error {
 	logger.Printf("Dry run — project: %s\n", o.projectName)
 	logger.Printf("Target directory: %s\n\n", targetDir)
@@ -316,28 +270,6 @@ func stripServiceName(units []c2q.QuadletUnit) {
 				}
 			}
 			units[i].Sections[j].Directives = filtered
-		}
-	}
-}
-
-func resolveContainerImages(units []c2q.QuadletUnit) {
-	for i := range units {
-		if units[i].Type != c2q.UnitContainer {
-			continue
-		}
-		for j := range units[i].Sections {
-			sec := &units[i].Sections[j]
-			if sec.Name != c2q.SectionContainer {
-				continue
-			}
-			for k, d := range sec.Directives {
-				if d.Key != "Image" || len(d.Values) == 0 {
-					continue
-				}
-				resolved := resolveImageRef(units, d.Values[0])
-				resolved = normalizeImageRef(resolved)
-				sec.Directives[k].Values[0] = resolved
-			}
 		}
 	}
 }

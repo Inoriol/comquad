@@ -22,14 +22,14 @@ func TestList_EmptyStateReturnsNoError(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("", t.TempDir(), state, newMockSystemdClient())
 
-	if err := o.List(); err != nil {
+	if err := o.List(""); err != nil {
 		t.Errorf("List on empty state should not error, got %v", err)
 	}
 }
 
 func TestList_StateError(t *testing.T) {
 	o := newTestOrchestratorWithStateErr("myapp", t.TempDir(), errors.New("state broken"))
-	err := o.List()
+	err := o.List("")
 	if err == nil || !strings.Contains(err.Error(), "state broken") {
 		t.Errorf("expected state error, got %v", err)
 	}
@@ -43,7 +43,7 @@ func TestList_MultipleProjectsNoFilter(t *testing.T) {
 	// No project name filter
 	o := newTestOrchestrator("", t.TempDir(), state, newMockSystemdClient())
 	// Just verify it doesn't error
-	if err := o.List(); err != nil {
+	if err := o.List(""); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -54,8 +54,26 @@ func TestList_FiltersByProjectName(t *testing.T) {
 		"beta":  makeProjectState("beta", "/b", nil),
 	})
 	o := newTestOrchestrator("alpha", t.TempDir(), state, newMockSystemdClient())
-	if err := o.List(); err != nil {
+	if err := o.List("alpha"); err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestList_NoFilterListsAllRegardlessOfProjectName(t *testing.T) {
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"alpha": makeProjectState("alpha", "/a", nil),
+		"beta":  makeProjectState("beta", "/b", nil),
+	})
+	o := newTestOrchestrator("alpha", t.TempDir(), state, newMockSystemdClient())
+
+	out := captureStdout(t, func() {
+		if err := o.List(""); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "alpha") || !strings.Contains(out, "beta") {
+		t.Errorf("expected both projects listed when no filter, got:\n%s", out)
 	}
 }
 
