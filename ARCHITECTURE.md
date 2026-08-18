@@ -281,7 +281,7 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 
 * Relative volume host paths are automatically fully-qualified to absolute paths.
 * When SELinux is detected (via `/sys/fs/selinux/enforce`), `Volume=` directives in generated `.container` files get `,z` appended and `Mount=` directives get `relabel=shared` appended (`Mount=type=bind,...` → `Mount=type=bind,...,relabel=shared`). Idempotent — skips if `:z`, `:Z`, or `relabel=` already present.
-* A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Services without an explicit `networks:` key are auto-attached to `cq-default` only when that network was injected — preventing dangling network references when user-defined networks exist.
+* A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Any container without an explicit `Network=` directive is auto-attached to `cq-default` — this includes cases where user-defined networks exist but a service has no `networks:` key.
 * Generated containers follow a strict naming blueprint: `<project>-<service>`.
 * `NetworkAlias=` is injected into every `.container` file so services can resolve each other by service name and `ContainerName=` value within compose networks.
 * An identifying label (`com.comquad.project`) is attached to all generated units that support labels (`.container`, `.network`, `.volume`, `.build`).

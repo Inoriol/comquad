@@ -1,9 +1,12 @@
 package main
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 
-	"github.com/Inoriol/comquad/internal/orchestrator"
+	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/logger"
 )
 
 var listCmd = &cobra.Command{
@@ -11,11 +14,28 @@ var listCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Short:   "List all currently deployed projects",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		o, err := orchestrator.NewOrchestrator(projectName)
+		stateMgr, err := deploy.NewStateManager()
 		if err != nil {
 			return err
 		}
-		return o.List(projectName)
+
+		projects := stateMgr.ListProjects()
+
+		if len(projects) == 0 {
+			logger.Print("No projects currently deployed.")
+			return nil
+		}
+
+		logger.Printf("%-20s %-40s %s\n", "PROJECT", "SOURCE", "FILES")
+		logger.Print(strings.Repeat("-", 72))
+		for _, p := range projects {
+			if projectName != "" && p.ProjectName != projectName {
+				continue
+			}
+			logger.Printf("%-20s %-40s %d units\n", p.ProjectName, p.SourcePath, len(p.Files))
+		}
+
+		return nil
 	},
 }
 

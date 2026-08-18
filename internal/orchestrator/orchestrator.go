@@ -201,13 +201,13 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	priorState, hadPriorState := o.getProjectState()
 
 	if err := o.registerState(projectFiles); err != nil {
-		o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
+		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
 
 	logger.Action("Handling images...")
 	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
-		o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
+		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
 
@@ -224,7 +224,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 		logger.Action("Starting services...")
 		if err := o.startUnits(projectFiles, result); err != nil {
-			o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
+			o.rollbackDeploy(plan, priorState, hadPriorState)
 			return fmt.Errorf("failed to start services: %w", err)
 		}
 
@@ -234,7 +234,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	logger.Action("Starting services...")
 	if err := o.startUnits(projectFiles, result); err != nil {
-		o.rollbackDeploy(plan, priorState, hadPriorState, secretsDir)
+		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return fmt.Errorf("failed to start services: %w", err)
 	}
 
@@ -253,7 +253,7 @@ func (o *Orchestrator) getProjectState() (deploy.ProjectState, bool) {
 // rollbackDeploy reverts the quadlet files and baseline touched by a reconcile
 // back to their pre-deploy state, so a failed deploy leaves the previous
 // deployment intact instead of tearing it down.
-func (o *Orchestrator) rollbackDeploy(plan reconcile.Plan, priorState deploy.ProjectState, hadPriorState bool, secretsDir string) {
+func (o *Orchestrator) rollbackDeploy(plan reconcile.Plan, priorState deploy.ProjectState, hadPriorState bool) {
 	for _, fp := range plan.Files {
 		if fp.Status == reconcile.StatusUnchanged {
 			continue
@@ -281,7 +281,6 @@ func (o *Orchestrator) rollbackDeploy(plan reconcile.Plan, priorState deploy.Pro
 			sm.UnregisterProject(o.projectName)
 		}
 	}
-	os.RemoveAll(secretsDir)
 	if dbusMgr, err := o.newSystemd(); err == nil {
 		defer dbusMgr.Close()
 		dbusMgr.ReloadDaemon()

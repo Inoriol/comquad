@@ -52,3 +52,19 @@ Bugs and correctness issues found and fixed while analyzing the codebase:
 - [x] **Dead code** — removed `hasBuildFile`, `resolveContainerImages`, `normalizeImageRef`, `isRegistryWithPort` (orchestrator copy), and `truncate`, plus their tests.
 - [x] **Doc** — corrected the ARCHITECTURE.md label claim: `.image` units carry no `Label=` directive and are identified by filename. (`restart: unless-stopped` was reviewed and left as-is: systemd `Restart=always` respects a manual `systemctl stop`, so the mapping is a reasonable approximation; `processConfig`'s `%04o` mode formatting is correct.)
 
+### Code Review Findings (2026-08-18) — resolved
+
+Bugs and correctness issues found while analyzing the codebase:
+
+**High Severity:**
+- [x] **`--since=` passed empty to journalctl in follow mode** — `buildJournalctlFollowCmd` now only adds `--since=` when `since != ""`. Affects `comquad logs -f` when `--since` is not provided (note: `comquad up -f` passes a valid deployment timestamp, so it is unaffected).
+- [x] **`rollbackDeploy` unconditionally removes secrets directory** — Removed `os.RemoveAll(secretsDir)` from `rollbackDeploy`. Secrets dir cleanup already happens in `down`, so a failed deploy no longer destroys secrets from a prior successful deployment.
+
+**Medium Severity:**
+- [x] **Doc/Code mismatch: Default network attachment** — ARCHITECTURE.md updated to clarify that any container without a `Network=` directive is auto-attached to `cq-default`, even when user-defined networks exist.
+
+**Low Severity:**
+- [x] **`Regenerate` resource count omits Images and Builds** — `regenerate.go:37` now includes `Images` and `Builds` in the total resource count.
+- [x] **Misleading comment in `parseContainer`** — Comment in `ps_podman.go:93-94` corrected to reflect that Podman container names are `<project>-<service>` (no `cq-` prefix).
+- [x] **Unnecessary Orchestrator creation in `list` command** — `list.go` now directly uses `deploy.NewStateManager()` instead of creating an `Orchestrator`, avoiding an unnecessary `os.Getwd()` call.
+
