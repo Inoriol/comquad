@@ -3,8 +3,8 @@ package mapper
 import (
 	"testing"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestService_MemoryMax(t *testing.T) {
@@ -60,7 +60,11 @@ func TestService_TasksMax(t *testing.T) {
 func TestService_OOMKillDisable(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", OomKillDisable: true}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
-	assertDirective(t, dirs, "ManagedOOMMemoryPressure", "kill")
+	for _, d := range dirs {
+		if d.Key == "ManagedOOMMemoryPressure" || d.Key == "PodmanArgs" {
+			t.Fatalf("OOM kill disable should not be mapped in [Service], got %s=%v", d.Key, d.Values)
+		}
+	}
 }
 
 func TestService_OOMScoreAdjust(t *testing.T) {

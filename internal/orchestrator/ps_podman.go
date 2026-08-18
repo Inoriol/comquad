@@ -28,7 +28,7 @@ func listContainersFromPodman(projectName string, all bool) ([]ContainerInfo, er
 
 	var containers []ContainerInfo
 	for _, raw := range rawContainers {
-		c := parseContainer(raw)
+		c := parseContainer(raw, projectName)
 		if c == nil {
 			continue
 		}
@@ -43,7 +43,7 @@ func listContainersFromPodman(projectName string, all bool) ([]ContainerInfo, er
 	return containers, nil
 }
 
-func parseContainer(raw map[string]interface{}) *ContainerInfo {
+func parseContainer(raw map[string]interface{}, projectNames ...string) *ContainerInfo {
 	if raw == nil {
 		return nil
 	}
@@ -93,7 +93,9 @@ func parseContainer(raw map[string]interface{}) *ContainerInfo {
 	// Derive service name from container name by stripping <project>- prefix
 	// (Podman container names are <project>-<service>, without the cq- file prefix)
 	service := name
-	if idx := strings.Index(name, "-"); idx > 0 {
+	if len(projectNames) > 0 && projectNames[0] != "" {
+		service = strings.TrimPrefix(name, projectNames[0]+"-")
+	} else if idx := strings.Index(name, "-"); idx > 0 {
 		service = name[idx+1:]
 	}
 
@@ -193,7 +195,8 @@ func batchGetExposedPorts(containers []ContainerInfo) map[string][]string {
 
 	result := make(map[string][]string, len(inspectResults))
 	for _, r := range inspectResults {
-		if r.Name == "" || r.Config.ExposedPorts == nil {
+		name := strings.TrimPrefix(r.Name, "/")
+		if name == "" || r.Config.ExposedPorts == nil {
 			continue
 		}
 		var ports []string
@@ -201,7 +204,7 @@ func batchGetExposedPorts(containers []ContainerInfo) map[string][]string {
 			ports = append(ports, portKey)
 		}
 		sort.Strings(ports)
-		result[r.Name] = ports
+		result[name] = ports
 	}
 	return result
 }

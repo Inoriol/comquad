@@ -27,6 +27,8 @@ type Config struct {
 	NormalizeDockerfile bool
 	Info                func(string)
 	PatchedDockerfiles  map[string]string
+	ExternalNetworks    map[string]string
+	ExternalVolumes     map[string]string
 }
 
 type Version struct {
@@ -140,6 +142,13 @@ func WithInfo(fn func(string)) Option {
 
 func (c *Config) Warn(w Warning) {
 	c.Warnings = append(c.Warnings, w)
+	if c.Info != nil && w.Level != WarningFatal {
+		context := w.Field
+		if w.Service != "" {
+			context = w.Service + ": " + context
+		}
+		c.Info("Warning: " + context + ": " + w.Message)
+	}
 }
 
 func ParseVersion(s string) (Version, error) {

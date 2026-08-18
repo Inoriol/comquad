@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -42,16 +43,18 @@ const (
 
 // FilePlan describes what will happen to a single quadlet file.
 type FilePlan struct {
-	Name            string
-	TargetPath      string
-	BasePath        string
-	Status          FileStatus
-	OldContent      string
-	OldBaseline     string
-	NewContent      string
-	BaselineContent string
-	NoBaseline      bool
-	Conflicts       []Conflict
+	Name              string
+	TargetPath        string
+	BasePath          string
+	Status            FileStatus
+	OldContent        string
+	OldTargetExists   bool
+	OldBaseline       string
+	OldBaselineExists bool
+	NewContent        string
+	BaselineContent   string
+	NoBaseline        bool
+	Conflicts         []Conflict
 }
 
 // Plan is a read-only preview of a reconcile pass.
@@ -125,7 +128,9 @@ func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Pl
 			return plan, err
 		}
 		fp.OldContent = diskContent
+		fp.OldTargetExists = diskExists
 		fp.OldBaseline = baseContent
+		fp.OldBaselineExists = baseExists
 
 		switch {
 		case !diskExists:
@@ -192,26 +197,31 @@ func Apply(targetDir, baselineDir string, plan Plan) (Result, error) {
 		return res, err
 	}
 
+	var applied []FilePlan
 	for _, fp := range plan.Files {
+		var err error
 		switch fp.Status {
 		case StatusCreated:
-			if err := writeFileAtomic(fp.TargetPath, fp.NewContent); err != nil {
-				return res, err
+			err = writeFileAtomic(fp.TargetPath, fp.NewContent)
+			if err != nil {
+				return res, rollbackApply(applied, fp, err)
 			}
 			res.Created = append(res.Created, fp.TargetPath)
 		case StatusChanged:
-			if err := writeFileAtomic(fp.TargetPath, fp.NewContent); err != nil {
-				return res, err
+			err = writeFileAtomic(fp.TargetPath, fp.NewContent)
+			if err != nil {
+				return res, rollbackApply(applied, fp, err)
 			}
 			res.Changed = append(res.Changed, fp.TargetPath)
 		case StatusRemoved:
-			if err := os.Remove(fp.TargetPath); err != nil && !os.IsNotExist(err) {
-				return res, err
+			if removeErr := os.Remove(fp.TargetPath); removeErr != nil && !os.IsNotExist(removeErr) {
+				return res, rollbackApply(applied, fp, removeErr)
 			}
-			if err := os.Remove(fp.BasePath); err != nil && !os.IsNotExist(err) {
-				return res, err
+			if removeErr := os.Remove(fp.BasePath); removeErr != nil && !os.IsNotExist(removeErr) {
+				return res, rollbackApply(applied, fp, removeErr)
 			}
 			res.Removed = append(res.Removed, fp.TargetPath)
+			applied = append(applied, fp)
 			continue
 		}
 
@@ -220,11 +230,35 @@ func Apply(targetDir, baselineDir string, plan Plan) (Result, error) {
 		}
 		res.Conflicts = append(res.Conflicts, fp.Conflicts...)
 		if err := writeFileAtomic(fp.BasePath, fp.BaselineContent); err != nil {
-			return res, err
+			return res, rollbackApply(applied, fp, err)
 		}
+		applied = append(applied, fp)
 	}
 
 	return res, nil
+}
+
+func rollbackApply(applied []FilePlan, current FilePlan, cause error) error {
+	all := append(applied, current)
+	for i := len(all) - 1; i >= 0; i-- {
+		fp := all[i]
+		if fp.OldTargetExists {
+			if err := writeFileAtomic(fp.TargetPath, fp.OldContent); err != nil {
+				return fmt.Errorf("%w (rollback target %s failed: %v)", cause, fp.TargetPath, err)
+			}
+		} else if err := os.Remove(fp.TargetPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("%w (rollback target %s failed: %v)", cause, fp.TargetPath, err)
+		}
+
+		if fp.OldBaselineExists {
+			if err := writeFileAtomic(fp.BasePath, fp.OldBaseline); err != nil {
+				return fmt.Errorf("%w (rollback baseline %s failed: %v)", cause, fp.BasePath, err)
+			}
+		} else if err := os.Remove(fp.BasePath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("%w (rollback baseline %s failed: %v)", cause, fp.BasePath, err)
+		}
+	}
+	return cause
 }
 
 // Reconcile computes and applies changes in a single step.

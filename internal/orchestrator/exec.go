@@ -52,16 +52,19 @@ func (o *Orchestrator) Exec(service string, user string, tty bool, command []str
 		return fmt.Errorf("ambiguous service '%s', matched multiple containers: %s. Please specify a single container", service, strings.Join(names, ", "))
 	}
 
-	// Derive container name from the base filename: cq-myapp-web.container -> myapp-web
-	base := strings.TrimSuffix(filepath.Base(matches[0]), ".container")
-	containerName := strings.TrimPrefix(base, "cq-")
+	// Prefer an explicit ContainerName=, falling back to the generated filename.
+	containerName := readContainerName(matches[0])
+	if containerName == "" {
+		base := strings.TrimSuffix(filepath.Base(matches[0]), ".container")
+		containerName = strings.TrimPrefix(base, "cq-")
+	}
 
 	if _, err := exec.LookPath("podman"); err != nil {
 		return fmt.Errorf("podman not found in PATH: %w", err)
 	}
 
 	// Build podman exec command
-	cmdArgs := []string{"exec"}
+	cmdArgs := []string{"exec", "-i"}
 	if tty {
 		cmdArgs = append(cmdArgs, "-t")
 	}

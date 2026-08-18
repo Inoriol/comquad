@@ -38,6 +38,20 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 				if suffixes, ok := refKeys[d.Key]; ok {
 					for vi := range d.Values {
 						head, tail := splitRefHead(d.Values[vi])
+						if d.Key == "Network" && strings.HasSuffix(head, ".network") {
+							logical := strings.TrimSuffix(head, ".network")
+							if actual, ok := cfg.ExternalNetworks[logical]; ok {
+								d.Values[vi] = actual + tail
+								continue
+							}
+						}
+						if d.Key == "Volume" && strings.HasSuffix(head, ".volume") {
+							logical := strings.TrimSuffix(head, ".volume")
+							if actual, ok := cfg.ExternalVolumes[logical]; ok {
+								d.Values[vi] = actual + tail
+								continue
+							}
+						}
 						for _, suffix := range suffixes {
 							if strings.HasSuffix(head, suffix) {
 								d.Values[vi] = prefix + head + tail

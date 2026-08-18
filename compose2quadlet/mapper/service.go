@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func Service(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
@@ -77,7 +77,7 @@ func cpu(svc types.ServiceConfig, cfg *c2qtypes.Config, deploy *types.DeployConf
 			dirs = append(dirs, c2qtypes.Directive{Key: "CPUQuota", Values: []string{fmt.Sprintf("%d%%", quota)}})
 		}
 		if deploy.Resources.Reservations != nil && deploy.Resources.Reservations.NanoCPUs > 0 && svc.CPUShares == 0 {
-			weight := max(1, int(math.Round(float64(deploy.Resources.Reservations.NanoCPUs) * 100 / 1e9)))
+			weight := max(1, int(math.Round(float64(deploy.Resources.Reservations.NanoCPUs)*100/1e9)))
 			dirs = append(dirs, c2qtypes.Directive{Key: "CPUWeight", Values: []string{strconv.Itoa(weight)}})
 		}
 	}
@@ -101,9 +101,6 @@ func tasksMax(svc types.ServiceConfig, cfg *c2qtypes.Config, deploy *types.Deplo
 func oom(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
 	var dirs []c2qtypes.Directive
 
-	if svc.OomKillDisable {
-		dirs = append(dirs, c2qtypes.Directive{Key: "ManagedOOMMemoryPressure", Values: []string{"kill"}})
-	}
 	if svc.OomScoreAdj != 0 {
 		dirs = append(dirs, c2qtypes.Directive{Key: "OOMScoreAdjust", Values: []string{strconv.FormatInt(svc.OomScoreAdj, 10)}})
 	}

@@ -132,9 +132,11 @@ func flushEntries(entries []journalEntry, showTime bool) {
 // Logs prints logs for a deployed project's services via journalctl.
 func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, showTime bool) error {
 	if since != "" {
-		if err := validateSince(since); err != nil {
+		normalized, err := normalizeSince(since)
+		if err != nil {
 			return err
 		}
+		since = normalized
 	}
 
 	_, state, err := o.ensureProjectDeployed()
@@ -402,9 +404,11 @@ func (o *Orchestrator) runJournalctlFollow(cmds []*exec.Cmd, showTime bool) erro
 // from the given timestamp onward.
 func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 	if since != "" {
-		if err := validateSince(since); err != nil {
+		normalized, err := normalizeSince(since)
+		if err != nil {
 			return err
 		}
+		since = normalized
 	}
 
 	_, state, err := o.ensureProjectDeployed()
@@ -440,6 +444,20 @@ func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 	return o.runJournalctlFollow([]*exec.Cmd{cmd}, showTime)
 }
 
+// normalizeSince validates the --since argument and converts bare durations
+// such as "10m" to journalctl's relative-time form "-10m".
+func normalizeSince(since string) (string, error) {
+	if err := validateSince(since); err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(since, "-") {
+		if _, err := time.ParseDuration(since); err == nil {
+			return "-" + since, nil
+		}
+	}
+	return since, nil
+}
+
 // validateSince checks that the --since argument is plausibly valid.
 // journalctl accepts dates (YYYY-MM-DD), relative times (-10m, 1h ago), and keywords (today, yesterday, now).
 func validateSince(since string) error {
@@ -461,6 +479,9 @@ func validateSince(since string) error {
 		if _, err := time.Parse(f, since); err == nil {
 			return nil
 		}
+	}
+	if duration, err := time.ParseDuration(since); err == nil && duration > 0 {
+		return nil
 	}
 	return fmt.Errorf("invalid --since %q: expected a date (YYYY-MM-DD [HH:MM[:SS]]), relative time (-10m, -1h, 1h ago), or keyword (today, yesterday, now, boot)", since)
 }

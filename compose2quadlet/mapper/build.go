@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUnit {
@@ -39,15 +39,33 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 				patched, err := PatchDockerfileFROM(bytes.NewReader(content))
 				if err == nil {
 					patchedPath := filepath.Join(cfg.BuildCacheDir, name+".Dockerfile")
+					patchedOK := true
 					if !cfg.DryRun {
-						os.MkdirAll(filepath.Dir(patchedPath), 0755)
-						os.WriteFile(patchedPath, patched, 0644)
+						if err := os.MkdirAll(filepath.Dir(patchedPath), 0755); err != nil {
+							patchedOK = false
+							cfg.Warn(c2qtypes.Warning{
+								Level:   c2qtypes.WarningDegraded,
+								Service: name,
+								Field:   "build.dockerfile",
+								Message: fmt.Sprintf("failed to create Dockerfile cache directory: %v", err),
+							})
+						} else if err := os.WriteFile(patchedPath, patched, 0644); err != nil {
+							patchedOK = false
+							cfg.Warn(c2qtypes.Warning{
+								Level:   c2qtypes.WarningDegraded,
+								Service: name,
+								Field:   "build.dockerfile",
+								Message: fmt.Sprintf("failed to write patched Dockerfile: %v", err),
+							})
+						}
 					}
-					if cfg.PatchedDockerfiles == nil {
-						cfg.PatchedDockerfiles = make(map[string]string)
+					if patchedOK {
+						if cfg.PatchedDockerfiles == nil {
+							cfg.PatchedDockerfiles = make(map[string]string)
+						}
+						cfg.PatchedDockerfiles[name] = string(patched)
+						build.Dockerfile = patchedPath
 					}
-					cfg.PatchedDockerfiles[name] = string(patched)
-					build.Dockerfile = patchedPath
 				}
 			}
 		}

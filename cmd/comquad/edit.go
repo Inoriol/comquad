@@ -9,11 +9,12 @@ import (
 var noReload bool
 
 var editCmd = &cobra.Command{
-	Use:   "edit [project] [service]",
+	Use:   "edit [service]",
 	Short: "Edit systemd units for a project or a specific unit file",
-	Example: `  comquad edit myapp web     # Edit cq-myapp-web.container
+	Example: `  comquad edit web          # Edit cq-myapp-web.container
   comquad edit                # Edit all project units
   comquad edit --no-reload    # Edit without auto-reloading systemd`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		o, err := orchestrator.NewOrchestrator(projectName)
 		if err != nil {

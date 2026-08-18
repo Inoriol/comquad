@@ -5,16 +5,40 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/Inoriol/comquad/compose2quadlet/mapper"
 	"github.com/Inoriol/comquad/compose2quadlet/opinionated"
+	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, error) {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
+	}
+	if cfg.ExternalNetworks == nil {
+		cfg.ExternalNetworks = make(map[string]string)
+	}
+	for name, network := range project.Networks {
+		if network.External {
+			actual := network.Name
+			if actual == "" {
+				actual = name
+			}
+			cfg.ExternalNetworks[name] = actual
+		}
+	}
+	if cfg.ExternalVolumes == nil {
+		cfg.ExternalVolumes = make(map[string]string)
+	}
+	for name, volume := range project.Volumes {
+		if volume.External {
+			actual := volume.Name
+			if actual == "" {
+				actual = name
+			}
+			cfg.ExternalVolumes[name] = actual
+		}
 	}
 
 	var units []QuadletUnit

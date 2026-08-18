@@ -99,6 +99,26 @@ func TestApplyReferences_NetworkVolume(t *testing.T) {
 	assertDirectiveValue(t, sec, "Image", "cq-nginx.image")
 }
 
+func TestApplyReferences_ExternalNetworkAndVolume(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "cq-app-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Network", "backend.network"),
+				mkDir("Volume", "data.volume:/var/lib/data:rw"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "app"
+	cfg.ExternalNetworks = map[string]string{"backend": "shared-net"}
+	cfg.ExternalVolumes = map[string]string{"data": "shared-data"}
+
+	result := ApplyReferences(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Network", "shared-net")
+	assertDirectiveValue(t, sec, "Volume", "shared-data:/var/lib/data:rw")
+}
+
 func TestApplyReferences_UnitDeps(t *testing.T) {
 	units := []c2qtypes.QuadletUnit{
 		mkUnit(c2qtypes.UnitContainer, "prefixed-web", []c2qtypes.Section{
@@ -329,6 +349,31 @@ func TestApplyDefaultNetwork_AlreadyHasNetwork(t *testing.T) {
 	if len(result) != 1 {
 		t.Fatalf("expected 1 unit, got %d", len(result))
 	}
+}
+
+func TestApplyDefaultNetwork_MixedExplicitAndImplicitNetworks(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Network", "backend.network"),
+			}},
+		}),
+		mkUnit(c2qtypes.UnitContainer, "worker", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Image", "worker.image"),
+			}},
+		}),
+		mkUnit(c2qtypes.UnitNetwork, "backend", nil),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "app"
+
+	result := ApplyDefaultNetwork(units, cfg)
+	if len(result) != 4 {
+		t.Fatalf("expected existing and default network plus two containers, got %d units", len(result))
+	}
+	sec := result[1].Sections[0]
+	assertDirectiveValue(t, sec, "Network", "cq-app-default.network")
 }
 
 func TestApplyPortOffset(t *testing.T) {

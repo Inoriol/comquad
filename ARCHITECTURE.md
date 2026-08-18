@@ -24,9 +24,9 @@ On every `up`, comquad reconciles the freshly generated quadlet units against wh
 
 - **Baseline** — each successful deploy stores the *pure generated* content of every quadlet file under `$XDG_DATA_HOME/comquad/baseline/<project>/`. The baseline is what `compose.yaml` produced last time, never the merged result.
 - **Three-way merge** — `MergeUnit(base, disk, new)` does a directive-level merge. `disk` is the on-disk file (baseline + manual `edit` changes), `new` is the fresh generation. Per directive key it resolves: unchanged / user-changed / compose-changed / both-changed (conflict → user wins + warning) / added / removed.
-- **Plan / Apply split** — `Compute(...)` builds a read-only `Plan` (per-file status, old/new content, conflicts); `Apply(...)` writes files atomically, updates the baseline, and removes stale files. `Up` shows `Plan.Diff()` (a color-coded unified diff) and asks for confirmation before calling `Apply`.
+- **Plan / Apply split** — `Compute(...)` builds a read-only `Plan` (per-file status, old/new content, conflicts); `Apply(...)` writes files atomically, updates the baseline, removes stale files, and restores already-applied targets/baselines if a later operation fails. `Up` shows `Plan.Diff()` (a color-coded unified diff) and asks for confirmation before calling `Apply`.
 - **Selective restart** — only created units are started and only changed containers/images are restarted; units for dropped services are stopped before `daemon-reload` forgets them.
-- **Baseline lifecycle** — rewritten on each successful `up`, removed on `down`, cleared by `regenerate`, and restored to its previous content on a failed `up` (`rollbackDeploy` reverts the files and baseline touched by the failed reconcile instead of deleting the whole project).
+- **Baseline lifecycle** — rewritten on each successful `up`, removed on `down`, cleared by `regenerate`, and restored to its previous content on a failed `up` (`Apply` and `rollbackDeploy` restore files and baselines touched by failed operations instead of deleting the whole project).
 
 `--no-diff` skips the diff and confirmation. On a first deploy (or after `regenerate`) there is no baseline, so reconciliation falls back to a 2-way comparison (overwrite + warning) that cannot distinguish manual edits.
 
@@ -62,9 +62,10 @@ After `TranspileFile()` returns, comquad applies one fix before writing units to
 - **`stripServiceName`** — Removes `ServiceName=` from container units. Without this, quadlet names the systemd unit after the compose service name (e.g. `db.service`) instead of the file-prefixed name (`cq-<project>-db.service`), breaking comquad's unit lookup.
 
 The library handles the rest through its opinionated transforms:
-- **`ApplyContainerName`** — Injects `ContainerName=<project>-<service>` into every container (e.g. `nextcloud-redis-mariadb-db`), matching Docker Compose's container naming convention.
+- **`ApplyContainerName`** — Supplies `ContainerName=<project>-<service>` when no explicit Compose `container_name` is present (e.g. `nextcloud-redis-mariadb-db`), matching Docker Compose's default naming convention.
 - **`ApplyNetworkAliases`** — Injects `NetworkAlias=<service>` and `NetworkAlias=<project>-<service>` so services can resolve each other by compose service name and project-qualified name within compose networks.
 - **`.image` references are kept** — Containers reference `.image` files via `Image=<name>.image` (not resolved). The quadlet generator follows the chain through to the `.image` unit's fully-qualified `Image=` directive, which satisfies `AutoUpdate=registry`'s requirement for fully-qualified references.
+- **External resources are preserved** — External networks and volumes are not generated as Quadlets; references retain their configured Podman resource names instead of being rewritten to managed `cq-<project>-` units.
 - **`SECTION SPACING`** — Serialization now adds blank lines between non-empty sections for readability, matching the format produced by the previous podlet-based pipeline.
 
 ## 📊 Ps Command
@@ -166,8 +167,8 @@ The `down` command performs a complete teardown of a deployed project in seven s
 1. **Stop units** — Stops all container, image, and build units via systemd D-Bus `StopUnit`, then verifies all container units are no longer active (aborting if any remain). Network and volume units are also stopped.
 2. **Remove quadlet files** — Deletes all `.container`, `.network`, `.volume`, `.image`, and `.build` files from the systemd target directory.
 3. **Reload daemon** — Triggers `daemon-reload` via D-Bus so systemd forgets the removed units and releases its references to networks and volumes.
-4. **Remove networks** — Lists all Podman networks with the `com.comquad.project` label matching the current project, then removes them via `podman network rm`.
-5. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes with the `com.comquad.project` label matching the current project, then removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
+4. **Remove networks** — Lists all Podman networks with both `com.comquad.managed=true` and the matching `com.comquad.project` label, then removes them via `podman network rm`.
+5. **Remove volumes (opt-in)** — When the `-d, --delete-volumes` flag is provided, lists all Podman volumes with both `com.comquad.managed=true` and the matching `com.comquad.project` label, then removes them via `podman volume rm`. Volumes are opt-in because they may contain persistent data.
 6. **Unregister project** — Removes the project entry from `projects.json` state file.
 7. **Remove auxiliary state** — Deletes the project's baseline (`$XDG_DATA_HOME/comquad/baseline/<project>`), secrets, and build-cache directories.
 
@@ -191,7 +192,7 @@ The `down` command prompts for confirmation when stdin is a terminal. This preve
 
 The `exec` command runs a command inside a running container via `podman exec`. It requires a single service argument and allocates a TTY by default (like `docker compose exec`).
 
-**Service resolution:** Uses `MatchAllContainers` to resolve the service name to a container quadlet file. The container name is derived from the base filename by stripping the `cq-` prefix and `.container` suffix (e.g. `cq-myapp-web.container` → `myapp-web`). If the service matches multiple containers, an error is returned listing the ambiguous matches.
+**Service resolution:** Uses `MatchAllContainers` to resolve the service name to a container quadlet file. `exec` uses the unit's explicit `ContainerName=` when present, otherwise derives the name from the base filename by stripping the `cq-` prefix and `.container` suffix (e.g. `cq-myapp-web.container` → `myapp-web`). Interactive execution keeps stdin open and allocates a TTY by default. If the service matches multiple containers, an error is returned listing the ambiguous matches.
 
 **Flags:** `-u/--user` sets the user inside the container, `-t/--tty` controls TTY allocation (default `true`). The command is passed directly to `podman exec`, which handles `--` flag separation.
 
@@ -281,8 +282,8 @@ To ensure the transition to Quadlets is frictionless, the internal engine enforc
 
 * Relative volume host paths are automatically fully-qualified to absolute paths.
 * When SELinux is detected (via `/sys/fs/selinux/enforce`), `Volume=` directives in generated `.container` files get `,z` appended and `Mount=` directives get `relabel=shared` appended (`Mount=type=bind,...` → `Mount=type=bind,...,relabel=shared`). Idempotent — skips if `:z`, `:Z`, or `relabel=` already present.
-* A default bridge network (`cq-default`) is implicitly injected only when the compose file defines no networks at all. Any container without an explicit `Network=` directive is auto-attached to `cq-default` — this includes cases where user-defined networks exist but a service has no `networks:` key.
-* Generated containers follow a strict naming blueprint: `<project>-<service>`.
+* A default bridge network (`cq-default`) is implicitly injected whenever a container lacks an explicit `Network=` directive. This includes cases where user-defined networks exist but a service has no `networks:` key.
+* Generated containers default to the `<project>-<service>` naming blueprint; an explicit Compose `container_name` is preserved.
 * `NetworkAlias=` is injected into every `.container` file so services can resolve each other by service name and `ContainerName=` value within compose networks.
 * An identifying label (`com.comquad.project`) is attached to all generated units that support labels (`.container`, `.network`, `.volume`, `.build`).
 * A `com.comquad.managed` label is attached to those same units to indicate comquad management. `.image` units have no `[Container]`-style `Label=` directive, so they are identified by filename rather than label.
