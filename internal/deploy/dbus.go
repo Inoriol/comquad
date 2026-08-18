@@ -216,10 +216,12 @@ func removePodmanResources(resourceType, projectName string) error {
 	switch resourceType {
 	case "network":
 		cmd = exec.Command("podman", "network", "ls",
+			"--filter", "label=com.comquad.managed=true",
 			"--filter", "label=com.comquad.project="+projectName,
 			"--format", "{{.Name}}")
 	case "volume":
 		cmd = exec.Command("podman", "volume", "ls",
+			"--filter", "label=com.comquad.managed=true",
 			"--filter", "label=com.comquad.project="+projectName,
 			"--format", "{{.Name}}")
 	default:

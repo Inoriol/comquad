@@ -138,11 +138,11 @@ You can view or edit the underlying systemd quadlet files on the fly:
 ```bash
 # View the project overview with resource relationships
 comquad view                 # Also accessible via `comquad overview`
-comquad view myapp web       # Shows the cq-myapp-web.container file content
-comquad view db.image        # View a specific .image quadlet file
+comquad view web              # Shows the cq-<project>-web.container file content
+comquad view db.image         # View a specific .image quadlet file
 
 # Edit unit files directly (automatically triggers systemd daemon-reload)
-comquad edit myapp web
+comquad edit web
 comquad edit --no-reload     # Open files without auto-reloading systemd
 
 ```
@@ -156,7 +156,7 @@ If your local state gets out of sync, `comquad` can rebuild its tracking from Po
 ```bash
 comquad regenerate --force           # Reconstruct state file from live labels
 comquad regenerate --force --dry-run # Preview what would be reconstructed
-  comquad check                        # Check prerequisites (tools, podman >= 4.8, D-Bus, target dir)
+comquad check                          # Check prerequisites (tools, podman >= 4.8, D-Bus, target dir)
 
 ```
 
@@ -197,12 +197,12 @@ For a deep dive into how `comquad` processes compose files, manages state, and m
 
 * **Path Fixing:** Relative volume host paths are automatically fully qualified to absolute paths.
 * **SELinux Smart Patching:** When SELinux is active on the host, `Volume=` directives get `,z` appended and `Mount=` directives get `relabel=shared` safely and idempotently.
-* **Implicit Networks:** A default bridge network (`cq-default`) is injected if your compose file defines no networks.
+* **Implicit Networks:** A default bridge network (`cq-default`) is injected when any service lacks an explicit network, including projects that also define user networks.
 * **Image Quadlet Generation:** Every container gets a companion `.image` quadlet file. Compose `image`, `pull_policy`, and `platform` fields are extracted into dedicated image units so systemd can manage image pulls separately (enables `podman auto-update`).
-* **Secrets Management:** Compose `secrets:` are intercepted and translated into native quadlet directives. 
+* **Secrets Management:** Compose `secrets:` are intercepted and translated into native quadlet directives; secret and Dockerfile cache write failures are surfaced as warnings.
 * **Service Discovery:** `NetworkAlias=` are injected into every `.container` with `<project>-<service>` and `<service>` blueprints so services can resolve each other same way as in docker compose networks.
 * **Rootless Port Offsetting:** In rootless mode, privileged ports (≤ 1024) are automatically shifted by `ROOTLESS_PORT_OFFSET` (default: `2000`) to prevent deployment failures.
-* **Change Detection & Reconcile:** On re-deploy, comquad diffs the freshly generated quadlet files against the deployed ones (tracked via a baseline in `$XDG_DATA_HOME/comquad/baseline/`), preserves manual `edit` changes through a three-way merge, restarts only changed units, and removes units for services dropped from the compose file.
+* **Change Detection & Reconcile:** On re-deploy, comquad diffs the freshly generated quadlet files against the deployed ones (tracked via a baseline in `$XDG_DATA_HOME/comquad/baseline/`), preserves manual `edit` changes through a three-way merge, rolls back partial file/baseline writes on failure, restarts only changed units, and removes units for services dropped from the compose file.
 
 ---
 

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func PremapSecrets(svc *types.ServiceConfig, secrets types.Secrets, configs types.Configs, cfg *c2qtypes.Config) []c2qtypes.Directive {
@@ -99,9 +99,21 @@ func processSecret(serviceName string, ref types.ServiceSecretConfig, def types.
 		sourcePath := filepath.Join(cfg.SecretsDir, ref.Source)
 		if !cfg.DryRun {
 			if err := os.MkdirAll(cfg.SecretsDir, 0700); err != nil {
+				cfg.Warn(c2qtypes.Warning{
+					Level:   c2qtypes.WarningDegraded,
+					Service: serviceName,
+					Field:   "secrets." + ref.Source,
+					Message: fmt.Sprintf("failed to create secrets directory: %v", err),
+				})
 				return nil
 			}
 			if err := os.WriteFile(sourcePath, []byte(val), 0600); err != nil {
+				cfg.Warn(c2qtypes.Warning{
+					Level:   c2qtypes.WarningDegraded,
+					Service: serviceName,
+					Field:   "secrets." + ref.Source,
+					Message: fmt.Sprintf("failed to write secret file: %v", err),
+				})
 				return nil
 			}
 		}

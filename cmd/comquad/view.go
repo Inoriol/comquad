@@ -7,9 +7,10 @@ import (
 )
 
 var viewCmd = &cobra.Command{
-	Use:     "view [project] [service]",
+	Use:     "view [service]",
 	Aliases: []string{"overview"},
 	Short:   "View systemd units for a project or display a specific unit file",
+	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		o, err := orchestrator.NewOrchestrator(projectName)
 		if err != nil {

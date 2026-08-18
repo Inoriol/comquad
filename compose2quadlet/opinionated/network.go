@@ -9,27 +9,27 @@ func ApplyDefaultNetwork(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c
 		return units
 	}
 
-	hasNetwork := false
+	needsDefault := false
 	for _, u := range units {
-		if u.Type == c2qtypes.UnitNetwork {
-			hasNetwork = true
-			break
-		}
 		if u.Type == c2qtypes.UnitContainer {
+			containerHasNetwork := false
 			for _, s := range u.Sections {
 				if s.Name == c2qtypes.SectionContainer {
 					for _, d := range s.Directives {
 						if d.Key == "Network" {
-							hasNetwork = true
+							containerHasNetwork = true
 							break
 						}
 					}
 				}
 			}
+			if !containerHasNetwork {
+				needsDefault = true
+			}
 		}
 	}
 
-	if hasNetwork {
+	if !needsDefault {
 		return units
 	}
 
@@ -53,7 +53,16 @@ func ApplyDefaultNetwork(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c
 			Name: c2qtypes.SectionNetwork,
 		}},
 	}
-	units = append(units, netUnit)
+	hasDefault := false
+	for _, u := range units {
+		if u.Type == c2qtypes.UnitNetwork && u.Name == netName {
+			hasDefault = true
+			break
+		}
+	}
+	if !hasDefault {
+		units = append(units, netUnit)
+	}
 
 	for ui := range units {
 		if units[ui].Type != c2qtypes.UnitContainer {

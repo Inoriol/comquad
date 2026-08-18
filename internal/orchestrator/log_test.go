@@ -96,6 +96,27 @@ func TestLogs_WithSinceFlag(t *testing.T) {
 	}
 }
 
+func TestNormalizeSince_BareDuration(t *testing.T) {
+	got, err := normalizeSince("10m")
+	if err != nil {
+		t.Fatalf("normalizeSince returned error: %v", err)
+	}
+	if got != "-10m" {
+		t.Fatalf("normalizeSince(10m) = %q, want -10m", got)
+	}
+}
+
+func TestNormalizeSince_PreservesJournalctlValue(t *testing.T) {
+	for _, since := range []string{"-10m", "1h ago", "2024-01-01 12:00:00", "today"} {
+		got, err := normalizeSince(since)
+		if err != nil {
+			t.Errorf("normalizeSince(%q) returned error: %v", since, err)
+		} else if got != since {
+			t.Errorf("normalizeSince(%q) = %q, want unchanged", since, got)
+		}
+	}
+}
+
 func TestParseJournalEntry_ValidEntry(t *testing.T) {
 	json := `{"__REALTIME_TIMESTAMP":"1700000000000000","SYSTEMD_UNIT":"cq-myapp-web.service","MESSAGE":"test message","PRIORITY":6}`
 	entry, ok := parseJournalEntry(json)

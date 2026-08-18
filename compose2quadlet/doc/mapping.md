@@ -231,8 +231,7 @@ The **Since** column tracks the minimum version required for each mapping:
 | Compose field | P | Target directive | Target section | Since |
 |---|---|---|---|---|
 | `oom_score_adj` | 2 | `OOMScoreAdjust=` | `[Service]` | sd 208 |
-| `oom_kill_disable` | 2 | `ManagedOOMMemoryPressure=kill` | `[Service]` | sd 247 |
-| `oom_kill_disable` (alt) | 3 | `PodmanArgs=--oom-kill-disable` | `[Container]` | 4.6.0 |
+| `oom_kill_disable` | 3 | `PodmanArgs=--oom-kill-disable` | `[Container]` | 4.6.0 |
 
 ### Devices
 

@@ -46,7 +46,6 @@ compose2quadlet/
 ├── README.md                 # End-user documentation
 ├── (module metadata is in the repository root go.mod)
 │
-├── TODO.md                   # Known issues and planned improvements
 ├── types.go                  # Type aliases re-exporting from internal/types/
 ├── transpile.go              # Entry points: Transpile(project, opts...), TranspileFile(path, opts...)
 ├── options.go                # TranspileOption constructors, delegates to internal/types/
@@ -93,12 +92,12 @@ compose2quadlet/
 ├── opinionated/              # Opinionated transforms
 │   ├── opinionated.go        # Apply() — orchestrates all transforms
 │   ├── prefix.go             # ApplyPrefix() — cq-<project>- prefix on all unit names
-│   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, Image=, Mount= references
-│   ├── containername.go      # ApplyContainerName() — inject ContainerName=<project>-<service>
+│   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, Image=, Mount= references; preserve external names
+│   ├── containername.go      # ApplyContainerName() — default ContainerName=<project>-<service>
 │   ├── aliases.go            # ApplyNetworkAliases() — inject NetworkAlias=<service>, <project>-<service>
 │   ├── selinux.go            # ApplySELinux() — add relabel=shared to Mount=, :z to Volume=
 │   ├── labels.go             # ApplyLabels() — inject consumer-provided labels (Container/Network/Volume/Build only)
-│   ├── network.go            # ApplyDefaultNetwork() — inject default network if needed
+│   ├── network.go            # ApplyDefaultNetwork() — inject default network for services without explicit networks
 │   ├── ports.go              # ApplyPortOffset() — apply port offset with Info callback logging
 │   ├── autoupdate.go         # ApplyAutoUpdate() — add AutoUpdate=registry
 │   └── install.go            # ApplyInstallSection() — add [Install] section
@@ -191,11 +190,11 @@ Transpile(project, opts...)
     ├── 5. Opinionated transforms (opinionated/) ✅
     │       ├── prefix.go:        cq-<project>- prefix on all unit names
     │       ├── references.go:    rewrite Network=, Volume=, Image=, Mount=, After= references
-    │       ├── containername.go: inject ContainerName=<project>-<service>
+    │       ├── containername.go: default ContainerName=<project>-<service> when unspecified
     │       ├── aliases.go:       inject NetworkAlias=<service> (service name + project-service)
     │       ├── selinux.go:       add relabel=shared to Mount=, :z to Volume=
     │       ├── labels.go:        inject consumer-provided labels (skips [Service], [Unit], [Image])
-    │       ├── network.go:       inject default network if needed
+│       ├── network.go:       inject default network for services without explicit networks
     │       ├── ports.go:         apply port offset
     │       ├── autoupdate.go:    add AutoUpdate=registry
     │       └── install.go:       add [Install] section
@@ -252,7 +251,7 @@ Every field that cannot be mapped is surfaced — there are **no silent skips**.
 | `WarningDegraded` | P3 PodmanArgs fallback instead of P1 | `entrypoint` on podman 4.8.0 | Warn: "mapped via PodmanArgs, upgrade to podman 5.0 for native support" |
 | `WarningFatal` | Mapping is impossible at this version | `build:` on podman 4.8.0 | `Transpile()` returns error |
 
-Warnings are collected in `transpileConfig.Warnings` during the pipeline and surfaced alongside the result. Consumers (comquad) decide how to present each level. No separate error/warning channel is threaded through mapper signatures — the config acts as a shared collector.
+Warnings are collected in `Config.Warnings` during the pipeline. Non-fatal warnings are also sent through the `WithInfo` callback when configured; fatal warnings cause `Transpile()` to return an error. No separate error/warning channel is threaded through mapper signatures — the config acts as a shared collector.
 
 ```go
 // Internal usage in a mapper:
@@ -273,22 +272,22 @@ All transforms are **enabled by default** and can be individually disabled via `
 |---|---|---|
 | File prefixing | `WithoutPrefix()` | Prepends `cq-<project>-` to unit filenames |
 | Reference rewriting | *(always on)* | Rewrites `Network=`, `Volume=`, `Image=`, `After=`, `Requires=` to prefixed names; handles colon-separated values (e.g. `name.volume:/path`) |
-| ContainerName injection | *(always on)* | Adds `ContainerName=<project>-<service>` to containers (e.g. `nextcloud-redis-mariadb-db`) |
+| ContainerName injection | *(always on)* | Adds the default `ContainerName=<project>-<service>` only when `container_name` is unspecified |
 | NetworkAlias injection | `WithoutNetworkAliases()` | Adds `NetworkAlias=<service>` and `NetworkAlias=<project>-<service>` for DNS-based service discovery |
 | SELinux labeling | `WithoutSELinux()` | Appends `relabel=shared` to `Mount=` bind-mount directives and `,z` to `Volume=` directives |
 | Managed label | `WithLabels(map)` | Adds consumer-provided labels to `[Container]`, `[Network]`, `[Volume]`, `[Build]` sections (not `[Service]`, `[Unit]`, `[Image]` which don't support `Label=`) |
 | Project label | `WithLabels(map)` + `WithProjectName` | Adds consumer-provided labels to every unit |
-| Default network | `WithoutDefaultNetwork()` | Injects `cq-default.network` if no networks defined |
+| Default network | `WithoutDefaultNetwork()` | Injects `cq-default.network` when a service lacks an explicit network |
 | Port offset | `WithPortOffset(N)` | Adds offset to host-side published ports ≤ 1024; logs changes via `Info` callback |
 | AutoUpdate | `WithAutoUpdate()` | Adds `AutoUpdate=registry` to containers |
 | Install section | `WithoutInstallSection()` | Adds `[Install] WantedBy=default.target` |
 | Image retry | `WithImageRetry(N)` / `WithImageRetryDelay(S)` | Sets `Retry=`/`RetryDelay=` on `.image` units (default: 3 / 5s; RetryDelay uses duration string format e.g. `5s`) |
 | Image normalization | *(always on)* | Normalizes bare image names (`nginx:latest` → `docker.io/library/nginx:latest`) in `.image` units |
 | Working directory | `WithWorkingDirectory(path)` | Resolves relative bind-mount volume paths against this directory |
-| Secrets directory | `WithSecretsDirectory(path)` | Enables environment-based secret resolution; writes managed files to this dir |
+| Secrets directory | `WithSecretsDirectory(path)` | Enables environment-based secret resolution; writes managed files to this dir and warns on write failures |
 | Dry run | `WithDryRun()` | Skips writing managed secret files to disk (still generates directives) |
-| Dockerfile normalization | `WithDockerfileNormalization()` + `WithBuildCacheDir(path)` | Patches Dockerfile FROM lines to fully-qualified image names; writes patched copies to cache dir |
-| Info callback | `WithInfo(fn)` | Receives info-level messages (e.g. port offset changes) for consumer logging |
+| Dockerfile normalization | `WithDockerfileNormalization()` + `WithBuildCacheDir(path)` | Patches Dockerfile FROM lines to fully-qualified image names; writes patched copies to cache dir and warns on cache write failures |
+| Info callback | `WithInfo(fn)` | Receives info-level messages and non-fatal mapping warnings for consumer logging |
 | Version parsing | `ParseVersion(s)` | Parses `"5.2.0"` or `"v4.8"` into `Version` for `WithPodmanVersion()` |
 | Batch write | `serialization.WriteUnits(dir, units)` | Writes all units to a directory with `<name>.<type>` filenames |
 
@@ -431,8 +430,8 @@ From the project scope document:
 3. **Opinionated defaults** — all comquad transforms ported as opt-out `TranspileOption`s ✅
 4. **Deploy + systemd** — `deploy.resources`, `deploy.restart_policy` mapped to `[Service]` ✅
 5. **Secrets + builds** — compose `secrets:` and `build:` handled natively ✅
-6. **Integration** — comquad imports the library, drops podlet dependency 🔜
-7. **Deprecate podlet** — comquad no longer requires podlet binary at runtime 🔜
+6. **Integration** — comquad imports the library and drops the podlet dependency ✅
+7. **Deprecate podlet** — comquad no longer requires the podlet binary at runtime ✅
 
 ## Key Design Decisions
 

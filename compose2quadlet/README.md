@@ -8,7 +8,7 @@ Heavily inspired by [podlet](https://github.com/containers/podlet), but designed
 
 ## Motivation
 
-Replaces the `podlet` binary dependency with a native Go library. Eliminates the fragile text-based pipeline (preprocess → strip → transpile → cook → graft) for comquad (that currently uses podlet) with structured, type-safe quadlet output.
+Replaces the former `podlet` binary dependency with a native Go library. Eliminates the fragile text-based pipeline (preprocess → strip → transpile → cook → graft) with structured, type-safe quadlet output.
 
 ## Usage
 
@@ -84,8 +84,10 @@ func main() {
   - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
   - `secrets.go` — pre-mapping interceptor for secrets and configs
   - `dockerfile.go` — `PatchDockerfileFROM()` normalizes bare image names in Dockerfile FROM lines
-- **`opinionated/`** — Composable post-processing transforms (prefix, references, container name, SELinux relabeling, labels, default network, network aliases, port offset, auto-update, install section)
+- **`opinionated/`** — Composable post-processing transforms (prefix, references including external resources, container name, SELinux relabeling, labels, default network, network aliases, port offset, auto-update, install section)
 - **`serialization/`** — `Marshal()`, `Write()`, `WriteUnits()`, `Unmarshal()` for ini-format serialization
+
+Warnings from degraded or skipped mappings are sent through the `WithInfo` callback when configured. Fatal mappings still return an error. Environment-secret and patched-Dockerfile write failures are reported as degraded warnings.
 
 ## Dependencies
 

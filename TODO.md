@@ -68,3 +68,28 @@ Bugs and correctness issues found while analyzing the codebase:
 - [x] **Misleading comment in `parseContainer`** — Comment in `ps_podman.go:93-94` corrected to reflect that Podman container names are `<project>-<service>` (no `cq-` prefix).
 - [x] **Unnecessary Orchestrator creation in `list` command** — `list.go` now directly uses `deploy.NewStateManager()` instead of creating an `Orchestrator`, avoiding an unnecessary `os.Getwd()` call.
 
+### Code Review Findings (2026-08-18) — resolved
+
+- [x] **`--since 10m` documentation did not work** — Bare positive durations are now accepted and normalized to journalctl's `-10m` form.
+- [x] **`view`/`edit` examples passed an ignored argument** — Examples now use the single service argument supported by both commands, and extra positional arguments are rejected.
+- [x] **Malformed `check` example in README** — Corrected the indentation in the usage snippet.
+
+### Code Review Findings (2026-08-18) — resolved
+
+**High Severity:**
+
+- [x] **External networks and volumes were referenced as managed Quadlets** — External resource names are now preserved through transpilation, with focused reference tests.
+- [x] **Failed reconcile writes were not rolled back** — `reconcile.Apply` now restores changed targets and baselines when a later write/remove fails.
+- [x] **`oom_kill_disable` was mapped to an enabling directive** — Removed the incorrect `ManagedOOMMemoryPressure=kill` mapping; the container uses `PodmanArgs=--oom-kill-disable`.
+
+**Medium Severity:**
+
+- [x] **Teardown did not require the managed label** — Network and volume removal now filters by both managed and project labels.
+- [x] **`exec` ignored an explicit `container_name`** — `Exec` now prefers the unit's `ContainerName=` directive.
+- [x] **`ps` derived service names incorrectly for hyphenated projects** — Parsing now uses the known project prefix, with a regression test.
+- [x] **Default-network behavior contradicted the documented Compose behavior** — Mixed explicit/implicit network generation now adds and attaches the default network correctly.
+
+**Low Severity:**
+
+- [x] **Secret and Dockerfile cache write failures were silently ignored** — Failures now produce degraded warnings, and failed Dockerfile patch writes no longer replace the original path.
+- [x] **Interactive `exec` did not request stdin** — `podman exec` now receives `-i` (and `-t` when enabled).

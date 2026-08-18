@@ -76,6 +76,22 @@ func TestPs_HappyPathWithRunningContainers(t *testing.T) {
 	}
 }
 
+func TestParseContainer_UsesProjectPrefixForServiceName(t *testing.T) {
+	raw := map[string]interface{}{
+		"Names":  []interface{}{"my-app-web"},
+		"State":  "running",
+		"Status": "Up 1 minute",
+	}
+
+	container := parseContainer(raw, "my-app")
+	if container == nil {
+		t.Fatal("expected container")
+	}
+	if container.Service != "web" {
+		t.Fatalf("expected service web, got %q", container.Service)
+	}
+}
+
 func TestPs_MergesSystemdState(t *testing.T) {
 	dir := t.TempDir()
 	state := newMockStateStore(map[string]deploy.ProjectState{
