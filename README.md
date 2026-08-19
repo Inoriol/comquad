@@ -4,6 +4,8 @@
 
 It lets you define your services in a standard `compose.yaml` file and deploy them as individual systemd units using Podman's Quadlet technology. Instead of running its own orchestrator, `comquad` prepares the quadlet files and delegates lifecycle management entirely to systemd.
 
+![comquad demo](.github/assets/demo.gif)
+
 ## 🎯 Design & Architecture Goals
 
 `comquad` is designed to bridge the developer experience of Docker Compose with the operational guarantees of native systemd process management.
