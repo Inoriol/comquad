@@ -1,6 +1,7 @@
 package opinionated
 
 import (
+	"strings"
 	"testing"
 
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
@@ -590,5 +591,117 @@ func TestHasSELinuxContext(t *testing.T) {
 		if hasSELinuxContext(tc.in) != tc.want {
 			t.Errorf("hasSELinuxContext(%q) = %v, want %v", tc.in, !tc.want, tc.want)
 		}
+	}
+}
+
+func TestWarnDangerousBindMounts_Mount(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "cq-myapp-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Mount", "type=bind,source=/etc/config,destination=/app/config"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	WarnDangerousBindMounts(units, cfg)
+	if len(cfg.Warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(cfg.Warnings))
+	}
+	if cfg.Warnings[0].Service != "web" {
+		t.Errorf("expected service 'web', got %q", cfg.Warnings[0].Service)
+	}
+	if !strings.Contains(cfg.Warnings[0].Message, "/etc/config") {
+		t.Errorf("expected warning to mention /etc/config, got %q", cfg.Warnings[0].Message)
+	}
+}
+
+func TestWarnDangerousBindMounts_Volume(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "cq-myapp-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "/var/data:/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	WarnDangerousBindMounts(units, cfg)
+	if len(cfg.Warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(cfg.Warnings))
+	}
+	if !strings.Contains(cfg.Warnings[0].Message, "/var/data") {
+		t.Errorf("expected warning to mention /var/data, got %q", cfg.Warnings[0].Message)
+	}
+}
+
+func TestWarnDangerousBindMounts_SafePath(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "cq-myapp-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "/opt/data:/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	WarnDangerousBindMounts(units, cfg)
+	if len(cfg.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got %d", len(cfg.Warnings))
+	}
+}
+
+func TestWarnDangerousBindMounts_ExactMatch(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "cq-myapp-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "/home:/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	WarnDangerousBindMounts(units, cfg)
+	if len(cfg.Warnings) != 1 {
+		t.Fatalf("expected 1 warning for exact /home match, got %d", len(cfg.Warnings))
+	}
+}
+
+func TestWarnDangerousBindMounts_Disabled(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "cq-myapp-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "/etc/config:/config"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+	cfg.SelinuxContext = false
+
+	WarnDangerousBindMounts(units, cfg)
+	if len(cfg.Warnings) != 0 {
+		t.Fatalf("expected no warnings when SELinux disabled, got %d", len(cfg.Warnings))
+	}
+}
+
+func TestWarnDangerousBindMounts_NamedVolume(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "cq-myapp-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "mydata.volume:/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	WarnDangerousBindMounts(units, cfg)
+	if len(cfg.Warnings) != 0 {
+		t.Fatalf("expected no warnings for named volumes, got %d", len(cfg.Warnings))
 	}
 }

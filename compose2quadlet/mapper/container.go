@@ -51,7 +51,7 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	if svc.ContainerName != "" {
 		dirs = append(dirs, c2qtypes.Directive{Key: "ContainerName", Values: []string{svc.ContainerName}})
 	}
-	if svc.Name != "" {
+	if svc.Name != "" && cfg.ServiceName {
 		if cfg.PodmanVersion.AtLeast(5, 3) {
 			dirs = append(dirs, c2qtypes.Directive{Key: "ServiceName", Values: []string{svc.Name}})
 		} else {

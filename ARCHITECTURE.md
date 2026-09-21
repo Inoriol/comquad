@@ -91,11 +91,15 @@ Applying a plan:
 1. Writes generated Quadlet files atomically.
 2. Removes files for services no longer in the Compose file.
 3. Updates the baseline.
-4. Reloads the systemd manager.
-5. Starts new resources and restarts changed containers and images.
-6. Registers the project in the state file.
+4. Stops removed units and reloads the systemd manager.
+5. Starts `.image` units via systemd to pull images (respecting `Policy=` directive).
+6. Starts `.build` units via systemd to build images.
+7. Starts `.container` units and restarts changed containers.
+8. Registers the project in the state file.
 
 Only affected units are restarted. If a later step fails, files and baselines touched by the deployment are restored where possible.
+
+Image pulling is delegated to systemd via `.image` quadlet units. The `--pull` flag value (`always`/`missing`/`never`) is applied as `Policy=` on `.image` units, allowing quadlet to enforce the pull behavior natively (requires podman >= 5.6). On older podman versions, the `Policy=` directive is ignored and images are always pulled.
 
 ### 4. Follow Logs
 

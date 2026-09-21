@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 
@@ -17,9 +18,8 @@ var projectName string
 var dryRun bool
 
 var rootCmd = &cobra.Command{
-	Use:     "comquad",
-	Short:   "comquad is a developer-friendly CLI for deploying Podman Quadlets.",
-	Version: version,
+	Use:   "comquad",
+	Short: "comquad is a developer-friendly CLI for deploying Podman Quadlets.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		logger.SetQuiet(quiet)
 		logger.SetVerbose(verbose)
@@ -27,12 +27,19 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	if version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+	}
+	rootCmd.Version = version
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress all non-error output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed information about changes made during deployment")
 }
 
 func main() {
 	rootCmd.AddCommand(upCmd)
+	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(downCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(regenerateCmd)

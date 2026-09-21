@@ -16,6 +16,7 @@ type Config struct {
 	AutoUpdate          bool
 	InstallSection      bool
 	NetworkAliases      bool
+	ServiceName         bool
 	PodmanVersion       Version
 	Warnings            []Warning
 	ImageRetry          int
@@ -57,6 +58,7 @@ func DefaultConfig() *Config {
 		AutoUpdate:      false,
 		InstallSection:  true,
 		NetworkAliases:  true,
+		ServiceName:     true,
 		ImageRetry:      3,
 		ImageRetryDelay: 5,
 	}
@@ -102,6 +104,10 @@ func WithoutInstallSection() Option {
 
 func WithoutNetworkAliases() Option {
 	return func(c *Config) { c.NetworkAliases = false }
+}
+
+func WithoutServiceName() Option {
+	return func(c *Config) { c.ServiceName = false }
 }
 
 func WithPodmanVersion(v Version) Option {

@@ -74,6 +74,7 @@ Run commands from the directory containing the project `compose.yaml`.
 | Command | Purpose | Common options |
 |---|---|---|
 | `comquad up` | Generate or update Quadlets and start the project | `-f` follow logs, `--dry-run` preview, `--pull always\|missing\|never`, `--no-diff` skip diff and confirmation |
+| `comquad build` | Build images defined in compose.yaml without starting containers | `-f` follow build logs, `--dry-run` preview, `--pull always\|missing\|never`, `--no-diff` skip diff and confirmation |
 | `comquad down` | Stop and remove the project | `-d` also remove named volumes, `-y` skip confirmation, `--dry-run` preview |
 | `comquad ps` | Show container status | `-a` include exited containers |
 | `comquad start [service ...]` | Start all services or selected services | `--dry-run` preview |
@@ -127,6 +128,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete Compose-to-Quadlet map
 | `NO_COLOR` | Unset | Set to any value to disable ANSI colors. |
 | `ROOTLESS_PORT_OFFSET` | `2000` | Offset applied to privileged ports in rootless mode. |
 | `XDG_DATA_HOME` | `~/.local/share` | Base directory for comquad state and deployment data. |
+| `COMQUAD_SELINUX_DANGEROUS_PATHS` | `/etc,/var,/home,/usr,/sys,/proc,/boot,/root` | Comma-separated list of host paths that trigger a warning when bind-mounted with SELinux relabeling. |
 
 ## Files and State
 

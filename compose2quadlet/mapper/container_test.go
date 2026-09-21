@@ -133,6 +133,18 @@ func TestContainer_ServiceName(t *testing.T) {
 	assertDirective(t, dirs, "ServiceName", "my-web")
 }
 
+func TestContainer_WithoutServiceName(t *testing.T) {
+	svc := types.ServiceConfig{Name: "my-web"}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ServiceName = false
+	dirs := Container(svc, cfg)
+	for _, d := range dirs {
+		if d.Key == "ServiceName" {
+			t.Fatal("expected no ServiceName directive when disabled")
+		}
+	}
+}
+
 func TestContainer_SecurityOpt_NoNewPrivileges(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", SecurityOpt: []string{"no-new-privileges"}}
 	cfg := c2qtypes.DefaultConfig()

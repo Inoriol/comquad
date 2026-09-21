@@ -131,6 +131,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		c2q.WithSecretsDirectory(secretsDir),
 		c2q.WithBuildCacheDir(buildCacheDir),
 		c2q.WithDockerfileNormalization(),
+		c2q.WithoutServiceName(),
 	}
 
 	if versionErr == nil {
@@ -155,7 +156,14 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		return fmt.Errorf("transpilation failed: %w", err)
 	}
 
-	stripServiceName(units)
+	strat, err := ParsePullStrategy(pullStrategy)
+	if err != nil {
+		return err
+	}
+	setPolicyOnImageUnits(units, strat)
+	if versionErr == nil && !podmanVersion.AtLeast(5, 6) {
+		logger.Info("Policy= in .image units requires podman >= 5.6.0 — pull strategy may not be enforced")
+	}
 
 	baselineDir, err := resolveBaselineDir(o.projectName)
 	if err != nil {
@@ -205,8 +213,20 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		return err
 	}
 
+	logger.Action("Preparing units...")
+	if err := o.prepareUnits(projectFiles, result); err != nil {
+		o.rollbackDeploy(plan, priorState, hadPriorState)
+		return err
+	}
+
 	logger.Action("Handling images...")
 	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
+		o.rollbackDeploy(plan, priorState, hadPriorState)
+		return err
+	}
+
+	logger.Action("Handling builds...")
+	if err := o.handleBuilds(projectFiles); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
@@ -223,7 +243,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		time.Sleep(500 * time.Millisecond)
 
 		logger.Action("Starting services...")
-		if err := o.startUnits(projectFiles, result); err != nil {
+		if err := o.startContainers(projectFiles, result); err != nil {
 			o.rollbackDeploy(plan, priorState, hadPriorState)
 			return fmt.Errorf("failed to start services: %w", err)
 		}
@@ -233,12 +253,185 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	}
 
 	logger.Action("Starting services...")
-	if err := o.startUnits(projectFiles, result); err != nil {
+	if err := o.startContainers(projectFiles, result); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return fmt.Errorf("failed to start services: %w", err)
 	}
 
 	logger.Success("Successfully deployed project: " + o.projectName)
+	return nil
+}
+
+func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDiff bool) error {
+	logger.Action("Reading compose file...")
+	composeFile := findComposeFile(o.cwd)
+	if composeFile == "" {
+		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
+	}
+
+	if !dryRun && !deploy.StateFileExists() {
+		logger.Action("First deployment detected — checking prerequisites...")
+		if err := deploy.ValidatePodmanVersion(); err != nil {
+			return fmt.Errorf("prerequisite check failed: %w", err)
+		}
+	}
+
+	podmanVersion, versionErr := deploy.DetectPodmanVersion()
+	if versionErr != nil {
+		if !dryRun {
+			logger.Warn("could not detect podman version, assuming latest: " + versionErr.Error())
+		}
+	}
+
+	targetDir, err := o.resolveTargetDir()
+	if err != nil {
+		return err
+	}
+
+	isRootless := deploy.IsRootless()
+	selinuxEnabled := deploy.IsSELinuxEnabled()
+
+	portOffset := 0
+	if isRootless {
+		portOffset = defaultPortOffset
+		if envOffset := os.Getenv("ROOTLESS_PORT_OFFSET"); envOffset != "" {
+			if parsed, err := strconv.Atoi(envOffset); err == nil && parsed > 0 {
+				portOffset = parsed
+			}
+		}
+	}
+
+	if selinuxEnabled {
+		logger.Action(fmt.Sprintf("SELinux detected, adding :z labels to all volumes"))
+	}
+
+	secretsDir, err := resolveSecretsDir(o.projectName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve secrets directory: %w", err)
+	}
+
+	buildCacheDir, err := resolveBuildCacheDir(o.projectName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve build cache directory: %w", err)
+	}
+
+	opts := []c2q.TranspileOption{
+		c2q.WithProjectName(o.projectName),
+		c2q.WithLabels(map[string]string{
+			"com.comquad.managed": "true",
+			"com.comquad.project": o.projectName,
+		}),
+		c2q.WithSecretsDirectory(secretsDir),
+		c2q.WithBuildCacheDir(buildCacheDir),
+		c2q.WithDockerfileNormalization(),
+		c2q.WithoutServiceName(),
+	}
+
+	if versionErr == nil {
+		opts = append(opts, c2q.WithPodmanVersion(podmanVersion))
+	}
+
+	if portOffset > 0 {
+		opts = append(opts, c2q.WithPortOffset(portOffset))
+		logger.Action(fmt.Sprintf("Applied port offset %d for rootless mode", portOffset))
+	}
+	opts = append(opts, c2q.WithInfo(logger.Action))
+	if !selinuxEnabled {
+		opts = append(opts, c2q.WithoutSELinux())
+	}
+	if dryRun {
+		opts = append(opts, c2q.WithDryRun())
+	}
+
+	logger.Action("Transpiling compose configuration...")
+	units, err := c2q.TranspileFile(composeFile, opts...)
+	if err != nil {
+		return fmt.Errorf("transpilation failed: %w", err)
+	}
+
+	strat, err := ParsePullStrategy(pullStrategy)
+	if err != nil {
+		return err
+	}
+	setPolicyOnImageUnits(units, strat)
+	if versionErr == nil && !podmanVersion.AtLeast(5, 6) {
+		logger.Info("Policy= in .image units requires podman >= 5.6.0 — pull strategy may not be enforced")
+	}
+
+	baselineDir, err := resolveBaselineDir(o.projectName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve baseline directory: %w", err)
+	}
+
+	prefix := "cq-" + o.projectName + "-"
+	plan, err := reconcile.Compute(targetDir, baselineDir, prefix, units)
+	if err != nil {
+		return fmt.Errorf("computing changes: %w", err)
+	}
+
+	if dryRun {
+		return o.printDryRun(units, targetDir, pullStrategy, plan)
+	}
+
+	if !noDiff && o.projectDeployed() && plan.HasChanges() {
+		fmt.Print(colorizeDiff(plan.Diff()))
+		if isTerminal(os.Stdin) {
+			proceed, err := confirmUpdate()
+			if err != nil {
+				return err
+			}
+			if !proceed {
+				logger.Print("Update cancelled — no changes applied.")
+				return nil
+			}
+		}
+	}
+
+	logger.Action("Reconciling quadlet files...")
+	result, err := reconcile.Apply(targetDir, baselineDir, plan)
+	if err != nil {
+		return fmt.Errorf("reconciling quadlet files: %w", err)
+	}
+	o.reportReconcile(result)
+
+	projectFiles, err := o.collectProjectFiles(targetDir)
+	if err != nil {
+		return err
+	}
+
+	priorState, hadPriorState := o.getProjectState()
+
+	if err := o.registerState(projectFiles); err != nil {
+		o.rollbackDeploy(plan, priorState, hadPriorState)
+		return err
+	}
+
+	logger.Action("Preparing units...")
+	if err := o.prepareUnits(projectFiles, result); err != nil {
+		o.rollbackDeploy(plan, priorState, hadPriorState)
+		return err
+	}
+
+	logger.Action("Handling images...")
+	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
+		o.rollbackDeploy(plan, priorState, hadPriorState)
+		return err
+	}
+
+	logger.Action("Handling builds...")
+	if err := o.handleBuilds(projectFiles); err != nil {
+		o.rollbackDeploy(plan, priorState, hadPriorState)
+		return err
+	}
+
+	deployTime := time.Now().Format("2006-01-02 15:04:05")
+
+	if follow {
+		logger.Print("Following logs for project: " + o.projectName)
+		return o.FollowLogs(deployTime, "", false)
+	}
+
+	logger.Success("Successfully built project images: " + o.projectName)
 	return nil
 }
 
