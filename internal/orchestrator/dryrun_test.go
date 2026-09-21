@@ -55,11 +55,20 @@ func makeTestUnits() []c2q.QuadletUnit {
 			Name: "cq-myapp-web",
 			Sections: []c2q.Section{
 				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
-					{Key: "Image", Values: []string{"docker.io/library/nginx"}},
+					{Key: "Image", Values: []string{"cq-myapp-web.image"}},
 					{Key: "Label", Values: []string{"com.comquad.project=myapp"}},
 				}},
 				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
 					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitImage,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionImage, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/nginx"}},
 				}},
 			},
 		},
@@ -73,7 +82,7 @@ func makeBuildTestUnits() []c2q.QuadletUnit {
 			Name: "cq-myapp-web",
 			Sections: []c2q.Section{
 				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
-					{Key: "Image", Values: []string{"myapp-web:latest"}},
+					{Key: "Image", Values: []string{"cq-myapp-web.build"}},
 				}},
 				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
 					{Key: "WantedBy", Values: []string{"default.target"}},
@@ -99,7 +108,7 @@ func makeMixedTestUnits() []c2q.QuadletUnit {
 			Name: "cq-myapp-web",
 			Sections: []c2q.Section{
 				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
-					{Key: "Image", Values: []string{"myapp-web:latest"}},
+					{Key: "Image", Values: []string{"cq-myapp-web.build"}},
 				}},
 				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
 					{Key: "WantedBy", Values: []string{"default.target"}},
@@ -120,10 +129,19 @@ func makeMixedTestUnits() []c2q.QuadletUnit {
 			Name: "cq-myapp-db",
 			Sections: []c2q.Section{
 				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
-					{Key: "Image", Values: []string{"docker.io/library/postgres:15"}},
+					{Key: "Image", Values: []string{"cq-myapp-db.image"}},
 				}},
 				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
 					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitImage,
+			Name: "cq-myapp-db",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionImage, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/postgres:15"}},
 				}},
 			},
 		},
@@ -137,10 +155,19 @@ func makeMultiTestUnits() []c2q.QuadletUnit {
 			Name: "cq-myapp-web",
 			Sections: []c2q.Section{
 				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
-					{Key: "Image", Values: []string{"docker.io/library/nginx"}},
+					{Key: "Image", Values: []string{"cq-myapp-web.image"}},
 				}},
 				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
 					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitImage,
+			Name: "cq-myapp-web",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionImage, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/nginx"}},
 				}},
 			},
 		},
@@ -149,10 +176,19 @@ func makeMultiTestUnits() []c2q.QuadletUnit {
 			Name: "cq-myapp-db",
 			Sections: []c2q.Section{
 				{Name: c2q.SectionContainer, Directives: []c2q.Directive{
-					{Key: "Image", Values: []string{"docker.io/library/postgres:15"}},
+					{Key: "Image", Values: []string{"cq-myapp-db.image"}},
 				}},
 				{Name: c2q.SectionInstall, Directives: []c2q.Directive{
 					{Key: "WantedBy", Values: []string{"default.target"}},
+				}},
+			},
+		},
+		{
+			Type: c2q.UnitImage,
+			Name: "cq-myapp-db",
+			Sections: []c2q.Section{
+				{Name: c2q.SectionImage, Directives: []c2q.Directive{
+					{Key: "Image", Values: []string{"docker.io/library/postgres:15"}},
 				}},
 			},
 		},
@@ -250,8 +286,8 @@ func TestPrintDryRun_PrintsFileCount(t *testing.T) {
 		o.printDryRun(units, t.TempDir(), "missing", dryRunPlan(t, t.TempDir(), units))
 	})
 
-	if !strings.Contains(out, "1 file(s) to write, 0 to change, 0 to remove") {
-		t.Errorf("expected '1 file(s) to write, 0 to change, 0 to remove' in output, got:\n%s", out)
+	if !strings.Contains(out, "2 file(s) to write, 0 to change, 0 to remove") {
+		t.Errorf("expected '2 file(s) to write, 0 to change, 0 to remove' in output, got:\n%s", out)
 	}
 }
 
@@ -279,8 +315,8 @@ func TestPrintDryRun_ImagePullNeverReported(t *testing.T) {
 		o.printDryRun(units, t.TempDir(), "never", dryRunPlan(t, t.TempDir(), units))
 	})
 
-	if !strings.Contains(out, "pull skipped: never") {
-		t.Errorf("expected 'pull skipped: never' in output, got:\n%s", out)
+	if !strings.Contains(out, "would verify local image") {
+		t.Errorf("expected 'would verify local image' in output, got:\n%s", out)
 	}
 }
 
@@ -292,8 +328,8 @@ func TestPrintDryRun_ImagePullAlwaysReported(t *testing.T) {
 		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
 	})
 
-	if !strings.Contains(out, "would pull: always") {
-		t.Errorf("expected 'would pull: always' in output, got:\n%s", out)
+	if !strings.Contains(out, "would re-pull: always") {
+		t.Errorf("expected 'would re-pull: always' in output, got:\n%s", out)
 	}
 }
 
@@ -403,8 +439,8 @@ func TestPrintDryRun_MixedBuildAndImageContainers(t *testing.T) {
 	if !strings.Contains(out, "[build]") {
 		t.Errorf("expected [build] label for built web container, got:\n%s", out)
 	}
-	if !strings.Contains(out, "[image]") {
-		t.Errorf("expected [image] label for db container, got:\n%s", out)
+	if !strings.Contains(out, "would re-pull: always") {
+		t.Errorf("expected 'would re-pull: always' for db container, got:\n%s", out)
 	}
 }
 

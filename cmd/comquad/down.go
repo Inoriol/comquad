@@ -28,6 +28,9 @@ var downCmd = &cobra.Command{
 		}
 
 		if !downYes && !dryRun && isStdinTerminal() {
+			if downRemoveVolumes {
+				fmt.Printf("WARNING: This will permanently delete all named volumes for project %q.\n", o.ProjectName())
+			}
 			fmt.Printf("Are you sure you want to remove project %q? [y/N]: ", o.ProjectName())
 			reader := bufio.NewReader(os.Stdin)
 			response, err := reader.ReadString('\n')

@@ -18,8 +18,10 @@ Coordinates the deployment pipeline and implements project operations. The main 
 
 - Reading the Compose file and invoking transpilation
 - Computing and applying reconciliation plans
-- Pulling or building images
-- Starting, stopping, and restarting units
+- Setting `Policy=` on `.image` units based on `--pull` flag
+- Starting `.image` units via systemd to pull images
+- Starting `.build` units via systemd to build images
+- Starting, stopping, and restarting container units
 - Resolving service names for command arguments
 - Implementing logs, exec, view, edit, and project recovery
 
@@ -49,7 +51,7 @@ Implements normal, verbose, quiet, and error output. `NO_COLOR` disables ANSI co
 
 Most conversion behavior belongs in `compose2quadlet`. The orchestration layer performs only the post-processing needed to integrate generated units with comquad's naming and lifecycle model.
 
-The main post-transpile fix is `stripServiceName`. Removing `ServiceName=` ensures systemd uses the generated filename, such as `cq-myproject-web.service`, instead of naming the unit only after the Compose service.
+The `WithoutServiceName()` option suppresses `ServiceName=` on container units so systemd uses the generated filename, such as `cq-myproject-web.service`, instead of naming the unit only after the Compose service.
 
 The conversion layer also:
 
@@ -70,7 +72,9 @@ Each service image is represented by an `.image` unit when applicable. Compose `
 
 Compose `build:` blocks produce `.build` units. Dockerfile `FROM` references are adjusted where needed so locally built images and generated references remain consistent.
 
-If the installed Quadlet generator cannot handle `.image` units, comquad logs a warning and its image handling path can perform a manual pull as a fallback.
+Image pulling is delegated to systemd via `.image` quadlet units. The `--pull` flag value (`always`/`missing`/`never`) is applied as `Policy=` on `.image` units during the `up` lifecycle, allowing quadlet to enforce the pull behavior natively (requires podman >= 5.6). On older podman versions, a verbose-mode warning is emitted and the `Policy=` directive is ignored.
+
+The `comquad build` command provides explicit control over image building. It transpiles the compose file, reconciles quadlet files, and starts `.build` units via systemd without starting `.container` units. The default pull strategy is `always` to ensure base images are re-pulled during builds.
 
 ## Service Resolution
 

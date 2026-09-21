@@ -1,10 +1,7 @@
 package orchestrator
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -34,47 +31,31 @@ func ParsePullStrategy(s string) (PullStrategy, error) {
 	}
 }
 
-func imageExists(image string) bool {
-	cmd := exec.Command("podman", "image", "inspect", image)
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && exitErr.ExitCode() != 125 {
-			logger.Warn(fmt.Sprintf("podman image inspect failed for %s: %v", image, err))
+func setPolicyOnImageUnits(units []c2q.QuadletUnit, strategy PullStrategy) {
+	for i := range units {
+		if units[i].Type != c2q.UnitImage {
+			continue
 		}
-		return false
-	}
-	return true
-}
-
-func pullImage(image string) error {
-	logger.Action("Pulling image: " + image)
-	cmd := exec.Command("podman", "pull", image)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to pull image %s: %w", image, err)
-	}
-	return nil
-}
-
-func handleImage(strategy PullStrategy, image string) error {
-	switch strategy {
-	case PullAlways:
-		return pullImage(image)
-	case PullNever:
-		if !imageExists(image) {
-			return fmt.Errorf("image %s not found locally and pull strategy is 'never'", image)
+		for j := range units[i].Sections {
+			if units[i].Sections[j].Name != c2q.SectionImage {
+				continue
+			}
+			dirs := units[i].Sections[j].Directives
+			found := false
+			for k := range dirs {
+				if dirs[k].Key == "Policy" {
+					dirs[k].Values = []string{string(strategy)}
+					found = true
+					break
+				}
+			}
+			if !found {
+				units[i].Sections[j].Directives = append(dirs, c2q.Directive{
+					Key:    "Policy",
+					Values: []string{string(strategy)},
+				})
+			}
 		}
-		logger.Action("Using local image: " + image)
-		return nil
-	case PullMissing:
-		if imageExists(image) {
-			logger.Action("Image already exists locally: " + image)
-			return nil
-		}
-		return pullImage(image)
-	default:
-		return fmt.Errorf("unknown pull strategy: %s", strategy)
 	}
 }
 
@@ -84,30 +65,85 @@ func (o *Orchestrator) handleImages(projectFiles []string, units []c2q.QuadletUn
 		return err
 	}
 
-	for _, unit := range units {
-		if unit.Type != c2q.UnitContainer {
+	dbusMgr, err := o.newSystemd()
+	if err != nil {
+		return fmt.Errorf("failed to connect to systemd: %w", err)
+	}
+	defer dbusMgr.Close()
+
+	for _, f := range projectFiles {
+		if !strings.HasSuffix(f, ".image") {
 			continue
 		}
 
-		if hasBuildUnit(units, unit.Name) {
-			logger.Action("Skipping pull for " + unit.Name + " (built from .build quadlet)")
+		unitName := ImageFileToUnitName(f)
+		baseName := strings.TrimSuffix(filepath.Base(f), ".image")
+
+		if hasBuildUnitForName(units, baseName) {
+			logger.Info("Skipping image unit " + unitName + " (has corresponding .build unit)")
 			continue
 		}
 
-		image := getDirective(unit, c2q.SectionContainer, "Image")
-		if image == "" {
+		if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
+			logger.Warn(fmt.Sprintf("image unit %s not produced by quadlet generator, skipping: %v", unitName, err))
 			continue
 		}
 
-		image = resolveImageRef(units, image)
+		logger.Action("Handling image unit: " + unitName)
 
-		if err := handleImage(strat, image); err != nil {
-			return fmt.Errorf("failed to handle image %s: %w", image, err)
+		switch strat {
+		case PullAlways:
+			logger.Action("Stopping image unit for re-pull: " + unitName)
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn(fmt.Sprintf("failed to stop image unit %s: %v", unitName, err))
+			}
+			if err := dbusMgr.StartUnit(unitName); err != nil {
+				return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
+			}
+		case PullMissing:
+			statuses, err := dbusMgr.ListUnitsByNames([]string{unitName})
+			if err != nil || len(statuses) == 0 {
+				if err := dbusMgr.StartUnit(unitName); err != nil {
+					return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
+				}
+			} else {
+				status := statuses[0]
+				if status.SubState != "exited" {
+					if err := dbusMgr.StartUnit(unitName); err != nil {
+						return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
+					}
+				} else {
+					logger.Info("Image unit already pulled: " + unitName)
+				}
+			}
+		case PullNever:
+			if err := dbusMgr.StartUnit(unitName); err != nil {
+				return fmt.Errorf("failed to verify image unit %s: %w", unitName, err)
+			}
 		}
-		logger.Success("Handled image: " + image)
+
+		logger.Success("Handled image unit: " + unitName)
 	}
 
 	return nil
+}
+
+func hasBuildUnitForName(units []c2q.QuadletUnit, name string) bool {
+	for _, unit := range units {
+		if unit.Type == c2q.UnitBuild && unit.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasImageUnitForName(units []c2q.QuadletUnit, name string) bool {
+	for _, unit := range units {
+		if unit.Type == c2q.UnitImage && unit.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func getDirective(unit c2q.QuadletUnit, sectionName, key string) string {
@@ -157,34 +193,44 @@ func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pu
 	}
 
 	for _, unit := range units {
-		if unit.Type != c2q.UnitContainer {
+		if unit.Type != c2q.UnitImage {
 			continue
 		}
 
-		image := getDirective(unit, c2q.SectionContainer, "Image")
+		image := getDirective(unit, c2q.SectionImage, "Image")
 		if image == "" {
 			continue
 		}
 
-		image = resolveImageRef(units, image)
-
-		if hasBuildUnit(units, unit.Name) {
-			logger.Printf("[build] %-12s %s  (would be built locally, no pull)\n", unit.Name+".container", image)
+		if hasBuildUnitForName(units, unit.Name) {
+			logger.Printf("[build] %-12s %s  (would be built locally, no pull)\n", unit.Name+".image", image)
 			continue
 		}
 
 		switch strat {
 		case PullAlways:
-			logger.Printf("[image] %-12s %s  (would pull: always)\n", unit.Name+".container", image)
+			logger.Printf("[image] %-12s %s  (would re-pull: always)\n", unit.Name+".image", image)
 		case PullMissing:
-			if imageExists(image) {
-				logger.Printf("[image] %-12s %s  (already exists locally, would skip pull)\n", unit.Name+".container", image)
-			} else {
-				logger.Printf("[image] %-12s %s  (would pull: not found locally)\n", unit.Name+".container", image)
-			}
+			logger.Printf("[image] %-12s %s  (would pull if not already pulled)\n", unit.Name+".image", image)
 		case PullNever:
-			logger.Printf("[image] %-12s %s  (pull skipped: never)\n", unit.Name+".container", image)
+			logger.Printf("[image] %-12s %s  (would verify local image)\n", unit.Name+".image", image)
 		}
+	}
+
+	for _, unit := range units {
+		if unit.Type != c2q.UnitBuild {
+			continue
+		}
+
+		if hasImageUnitForName(units, unit.Name) {
+			continue
+		}
+
+		imageTag := getDirective(unit, c2q.SectionBuild, "ImageTag")
+		if imageTag == "" {
+			imageTag = "unknown"
+		}
+		logger.Printf("[build] %-12s %s  (would be built locally)\n", unit.Name+".build", imageTag)
 	}
 
 	var created, changed, removed []reconcile.FilePlan
@@ -229,47 +275,6 @@ func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pu
 		logger.Print("")
 	}
 
-	for _, unit := range units {
-		if unit.Type == c2q.UnitBuild {
-			file := getDirective(unit, c2q.SectionBuild, "File")
-			if file != "" && filepath.IsAbs(file) {
-				logger.Printf("  Dockerfile → %s\n", file)
-				if wd := getDirective(unit, c2q.SectionBuild, "SetWorkingDirectory"); wd != "" {
-					src := filepath.Join(wd, "Dockerfile")
-					if _, err := os.Stat(src); os.IsNotExist(err) {
-						src = filepath.Join(wd, "Containerfile")
-					}
-					if patched, err := c2q.PatchDockerfileFile(src); err == nil {
-						logger.Print("\n── patched ────────────────────────────────────────────────────────────")
-						logger.Print(strings.TrimRight(patched, "\n"))
-						logger.Print("── end of patch ───────────────────────────────────────────────────────\n")
-					}
-				}
-			}
-		}
-	}
-
 	logger.Print("Dry run complete — nothing was written, no units started.")
 	return nil
-}
-
-func stripServiceName(units []c2q.QuadletUnit) {
-	for i := range units {
-		if units[i].Type != c2q.UnitContainer {
-			continue
-		}
-		for j := range units[i].Sections {
-			if units[i].Sections[j].Name != c2q.SectionContainer {
-				continue
-			}
-			dirs := units[i].Sections[j].Directives
-			filtered := dirs[:0]
-			for _, d := range dirs {
-				if d.Key != "ServiceName" {
-					filtered = append(filtered, d)
-				}
-			}
-			units[i].Sections[j].Directives = filtered
-		}
-	}
 }

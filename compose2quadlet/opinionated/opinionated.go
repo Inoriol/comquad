@@ -9,6 +9,7 @@ func Apply(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qtypes.Quadle
 	units = ApplyDefaultNetwork(units, cfg)
 	units = ApplyNetworkAliases(units, cfg)
 	units = ApplySELinux(units, cfg)
+	units = WarnDangerousBindMounts(units, cfg)
 	units = ApplyLabels(units, cfg)
 	units = ApplyPortOffset(units, cfg)
 	units = ApplyAutoUpdate(units, cfg)

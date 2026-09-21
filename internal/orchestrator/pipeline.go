@@ -82,15 +82,13 @@ func (o *Orchestrator) registerState(projectFiles []string) error {
 	})
 }
 
-func (o *Orchestrator) startUnits(projectFiles []string, res reconcile.Result) error {
+func (o *Orchestrator) prepareUnits(projectFiles []string, res reconcile.Result) error {
 	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}
 	defer dbusMgr.Close()
 
-	// Stop units whose quadlet files were removed (services dropped from compose),
-	// before daemon-reload forgets them.
 	for _, f := range res.Removed {
 		unitName := fileToUnitName(f)
 		if unitName == "" {
@@ -102,9 +100,6 @@ func (o *Orchestrator) startUnits(projectFiles []string, res reconcile.Result) e
 		}
 	}
 
-	changed := stringSet(res.Changed)
-	created := stringSet(res.Created)
-
 	var reloadFiles []string
 	reloadFiles = append(reloadFiles, res.Created...)
 	reloadFiles = append(reloadFiles, res.Changed...)
@@ -113,41 +108,35 @@ func (o *Orchestrator) startUnits(projectFiles []string, res reconcile.Result) e
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
 
-	for _, f := range projectFiles {
-		if strings.HasSuffix(f, ".image") {
-			if !created[f] && !changed[f] {
-				continue
-			}
-			unitName := ImageFileToUnitName(f)
-			logger.Action("Starting unit: " + unitName)
-			if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
-				logger.Warn(fmt.Sprintf("image unit %s not produced by quadlet generator, skipping: %v", unitName, err))
-				continue
-			}
-			if changed[f] {
-				if err := dbusMgr.RestartUnit(unitName); err != nil {
-					logger.Warn(fmt.Sprintf("failed to restart image unit %s: %v", unitName, err))
-				}
-			} else if err := dbusMgr.StartUnit(unitName); err != nil {
-				logger.Warn(fmt.Sprintf("failed to start image unit %s: %v", unitName, err))
-			}
-		}
+	return nil
+}
+
+func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Result) error {
+	dbusMgr, err := o.newSystemd()
+	if err != nil {
+		return fmt.Errorf("failed to connect to systemd: %w", err)
 	}
+	defer dbusMgr.Close()
+
+	changed := stringSet(res.Changed)
 
 	for _, f := range projectFiles {
-		if strings.HasSuffix(f, ".container") {
-			unitName := ContainerFileToUnitName(f)
-			logger.Action("Starting unit: " + unitName)
+		if !strings.HasSuffix(f, ".container") {
+			continue
+		}
+		unitName := ContainerFileToUnitName(f)
+		logger.Action("Starting unit: " + unitName)
 
-			if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
-				return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
+		if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
+			return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
+		}
+
+		if changed[f] {
+			if err := dbusMgr.RestartUnit(unitName); err != nil {
+				return fmt.Errorf("failed to restart unit %s: %w", unitName, err)
 			}
-
-			if changed[f] {
-				if err := dbusMgr.RestartUnit(unitName); err != nil {
-					return fmt.Errorf("failed to restart unit %s: %w", unitName, err)
-				}
-			} else if err := dbusMgr.StartUnit(unitName); err != nil {
+		} else {
+			if err := dbusMgr.StartUnit(unitName); err != nil {
 				return fmt.Errorf("failed to start unit %s: %w", unitName, err)
 			}
 		}
