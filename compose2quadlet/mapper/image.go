@@ -53,6 +53,8 @@ func Images(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 			dirs = append(dirs, c2qtypes.Directive{Key: "RetryDelay", Values: []string{fmt.Sprintf("%ds", cfg.ImageRetryDelay)}})
 		}
 
+		dirs = MergeDirectives(dirs, ExtractImageExtensions(svc, cfg))
+
 		units = append(units, c2qtypes.QuadletUnit{
 			Type:     c2qtypes.UnitImage,
 			Name:     name,

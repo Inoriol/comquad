@@ -70,6 +70,19 @@ The **Since** column tracks the minimum version required for each mapping:
 | `build.tags` | 1 | `ImageTag=` | `[Build]` | 5.2.0 |
 | `build.platforms` | 4 | — | — | — |
 | `build.extra_hosts` | 4 | — | — | — |
+| `build.dockerfile_inline` | 4 | — | — | — |
+| `build.additional_contexts` | 4 | — | — | — |
+| `build.cache_from` | 4 | — | — | — |
+| `build.cache_to` | 4 | — | — | — |
+| `build.entitlements` | 4 | — | — | — |
+| `build.isolation` | 4 | — | — | — |
+| `build.privileged` | 4 | — | — | — |
+| `build.provenance` | 4 | — | — | — |
+| `build.pull` | 4 | — | — | — |
+| `build.sbom` | 4 | — | — | — |
+| `build.ssh` | 4 | — | — | — |
+| `build.shm_size` | 4 | — | — | — |
+| `build.ulimits` | 4 | — | — | — |
 | `command` (string/list) | 1 | `Exec=` | `[Container]` | 4.4.0 |
 | `entrypoint` (string/list) | 1 | `Entrypoint=` | `[Container]` | 5.0.0 |
 | `working_dir` | 1 | `WorkingDir=` | `[Container]` | 4.6.0 |
@@ -83,6 +96,12 @@ The **Since** column tracks the minimum version required for each mapping:
 | `read_only` | 1 | `ReadOnly=` | `[Container]` | 4.4.0 |
 | `runtime` | 3 | `GlobalArgs=--runtime <name>` | `[Container]` | 4.6.0 |
 | `platform` | — | `OS=` / `Arch=` / `Variant=` | `[Image]` | 4.8.0 |
+| `post_start` | 4 | — | — | — |
+| `pre_stop` | 4 | — | — | — |
+| `pre_start` | 4 | — | — | — |
+| `models` | 4 | — | — | — |
+| `provider` | 4 | — | — | — |
+| `use_api_socket` | 4 | — | — | — |
 | `domainname` | 4 | — | — | — |
 | `attach` | 4 | — | — | — |
 | `develop` | 4 | — | — | — |
@@ -95,6 +114,7 @@ The **Since** column tracks the minimum version required for each mapping:
 |---|---|---|---|---|
 | `ports` (short syntax) | 1 | `PublishPort=` | `[Container]` | 4.4.0 |
 | `ports` (long syntax) | 1 | `PublishPort=` | `[Container]` | 4.4.0 |
+| `ports.app_protocol` | 4 | — | — | — |
 | `expose` | 1 | `ExposeHostPort=` | `[Container]` | 4.4.0 |
 | `networks` | 1 | `Network=` | `[Container]` | 4.4.0 |
 | `networks.aliases` | 1 | `NetworkAlias=` | `[Container]` | 5.2.0 |
@@ -103,6 +123,9 @@ The **Since** column tracks the minimum version required for each mapping:
 | `networks.mac_address` | 3 | `PodmanArgs=--mac-address ...` | `[Container]` | 4.6.0 |
 | `networks.priority` | 4 | — | — | — |
 | `networks.driver_opts` | 4 | — | — | — |
+| `networks.interface_name` | 4 | — | — | — |
+| `networks.link_local_ips` | 4 | — | — | — |
+| `networks.gw_priority` | 4 | — | — | — |
 | `network_mode: host` | 1 | `Network=host` | `[Container]` | 4.4.0 |
 | `network_mode: none` | 1 | `Network=none` | `[Container]` | 4.4.0 |
 | `network_mode: service:<name>` | 1 | `Network=container:<name>.container` | `[Container]` | 5.3.0 |
@@ -132,6 +155,8 @@ The **Since** column tracks the minimum version required for each mapping:
 | `volumes.nocopy` | 1 | `Volume=... :nocopy` | `[Container]` | 4.4.0 |
 | `volumes.subpath` | 4 | — | — | — |
 | `volumes.consistency` | 4 | — | — | — |
+| `volumes` (long, image) | 4 | — | — | — |
+| `volumes.image.subpath` | 4 | — | — | — |
 | `volumes_from` | 4 | — | — | — |
 | `tmpfs` (string/long) | 1 | `Tmpfs=` | `[Container]` | 4.5.0 |
 | `shm_size` | 1 | `ShmSize=` | `[Container]` | 4.7.0 |
@@ -149,6 +174,7 @@ The **Since** column tracks the minimum version required for each mapping:
 | `env_file` (string) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
 | `env_file` (list) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
 | `env_file` (`required: false`) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
+| `env_file` (`format: raw`) | 4 | — | — | — |
 
 ---
 
@@ -369,6 +395,7 @@ Generated as companion unit for every service with `image:`.
 | `networks.<name>.interface_name` | 1 | `InterfaceName=` | `[Network]` | 5.6.0 |
 | `networks.<name>.disable_dns` | 1 | `DisableDNS=` | `[Network]` | ? |
 | `networks.<name>.delete_on_stop` | 1 | `NetworkDeleteOnStop=` | `[Network]` | 5.5.0 |
+| `networks.<name>.name` | 1 | `NetworkName=` | `[Network]` | 4.7.0 |
 
 ---
 
@@ -417,17 +444,203 @@ Generated as companion unit for every service with `image:`.
 | `credential_spec` | Windows-only |
 | `isolation` | Windows/Swarm |
 
-## 16. Mapping Counts
+---
+
+## 16. Quadlet-Only Directives (No Compose Equivalent)
+
+These directives are supported by Quadlet but have **no corresponding Compose spec field**.
+They are available via the **x-extension mechanism** (see `x-container`, `x-image`, `x-build`, `x-network`, `x-volume`, `x-systemd` in README.md).
+
+### 16.1 `[Container]` — Quadlet-only (via `x-container`)
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `ContainersConfModule=` | `--module=` | ? | Load containers.conf(5) module |
+| `EnvironmentHost=` | `--env-host` | ? | Pass host environment into container |
+| `GIDMap=` | `--gidmap=` | 4.8.0 | GID mapping for user namespace |
+| `Group=` | `--user UID:GID` | ? | GID to run as (complement to `User=`) |
+| `HealthLogDestination=` | `--health-log-destination=` | ? | Health check log destination |
+| `HealthMaxLogCount=` | `--health-max-log-count=` | ? | Max health check log rotations |
+| `HealthMaxLogSize=` | `--health-max-log-size=` | ? | Max health check log size |
+| `HealthOnFailure=` | `--health-on-failure=` | ? | Action when container becomes unhealthy |
+| `HealthStartupCmd=` | `--health-startup-cmd=` | ? | Startup health check command |
+| `HealthStartupInterval=` | `--health-startup-interval=` | ? | Startup health check interval |
+| `HealthStartupRetries=` | `--health-startup-retries=` | ? | Startup health check retries |
+| `HealthStartupSuccess=` | `--health-startup-success=` | ? | Required successful startup checks |
+| `HealthStartupTimeout=` | `--health-startup-timeout=` | ? | Startup health check timeout |
+| `HttpProxy=` | `--http-proxy=` | 5.7.0 | Control proxy env var forwarding |
+| `ImageVolume=` | `--image-volume=` | 6.1.0 | How to handle builtin image volumes |
+| `Notify=` | `--sdnotify=` | 5.0.0 | sd_notify support (also `healthy`) |
+| `Pod=` | `--pod=` | 5.0.0 | Link container to a `.pod` quadlet |
+| `ReadOnlyTmpfs=` | `--read-only-tmpfs` | 4.8.0 | Mount tmpfs on read-only containers |
+| `ReloadCmd=` | *(generates ExecReload)* | 5.5.0 | Command for `systemctl reload` via exec |
+| `ReloadSignal=` | *(generates ExecReload)* | 5.5.0 | Signal for `systemctl reload` via kill |
+| `Retry=` | `--retry=` | 5.5.0 | Image pull retry count |
+| `RetryDelay=` | `--retry-delay=` | 5.5.0 | Delay between image pull retries |
+| `Rootfs=` | `--rootfs=` | 4.5.0 | Root filesystem path (alternative to Image) |
+| `StartWithPod=` | *(implicit)* | ? | Start container when pod starts |
+| `SubGIDMap=` | `--subgidname=` | 4.8.0 | Subordinate GID map by name |
+| `SubUIDMap=` | `--subuidname=` | 4.8.0 | Subordinate UID map by name |
+| `Timezone=` | `--tz=` | ? | Container timezone |
+| `UIDMap=` | `--uidmap=` | 4.8.0 | UID mapping for user namespace |
+| `Umask=` | `--umask=` | ? | Container process umask |
+
+### 16.2 `[Network]` — Quadlet-only (via `x-network`)
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `ContainersConfModule=` | `--module=` | ? | Load containers.conf(5) module |
+
+### 16.3 `[Volume]` — Quadlet-only (via `x-volume`)
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `ContainersConfModule=` | `--module=` | ? | Load containers.conf(5) module |
+| `Group=` | *(chown)* | 6.0.0 | GID owner of volume mount point |
+| `Image=` | *(artifact volume)* | 6.0.0 | Back volume with OCI artifact image |
+| `User=` | *(chown)* | 6.0.0 | UID owner of volume mount point |
+
+### 16.4 `[Build]` — Quadlet-only (via `x-build`)
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `Annotation=` | `--annotation=` | ? | OCI annotations on built image |
+| `Arch=` | `--arch=` | ? | Target architecture |
+| `AuthFile=` | `--authfile=` | ? | Registry authentication file |
+| `ContainersConfModule=` | `--module=` | ? | Load containers.conf(5) module |
+| `DNS=` | `--dns=` | ? | DNS servers during build |
+| `DNSOption=` | `--dns-option=` | ? | DNS options during build |
+| `DNSSearch=` | `--dns-search=` | ? | DNS search domains during build |
+| `Environment=` | `--env=` | ? | Environment variables during build |
+| `ForceRM=` | `--force-rm=` | ? | Always remove intermediate containers |
+| `Pull=` | `--pull=` | ? | Pull policy during build |
+| `Retry=` | `--retry=` | ? | Build retry count |
+| `RetryDelay=` | `--retry-delay=` | ? | Delay between build retries |
+| `TLSVerify=` | `--tls-verify=` | ? | Require TLS verification for registries |
+| `Variant=` | `--variant=` | ? | Target platform variant |
+| `Volume=` | `--volume=` | ? | Mount volume during build |
+
+### 16.5 `[Image]` — Quadlet-only (via `x-image`)
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `AllTags=` | `--all-tags` | ? | Pull all tagged images |
+| `AuthFile=` | `--authfile=` | ? | Registry authentication file |
+| `CertDir=` | `--cert-dir=` | ? | TLS certificates directory |
+| `ContainersConfModule=` | `--module=` | ? | Load containers.conf(5) module |
+| `Creds=` | `--creds=` | ? | Registry credentials |
+| `DecryptionKey=` | `--decryption-key=` | ? | Key for decrypting encrypted image |
+| `ImageTag=` | `--tag=` | 5.3.0 | Additional tag for pulled image |
+| `TLSVerify=` | `--tls-verify=` | ? | Require TLS verification for registries |
+
+### 16.6 `.pod` Quadlet (No Compose Equivalent)
+
+Pod quadlets have no Compose equivalent at all. The entire `.pod` unit type is Quadlet-specific.
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `AddHost=` | `--add-host=` | 5.0.0 | Host-to-IP mapping for pod |
+| `ContainersConfModule=` | `--module=` | ? | Load containers.conf(5) module |
+| `DNS=` | `--dns=` | 5.0.0 | DNS servers for pod |
+| `DNSOption=` | `--dns-option=` | 5.0.0 | DNS options for pod |
+| `DNSSearch=` | `--dns-search=` | 5.0.0 | DNS search domains for pod |
+| `ExitPolicy=` | `--exit-policy=` | 5.6.0 | Pod exit behavior (`stop`/`continue`) |
+| `GIDMap=` | `--gidmap=` | 5.0.0 | GID mapping for pod namespace |
+| `GlobalArgs=` | *(global podman args)* | 5.0.0 | Arguments between podman and pod |
+| `HostName=` | `--hostname=` | 5.0.0 | Hostname for pod |
+| `IP=` | `--ip=` | 5.0.0 | Static IPv4 for pod |
+| `IP6=` | `--ip6=` | 5.0.0 | Static IPv6 for pod |
+| `Label=` | `--label=` | 5.0.0 | OCI labels on pod |
+| `Network=` | `--network=` | 5.0.0 | Network for pod |
+| `NetworkAlias=` | `--network-alias=` | 5.0.0 | Network-scoped alias for pod |
+| `PodmanArgs=` | *(pod create args)* | 5.0.0 | Additional pod create arguments |
+| `PodName=` | `--name=` | 5.0.0 | Custom pod name |
+| `PublishPort=` | `--publish=` | 5.0.0 | Port publishing for pod |
+| `ServiceName=` | *(systemd unit name)* | 5.0.0 | Systemd service name |
+| `ShmSize=` | `--shm-size=` | 5.0.0 | Shared memory size for pod |
+| `StopTimeout=` | `--time=` | 5.7.0 | Stop timeout for pod |
+| `SubGIDMap=` | `--subgidname=` | 5.0.0 | Subordinate GID map by name |
+| `SubUIDMap=` | `--subuidname=` | 5.0.0 | Subordinate UID map by name |
+| `UIDMap=` | `--uidmap=` | 5.0.0 | UID mapping for pod namespace |
+| `UserNS=` | `--userns=` | 5.0.0 | User namespace mode for pod |
+| `Volume=` | `--volume=` | 5.0.0 | Volume mount for pod infra container |
+
+### 16.7 `.kube` Quadlet (No Compose Equivalent)
+
+Kube quadlets deploy from Kubernetes YAML. Entirely Quadlet-specific.
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `AutoUpdate=` | `--label io.containers.autoupdate=` | 4.4.0 | Auto-update policy |
+| `ConfigMap=` | `--configmap=` | 4.4.0 | ConfigMap YAML path |
+| `ContainersConfModule=` | `--module=` | ? | Load containers.conf(5) module |
+| `ExitCodePropagation=` | `--exit-code-propagation=` | ? | How to propagate exit codes |
+| `GlobalArgs=` | *(global podman args)* | 4.4.0 | Arguments between podman and kube |
+| `KubeDownForce=` | `--force=` | ? | Force removal on kube down |
+| `LogDriver=` | `--log-driver=` | 4.4.0 | Log driver for kube containers |
+| `Network=` | `--network=` | 4.4.0 | Network for kube containers |
+| `PodmanArgs=` | *(kube play args)* | 4.4.0 | Additional kube play arguments |
+| `PublishPort=` | `--publish=` | 4.4.0 | Port publishing |
+| `ServiceName=` | *(systemd unit name)* | ? | Systemd service name |
+| `SetWorkingDirectory=` | `--context-dir=` | ? | Working directory for kube |
+| `UserNS=` | `--userns=` | ? | User namespace mode |
+| `Yaml=` | *(positional arg)* | 4.4.0 | Path to Kubernetes YAML |
+
+### 16.8 `.artifact` Quadlet (No Compose Equivalent)
+
+Artifact quadlets manage OCI artifacts. Entirely Quadlet-specific (since 5.7.0).
+
+| Directive | Podman equivalent | Since | Notes |
+|---|---|---|---|
+| `Artifact=` | *(positional arg)* | 5.7.0 | Artifact identifier |
+| `AuthFile=` | `--authfile=` | 5.7.0 | Registry authentication file |
+| `CertDir=` | `--cert-dir=` | 5.7.0 | TLS certificates directory |
+| `ContainersConfModule=` | `--module=` | 5.7.0 | Load containers.conf(5) module |
+| `Creds=` | `--creds=` | 5.7.0 | Registry credentials |
+| `DecryptionKey=` | `--decryption-key=` | 5.7.0 | Key for decrypting encrypted artifact |
+| `GlobalArgs=` | *(global podman args)* | 5.7.0 | Arguments between podman and artifact |
+| `PodmanArgs=` | *(artifact pull args)* | 5.7.0 | Additional artifact pull arguments |
+| `Quiet=` | `--quiet` | 5.7.0 | Suppress output |
+| `Retry=` | `--retry=` | 5.7.0 | Pull retry count |
+| `RetryDelay=` | `--retry-delay=` | 5.7.0 | Delay between pull retries |
+| `ServiceName=` | *(systemd unit name)* | 5.7.0 | Systemd service name |
+| `TLSVerify=` | `--tls-verify=` | 5.7.0 | Require TLS verification |
+
+### 16.9 `[Quadlet]` Section
+
+| Directive | Since | Notes |
+|---|---|---|
+| `DefaultDependencies=` | ? | Disable implicit network-online.target dependencies |
+
+---
+
+## 17. Mapping Counts
 
 | Priority | Count | Min podman/systemd |
 |---|---|---|
-| **1** Direct Quadlet | ~76 fields | 4.4.0 baseline, ~15 later additions |
+| **1** Direct Quadlet | ~77 fields | 4.4.0 baseline, ~15 later additions |
 | **2** Systemd `[Service]`/`[Unit]` | ~30 fields | sd 208 baseline, ~5 later additions |
 | **3** PodmanArgs passthrough | ~15 fields | 4.6.0 (PodmanArgs added) |
-| **4** Unsupported | ~25 fields | — |
+| **4** Unsupported | ~52 fields | — |
 | **—** Structural | ~10 fields | 4.4.0 baseline |
 
-**Total: ~156 compose fields mapped.**
+**Total: ~184 compose fields tracked.**
+
+### Quadlet-only directives (no Compose equivalent)
+
+| Section | Count | Notes |
+|---|---|---|
+| `[Container]` | 29 | User namespaces, health startup, reload, timezone, … |
+| `[Network]` | 1 | `ContainersConfModule=` |
+| `[Volume]` | 4 | `User=`/`Group=`/`Image=`/`ContainersConfModule=` |
+| `[Build]` | 15 | Registry auth, DNS, env, retry, … |
+| `[Image]` | 8 | Registry auth, TLS, all-tags, … |
+| `.pod` | 25 | Entire pod unit type |
+| `.kube` | 14 | Entire kube unit type |
+| `.artifact` | 13 | Entire artifact unit type |
+| `[Quadlet]` | 1 | `DefaultDependencies=` |
+
+**Total: ~110 quadlet-only directives**
 
 ## Version Requirement Summary
 
@@ -436,11 +649,12 @@ All core [Container], [Network], [Volume] quadlet types and `.image` type.
 ~85% of priority-1 fields available.
 
 ### Later podman versions unlock
-- 5.0.0: `Entrypoint=` (as quadlet key), `StopTimeout=`
+- 5.0.0: `Entrypoint=` (as quadlet key), `StopTimeout=`, `Notify=`, `Pod=`, `.pod` type
 - 5.2.0: `.build` type, `NetworkAlias=`, `StopSignal=`, `LogOpt=`
-- 5.3.0: `CgroupsMode=`, `AddHost=`, `ServiceName=`
-- 5.5.0: `Memory=`, `Retry=`/`RetryDelay=`
-- 5.6.0: `Policy=`, `InterfaceName=`, env key-only
-- 5.7.0: `BuildArg=` (build)
+- 5.3.0: `CgroupsMode=`, `AddHost=`, `ServiceName=`, `StartWithPod=`
+- 5.5.0: `Memory=`, `Retry=`/`RetryDelay=`, `ReloadCmd=`/`ReloadSignal=`
+- 5.6.0: `Policy=`, `InterfaceName=`, env key-only, `ExitPolicy=` (pod)
+- 5.7.0: `BuildArg=` (build), `HttpProxy=`, `IgnoreFile=`, `.artifact` type
 - 5.8.0: `AppArmor=`
-- 6.0.0: Volume `UID=`/`GID=`/`Options=`
+- 6.0.0: Volume `UID=`/`GID=`/`Options=`/`User=`/`Group=`/`Image=`
+- 6.1.0: `ImageVolume=`

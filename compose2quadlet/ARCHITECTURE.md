@@ -86,8 +86,10 @@ compose2quadlet/
 │   ├── network.go            # Networks() — top-level .network quadlets
 │   ├── volume.go             # Volumes() — top-level .volume quadlets
 │   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor (env, file, external)
-│   ├── dockerfile.go          # PatchDockerfileFROM() — normalize bare image names in FROM lines
-│   └── helpers.go             # sortedKeys() — deterministic map key ordering
+│   ├── dockerfile.go         # PatchDockerfileFROM() — normalize bare image names in FROM lines
+│   ├── extensions.go         # Extract*Extensions() — x-extension extraction for quadlet-only directives
+│   ├── validation.go         # isValidDirective() — directive validation for x-extensions
+│   └── helpers.go            # sortedKeys() — deterministic map key ordering
 │
 ├── opinionated/              # Opinionated transforms
 │   ├── opinionated.go        # Apply() — orchestrates all transforms
@@ -334,6 +336,31 @@ When `WithSecretsDirectory(path)` is set, `PremapSecrets()` resolves `secrets:` 
 - Emits `Volume=<path>:/run/secrets/<name>:ro` in `[Container]`
 - `WithDryRun()` skips disk writes but still generates correct directives
 
+### X-Extensions
+
+X-extensions allow setting Quadlet directives that have no Compose equivalent. They are extracted from the `Extensions` field of compose-go types (which captures `x-*` keys from YAML).
+
+**Supported extensions:**
+- `x-container` → `[Container]` directives
+- `x-image` → `[Image]` directives
+- `x-build` → `[Build]` directives
+- `x-network` → `[Network]` directives
+- `x-volume` → `[Volume]` directives
+- `x-systemd` → `[Service]` and `[Unit]` directives (map with `Service` and/or `Unit` keys)
+
+**Override behavior:** X-extensions override compose-generated directives when there's a conflict. The `MergeDirectives()` function handles this by replacing directives with the same key.
+
+**Validation:** Directive names are validated against known Quadlet directives per section (defined in `mapper/validation.go`). Unknown directives emit a `WarningSkipped` warning but are still passed through for forward compatibility.
+
+**Integration:** Each mapper function calls the appropriate `Extract*Extensions()` function and merges the results:
+- `Container()` calls `ExtractContainerExtensions()`
+- `Images()` calls `ExtractImageExtensions()`
+- `Builds()` calls `ExtractBuildExtensions()`
+- `Service()` calls `ExtractSystemdExtensions()` for `[Service]`
+- `Unit()` calls `ExtractSystemdExtensions()` for `[Unit]`
+- `Networks()` calls `ExtractNetworkExtensions()`
+- `Volumes()` calls `ExtractVolumeExtensions()`
+
 ## Conventions
 
 ### Go Code Style
@@ -420,18 +447,6 @@ comquad's existing `tests/integration/` harness. The library itself does not sta
 - No external test dependencies beyond the standard library and compose-go/v2.
 - **Empty-default pattern**: every unit type gets a test verifying that a `QuadletUnit` with only mandatory fields serializes correctly — catches section rendering bugs early.
 - **Round-trip pattern**: for serialization, every test verifying serialization should also verify deserialization produces the same struct.
-
-## Development Order (Milestones)
-
-From the project scope document:
-
-1. **MVP** — `.container` files only, priority-1 field mappings, no opinionated transforms ✅
-2. **Full compose parity** — `.network`, `.volume`, `.image`, `.build` support, all priority-1 + priority-2 ✅
-3. **Opinionated defaults** — all comquad transforms ported as opt-out `TranspileOption`s ✅
-4. **Deploy + systemd** — `deploy.resources`, `deploy.restart_policy` mapped to `[Service]` ✅
-5. **Secrets + builds** — compose `secrets:` and `build:` handled natively ✅
-6. **Integration** — comquad imports the library and drops the podlet dependency ✅
-7. **Deprecate podlet** — comquad no longer requires the podlet binary at runtime ✅
 
 ## Key Design Decisions
 

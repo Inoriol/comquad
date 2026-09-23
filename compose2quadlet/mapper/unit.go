@@ -7,8 +7,10 @@ import (
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
 )
 
-func Unit(svc types.ServiceConfig) []c2qtypes.Directive {
-	return dependsOn(svc.Name, svc.DependsOn)
+func Unit(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
+	dirs := dependsOn(svc.Name, svc.DependsOn)
+	_, unitExt := ExtractSystemdExtensions(svc, cfg)
+	return MergeDirectives(dirs, unitExt)
 }
 
 func UnitService(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {

@@ -16,6 +16,7 @@ func Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directi
 	dirs = append(dirs, t0Container(svc, cfg)...)
 	dirs = append(dirs, t1Container(svc, cfg)...)
 	dirs = append(dirs, t3Container(svc, cfg)...)
+	dirs = MergeDirectives(dirs, ExtractContainerExtensions(svc, cfg))
 	return dirs
 }
 

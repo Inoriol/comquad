@@ -6,7 +6,7 @@ This document contains implementation details that are useful when changing comq
 
 ### `cmd/comquad`
 
-Defines the Cobra commands and their flags. Commands construct an orchestrator and pass command-specific options to it. The root command owns the persistent `--quiet` and `--verbose` flags.
+Defines the Cobra commands and their flags. Commands construct an orchestrator and pass command-specific options to it. The root command owns the persistent `--quiet`, `--verbose`, and `--json` flags.
 
 ### `compose2quadlet`
 
@@ -46,6 +46,22 @@ Provides systemd D-Bus communication, Podman queries, target-directory selection
 ### `internal/logger`
 
 Implements normal, verbose, quiet, and error output. `NO_COLOR` disables ANSI color output. Errors always go to stderr; quiet mode suppresses non-error output.
+
+### `internal/output`
+
+Provides JSON output formatting for machine-readable command output. Key components:
+
+- `schemas.go` — JSON schema definitions with versioned API envelope
+- `formatter.go` — `PrintJSON()`, `PrintError()`, and mode management via `SetJSONMode()`/`IsJSONMode()`
+
+To add JSON support to a command:
+
+1. Define the output struct in `schemas.go` (e.g., `ViewData`)
+2. In the command or orchestrator method, check `output.IsJSONMode()`
+3. Convert internal types to the JSON schema type
+4. Call `output.PrintJSON(&output.Envelope{Version: output.APIVersion, Data: yourData})`
+
+The `--json` flag is set in `PersistentPreRun` of the root command, so it is available to all subcommands.
 
 ## Compose-to-Quadlet Details
 
