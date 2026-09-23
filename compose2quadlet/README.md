@@ -84,10 +84,74 @@ func main() {
   - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
   - `secrets.go` — pre-mapping interceptor for secrets and configs
   - `dockerfile.go` — `PatchDockerfileFROM()` normalizes bare image names in Dockerfile FROM lines
+  - `extensions.go` — x-extension extraction for quadlet-only directives
+  - `validation.go` — directive validation for x-extensions
 - **`opinionated/`** — Composable post-processing transforms (prefix, references including external resources, container name, SELinux relabeling, labels, default network, network aliases, port offset, auto-update, install section)
 - **`serialization/`** — `Marshal()`, `Write()`, `WriteUnits()`, `Unmarshal()` for ini-format serialization
 
 Warnings from degraded or skipped mappings are sent through the `WithInfo` callback when configured. Fatal mappings still return an error. Environment-secret and patched-Dockerfile write failures are reported as degraded warnings.
+
+## X-Extensions
+
+X-extensions allow you to set Quadlet directives that have no Compose equivalent. They override compose-generated directives when there's a conflict.
+
+### Supported Extensions
+
+| Extension | Section | Example |
+|-----------|---------|---------|
+| `x-container` | `[Container]` | `Timezone`, `Notify`, `HealthOnFailure` |
+| `x-image` | `[Image]` | `AllTags`, `AuthFile`, `CertDir` |
+| `x-build` | `[Build]` | `DNS`, `Environment`, `Volume` |
+| `x-network` | `[Network]` | `ContainersConfModule` |
+| `x-volume` | `[Volume]` | `User`, `Group`, `Image` |
+| `x-systemd` | `[Service]` and `[Unit]` | See example below |
+
+### Example
+
+```yaml
+services:
+  web:
+    image: nginx
+    ports:
+      - "8080:80"
+    
+    # Container-specific quadlet directives
+    x-container:
+      Timezone: "Europe/Berlin"
+      Notify: "healthy"
+      HealthOnFailure: "restart"
+    
+    # Image-specific quadlet directives
+    x-image:
+      AllTags: true
+      AuthFile: "/path/to/auth.json"
+    
+    # Systemd [Service] and [Unit] pass-through
+    x-systemd:
+      Service:
+        MemoryMax: "512M"
+        Restart: "on-failure"
+      Unit:
+        After: "network-online.target"
+        Documentation: "https://example.com"
+
+networks:
+  frontend:
+    driver: bridge
+    x-network:
+      ContainersConfModule: "/etc/containers/my.conf"
+
+volumes:
+  data:
+    driver: local
+    x-volume:
+      User: "1000"
+      Group: "1000"
+```
+
+### Validation
+
+Unknown directives emit a warning but are still passed through. This allows forward compatibility with newer Podman versions that may add new directives.
 
 ## Dependencies
 

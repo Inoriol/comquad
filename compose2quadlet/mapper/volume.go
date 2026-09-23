@@ -59,6 +59,8 @@ func Volumes(volumes types.Volumes, cfg *c2qtypes.Config) []c2qtypes.QuadletUnit
 			dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, vc.Labels[k])}})
 		}
 
+		dirs = MergeDirectives(dirs, ExtractVolumeExtensions(name, vc, cfg))
+
 		units = append(units, c2qtypes.QuadletUnit{
 			Type:     c2qtypes.UnitVolume,
 			Name:     name,

@@ -51,7 +51,7 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 
 		var sections []Section
 
-		unitDirs := mapper.Unit(svc)
+		unitDirs := mapper.Unit(svc, cfg)
 		if len(unitDirs) > 0 {
 			sections = append(sections, Section{Name: SectionUnit, Directives: unitDirs})
 		}

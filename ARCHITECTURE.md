@@ -33,10 +33,11 @@ internal/orchestrator/ Deployment pipeline and command behavior
 internal/reconcile/    Diffing, merging, and atomic application
 internal/deploy/       systemd D-Bus, Podman, paths, and project state
 internal/logger/       Output levels and color handling
+internal/output/       JSON output formatting and API schemas
 tests/integration/     End-to-end tests using Podman and systemd
 ```
 
-The orchestrator coordinates the other packages. The conversion library produces units; the reconcile package decides what should change; the deploy package applies those changes through systemd and Podman.
+The orchestrator coordinates the other packages. The conversion library produces units; the reconcile package decides what should change; the deploy package applies those changes through systemd and Podman. The output package provides machine-readable JSON output for automation and integration.
 
 ## `up` Lifecycle
 
@@ -153,6 +154,25 @@ Commands that inspect or interact with services use the project state to resolve
 - `edit` opens generated units in `$EDITOR`, then reloads systemd when files change.
 
 `down` stops the project's units, removes generated files and managed networks, unregisters the project, and removes auxiliary state. Named volumes are retained unless `--delete-volumes` is supplied.
+
+## JSON Output
+
+All commands support the `--json` global flag for machine-readable output. This enables automation, scripting, and integration with tools like Cockpit.
+
+The output package (`internal/output`) provides:
+
+- Versioned API envelope: `{"version": "1.0", "data": {...}}`
+- Error envelope: `{"version": "1.0", "error": {"code": "...", "message": "..."}}`
+- Schema definitions for each command's output structure
+
+Commands check `output.IsJSONMode()` and emit JSON instead of human-readable tables or text. Currently supported commands: `list`, `ps`.
+
+When adding JSON support to a new command:
+
+1. Define the output schema in `internal/output/schemas.go`
+2. Check `output.IsJSONMode()` in the command or orchestrator method
+3. Convert internal data structures to JSON schema types
+4. Call `output.PrintJSON()` with the schema-wrapped data
 
 ## Failure Boundaries
 

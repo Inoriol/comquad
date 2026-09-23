@@ -10,6 +10,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 // Ps shows the current state of containers for the project.
@@ -24,6 +25,9 @@ func (o *Orchestrator) Ps(all bool) error {
 	}
 
 	if len(containers) == 0 {
+		if output.IsJSONMode() {
+			return output.PrintJSON(&output.PSData{Containers: []output.ContainerJSON{}})
+		}
 		logger.Printf("No containers found for project %s\n", o.projectName)
 		return nil
 	}
@@ -74,6 +78,39 @@ func (o *Orchestrator) Ps(all bool) error {
 		}
 		return strings.ToLower(containers[i].Name) < strings.ToLower(containers[j].Name)
 	})
+
+	if output.IsJSONMode() {
+		jsonContainers := make([]output.ContainerJSON, len(containers))
+		for i, c := range containers {
+			ports := make([]output.PortJSON, len(c.Ports))
+			for j, p := range c.Ports {
+				ports[j] = output.PortJSON{
+					Protocol:      p.Protocol,
+					ContainerPort: p.ContainerPort,
+					HostIP:        p.HostIP,
+					HostPort:      p.HostPort,
+				}
+			}
+			jsonContainers[i] = output.ContainerJSON{
+				Name:         c.Name,
+				Image:        c.Image,
+				Command:      c.Command,
+				Service:      c.Service,
+				State:        c.State,
+				Status:       c.Status,
+				Ports:        ports,
+				ExposedPorts: c.ExposedPorts,
+				Networks:     c.Networks,
+				Mounts:       c.Mounts,
+				CreatedAt:    c.CreatedAt,
+				ExitedAt:     c.ExitedAt,
+				ExitCode:     c.ExitCode,
+				DBusActive:   c.DBusActive,
+				DBusSub:      c.DBusSub,
+			}
+		}
+		return output.PrintJSON(&output.PSData{Containers: jsonContainers})
+	}
 
 	printPsTable(containers)
 

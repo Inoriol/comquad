@@ -1,0 +1,28 @@
+services:
+  web:
+    image: nginx
+    ports:
+      - "8080:80"
+    x-container:
+      Timezone: "Europe/Berlin"
+      Notify: "healthy"
+    x-image:
+      AllTags: true
+    x-systemd:
+      Service:
+        MemoryMax: "512M"
+      Unit:
+        Documentation: "https://example.com"
+
+networks:
+  frontend:
+    driver: bridge
+    x-network:
+      ContainersConfModule: "/etc/containers/my.conf"
+
+volumes:
+  data:
+    driver: local
+    x-volume:
+      User: "1000"
+      Group: "1000"

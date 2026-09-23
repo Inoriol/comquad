@@ -22,6 +22,9 @@ func Service(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive
 	dirs = append(dirs, ulimitsP2(svc, cfg)...)
 	dirs = append(dirs, slice(svc, cfg)...)
 
+	svcExt, _ := ExtractSystemdExtensions(svc, cfg)
+	dirs = MergeDirectives(dirs, svcExt)
+
 	return dirs
 }
 

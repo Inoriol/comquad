@@ -89,6 +89,8 @@ func Networks(networks types.Networks, cfg *c2qtypes.Config) []c2qtypes.QuadletU
 			}
 		}
 
+		dirs = MergeDirectives(dirs, ExtractNetworkExtensions(name, nc, cfg))
+
 		units = append(units, c2qtypes.QuadletUnit{
 			Type:     c2qtypes.UnitNetwork,
 			Name:     name,

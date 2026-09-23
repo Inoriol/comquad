@@ -257,3 +257,94 @@ func TestTranspile_ExternalVolumesSkipped(t *testing.T) {
 		t.Fatal("expected test-db_data.volume")
 	}
 }
+
+func TestTranspile_XExtensions(t *testing.T) {
+	project := loadProject(t, "testdata/x-extensions.yaml")
+	units, err := c2q.Transpile(project,
+		c2q.WithProjectName("test"),
+		c2q.WithoutPrefix(),
+		c2q.WithoutDefaultNetwork(),
+		c2q.WithoutSELinux(),
+		c2q.WithoutNetworkAliases(),
+		c2q.WithoutInstallSection(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check container x-extension
+	web, ok := findUnit(units, "test-web", c2q.UnitContainer)
+	if !ok {
+		t.Fatal("expected test-web.container")
+	}
+	containerSec, ok := hasSection(web, c2q.SectionContainer)
+	if !ok {
+		t.Fatal("expected [Container] section")
+	}
+	if !hasDirectiveValue(containerSec.Directives, "Timezone", "Europe/Berlin") {
+		t.Fatal("expected Timezone=Europe/Berlin from x-container")
+	}
+	if !hasDirectiveValue(containerSec.Directives, "Notify", "healthy") {
+		t.Fatal("expected Notify=healthy from x-container")
+	}
+
+	// Check [Service] x-extension
+	serviceSec, ok := hasSection(web, c2q.SectionService)
+	if !ok {
+		t.Fatal("expected [Service] section")
+	}
+	if !hasDirectiveValue(serviceSec.Directives, "MemoryMax", "512M") {
+		t.Fatal("expected MemoryMax=512M from x-systemd.Service")
+	}
+
+	// Check [Unit] x-extension
+	unitSec, ok := hasSection(web, c2q.SectionUnit)
+	if !ok {
+		t.Fatal("expected [Unit] section")
+	}
+	if !hasDirectiveValue(unitSec.Directives, "Documentation", "https://example.com") {
+		t.Fatal("expected Documentation=https://example.com from x-systemd.Unit")
+	}
+
+	// Check image x-extension
+	imgUnit, ok := findUnit(units, "test-web", c2q.UnitImage)
+	if !ok {
+		t.Fatal("expected test-web.image")
+	}
+	imgSec, ok := hasSection(imgUnit, c2q.SectionImage)
+	if !ok {
+		t.Fatal("expected [Image] section")
+	}
+	if !hasDirectiveValue(imgSec.Directives, "AllTags", "true") {
+		t.Fatal("expected AllTags=true from x-image")
+	}
+
+	// Check network x-extension
+	netUnit, ok := findUnit(units, "test-frontend", c2q.UnitNetwork)
+	if !ok {
+		t.Fatal("expected test-frontend.network")
+	}
+	netSec, ok := hasSection(netUnit, c2q.SectionNetwork)
+	if !ok {
+		t.Fatal("expected [Network] section")
+	}
+	if !hasDirectiveValue(netSec.Directives, "ContainersConfModule", "/etc/containers/my.conf") {
+		t.Fatal("expected ContainersConfModule=/etc/containers/my.conf from x-network")
+	}
+
+	// Check volume x-extension
+	volUnit, ok := findUnit(units, "test-data", c2q.UnitVolume)
+	if !ok {
+		t.Fatal("expected test-data.volume")
+	}
+	volSec, ok := hasSection(volUnit, c2q.SectionVolume)
+	if !ok {
+		t.Fatal("expected [Volume] section")
+	}
+	if !hasDirectiveValue(volSec.Directives, "User", "1000") {
+		t.Fatal("expected User=1000 from x-volume")
+	}
+	if !hasDirectiveValue(volSec.Directives, "Group", "1000") {
+		t.Fatal("expected Group=1000 from x-volume")
+	}
+}

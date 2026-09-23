@@ -9,7 +9,8 @@ import (
 
 func TestUnit_DependsOn(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true}, "redis": {Condition: "service_started", Required: false}}}
-	dirs := Unit(svc)
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Unit(svc, cfg)
 
 	assertDirective(t, dirs, "Requires", "db.container")
 	assertDirective(t, dirs, "Wants", "redis.container")
@@ -23,7 +24,8 @@ func TestUnit_DependsOnSortedOrder(t *testing.T) {
 		"adb": {Condition: "service_started", Required: true},
 		"mdb": {Condition: "service_started", Required: false},
 	}}
-	dirs := Unit(svc)
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Unit(svc, cfg)
 
 	var after []string
 	for _, d := range dirs {
@@ -44,7 +46,8 @@ func TestUnit_DependsOnSortedOrder(t *testing.T) {
 
 func TestUnit_DependsOn_Restart(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true, Restart: true}}}
-	dirs := Unit(svc)
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Unit(svc, cfg)
 
 	assertDirective(t, dirs, "Requires", "db.container")
 	assertDirective(t, dirs, "BindsTo", "db.container")
@@ -53,7 +56,8 @@ func TestUnit_DependsOn_Restart(t *testing.T) {
 
 func TestUnit_DependsOn_Empty(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{}}
-	dirs := Unit(svc)
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Unit(svc, cfg)
 	if len(dirs) != 0 {
 		t.Fatalf("expected no directives, got %v", dirs)
 	}
@@ -71,12 +75,13 @@ func TestUnit_DependsOn_ServiceHealthy(t *testing.T) {
 
 func TestUnit_DependsOn_ServiceCompletedSuccessfully(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"init": {Condition: "service_completed_successfully", Required: true}}}
-	unitDirs := Unit(svc)
+	cfg := c2qtypes.DefaultConfig()
+	unitDirs := Unit(svc, cfg)
 
 	assertDirective(t, unitDirs, "Requires", "init.container")
 	assertDirective(t, unitDirs, "After", "init.container")
 
-	serviceDirs := UnitService(svc, c2qtypes.DefaultConfig())
+	serviceDirs := UnitService(svc, cfg)
 	if len(serviceDirs) != 0 {
 		t.Fatal("expected no health polling for service_completed_successfully")
 	}
@@ -87,13 +92,14 @@ func TestUnit_DependsOn_MixedConditions(t *testing.T) {
 		"db":    {Condition: "service_healthy", Required: true},
 		"cache": {Condition: "service_started", Required: false},
 	}}
-	unitDirs := Unit(svc)
+	cfg := c2qtypes.DefaultConfig()
+	unitDirs := Unit(svc, cfg)
 	assertDirective(t, unitDirs, "Requires", "db.container")
 	assertDirective(t, unitDirs, "Wants", "cache.container")
 	assertDirective(t, unitDirs, "After", "db.container")
 	assertDirective(t, unitDirs, "After", "cache.container")
 
-	serviceDirs := UnitService(svc, c2qtypes.DefaultConfig())
+	serviceDirs := UnitService(svc, cfg)
 	if len(serviceDirs) != 1 {
 		t.Fatalf("expected 1 ExecStartPre, got %d", len(serviceDirs))
 	}

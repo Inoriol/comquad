@@ -140,6 +140,8 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 			})
 		}
 
+		dirs = MergeDirectives(dirs, ExtractBuildExtensions(svc, cfg))
+
 		units = append(units, c2qtypes.QuadletUnit{
 			Type:     c2qtypes.UnitBuild,
 			Name:     name,

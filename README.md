@@ -96,6 +96,28 @@ comquad logs --help
 comquad exec --help
 ```
 
+## JSON Output
+
+All commands support the `--json` flag for machine-readable output. This is useful for scripting, automation, and integration with tools like Cockpit.
+
+```bash
+comquad list --json
+comquad ps --json
+```
+
+JSON output includes a version field for API stability:
+
+```json
+{
+  "version": "1.0",
+  "data": {
+    "projects": []
+  }
+}
+```
+
+Currently supported commands: `list`, `ps`.
+
 ## Compose Files
 
 comquad accepts standard Compose files with `services`, `networks`, and `volumes`. Compose services, networks, volumes, secrets, images, and build blocks are translated into the corresponding Quadlet units where supported.
@@ -108,14 +130,17 @@ Some behavior is handled automatically:
 - Rootless privileged ports are shifted by `ROOTLESS_PORT_OFFSET`.
 - Image and build units are generated for systemd to manage.
 
-Native Quadlet behavior can also be added through supported `comquad-*` labels. For example:
+Native Quadlet directives that have no Compose equivalent can be set through x-extensions. Supported extensions: `x-container`, `x-image`, `x-build`, `x-network`, `x-volume`, and `x-systemd` (for `[Service]` and `[Unit]` sections). X-extensions override compose-generated directives when there's a conflict.
 
 ```yaml
 services:
   web:
     image: nginx
-    labels:
-      comquad-no-autoupdate: "true"
+    x-container:
+      Timezone: "Europe/Berlin"
+    x-systemd:
+      Service:
+        MemoryMax: "512M"
 ```
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete Compose-to-Quadlet mapping and implementation details.
