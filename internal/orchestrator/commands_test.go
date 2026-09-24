@@ -5,6 +5,8 @@ package orchestrator
 // state-lookup and argument-validation paths — not the actual systemd interaction.
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 // ---------------------------------------------------------------------------
@@ -74,6 +77,47 @@ func TestList_NoFilterListsAllRegardlessOfProjectName(t *testing.T) {
 
 	if !strings.Contains(out, "alpha") || !strings.Contains(out, "beta") {
 		t.Errorf("expected both projects listed when no filter, got:\n%s", out)
+	}
+}
+
+func TestList_ShowsStatusAndServices(t *testing.T) {
+	dir := t.TempDir()
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", "/src", []string{
+			filepath.Join(dir, "cq-myapp-web.container"),
+			filepath.Join(dir, "cq-myapp-db.container"),
+		}),
+	})
+	sys := newMockSystemdClient()
+	sys.units = []unitRecord{
+		{name: "cq-myapp-web.service", activeState: "active", subState: "running"},
+		{name: "cq-myapp-db.service", activeState: "inactive", subState: "dead"},
+	}
+	o := newTestOrchestrator("myapp", dir, state, sys)
+
+	out := captureStdout(t, func() {
+		if err := o.List(""); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "degraded") {
+		t.Errorf("expected degraded status, got:\n%s", out)
+	}
+	if !strings.Contains(out, "1/2") {
+		t.Errorf("expected 1/2 services, got:\n%s", out)
+	}
+}
+
+func TestList_SystemdError(t *testing.T) {
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", "/src", nil),
+	})
+	o := newTestOrchestratorWithSystemdErr("myapp", t.TempDir(), state, errors.New("dbus gone"))
+
+	err := o.List("")
+	if err == nil || !strings.Contains(err.Error(), "dbus gone") {
+		t.Errorf("expected dbus error, got %v", err)
 	}
 }
 
@@ -254,6 +298,125 @@ func TestView_PrintsUnitFileContent(t *testing.T) {
 	// View with a service arg reads the file — should not error
 	if err := o.View("web"); err != nil {
 		t.Errorf("unexpected error viewing unit file: %v", err)
+	}
+}
+
+func TestView_ProjectJSON(t *testing.T) {
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	dir := t.TempDir()
+	containerFile := filepath.Join(dir, "cq-myapp-web.container")
+	writeFile(t, containerFile, "[Container]\nImage=docker.io/library/nginx\nNetwork=cq-myapp-default.network\nVolume=cq-myapp-data.volume:/data\n")
+
+	networkFile := filepath.Join(dir, "cq-myapp-default.network")
+	writeFile(t, networkFile, "[Network]\n")
+
+	volumeFile := filepath.Join(dir, "cq-myapp-data.volume")
+	writeFile(t, volumeFile, "[Volume]\n")
+
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, []string{containerFile, networkFile, volumeFile}),
+	})
+	sys := newMockSystemdClient()
+	sys.units = []unitRecord{
+		{name: "cq-myapp-web.service", activeState: "active", subState: "running"},
+	}
+	o := newTestOrchestrator("myapp", dir, state, sys)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := o.View("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	var envelope output.Envelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
+		t.Fatalf("failed to parse JSON output: %v\noutput: %s", err, buf.String())
+	}
+
+	if envelope.Version != output.APIVersion {
+		t.Errorf("expected version %s, got %s", output.APIVersion, envelope.Version)
+	}
+
+	raw, _ := json.Marshal(envelope.Data)
+	var viewData output.ViewData
+	if err := json.Unmarshal(raw, &viewData); err != nil {
+		t.Fatalf("failed to parse ViewData: %v", err)
+	}
+
+	if viewData.Project != "myapp" {
+		t.Errorf("expected project 'myapp', got %q", viewData.Project)
+	}
+	if viewData.Status != "healthy" {
+		t.Errorf("expected status 'healthy', got %q", viewData.Status)
+	}
+	if len(viewData.Services) != 1 {
+		t.Fatalf("expected 1 service, got %d", len(viewData.Services))
+	}
+	if viewData.Services[0].Name != "web" {
+		t.Errorf("expected service name 'web', got %q", viewData.Services[0].Name)
+	}
+	if viewData.Services[0].Status != "running" {
+		t.Errorf("expected service status 'running', got %q", viewData.Services[0].Status)
+	}
+	if len(viewData.Resources) != 2 {
+		t.Errorf("expected 2 resources, got %d", len(viewData.Resources))
+	}
+}
+
+func TestView_UnitFileJSON(t *testing.T) {
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	dir := t.TempDir()
+	containerFile := filepath.Join(dir, "cq-myapp-web.container")
+	content := "[Container]\nImage=nginx\n"
+	writeFile(t, containerFile, content)
+
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, []string{containerFile}),
+	})
+	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := o.View("web")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	var envelope output.Envelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
+		t.Fatalf("failed to parse JSON output: %v\noutput: %s", err, buf.String())
+	}
+
+	raw, _ := json.Marshal(envelope.Data)
+	var unitFile output.UnitFileJSON
+	if err := json.Unmarshal(raw, &unitFile); err != nil {
+		t.Fatalf("failed to parse UnitFileJSON: %v", err)
+	}
+
+	if unitFile.Filename != "cq-myapp-web.container" {
+		t.Errorf("expected filename 'cq-myapp-web.container', got %q", unitFile.Filename)
+	}
+	if unitFile.Content != content {
+		t.Errorf("expected content %q, got %q", content, unitFile.Content)
 	}
 }
 

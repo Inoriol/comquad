@@ -1,0 +1,14 @@
+services:
+  web:
+    image: nginx:latest
+    volumes:
+      - shared-data:/app/data
+      - ./config:/app/config
+  api:
+    image: node:20
+    volumes:
+      - shared-data:/app/data
+      - ./config:/app/config
+
+volumes:
+  shared-data:

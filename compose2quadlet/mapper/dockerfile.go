@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func PatchDockerfileFROM(r io.Reader) ([]byte, error) {
+func PatchDockerfileFROM(r io.Reader, skipNormalize bool) ([]byte, error) {
 	content, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func PatchDockerfileFROM(r io.Reader) ([]byte, error) {
 			aliases[strings.ToLower(stageName)] = true
 		}
 
-		if image != "scratch" && !aliases[strings.ToLower(image)] {
+		if !skipNormalize && image != "scratch" && !aliases[strings.ToLower(image)] {
 			image = normalizeImage(image)
 		}
 

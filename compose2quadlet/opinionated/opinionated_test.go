@@ -1,6 +1,7 @@
 package opinionated
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -185,7 +186,23 @@ func TestApplySELinux_Volume(t *testing.T) {
 
 	result := ApplySELinux(units, cfg)
 	sec := result[0].Sections[0]
-	assertDirectiveValue(t, sec, "Volume", "/data:/data,z")
+	assertDirectiveValue(t, sec, "Volume", "/data:/data,Z")
+}
+
+func TestApplySELinux_Volume_Shared(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "cq-myapp-data.volume:/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SharedVolumes = map[string]bool{"data": true}
+
+	result := ApplySELinux(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Volume", "cq-myapp-data.volume:/data,z")
 }
 
 func TestApplySELinux_Mount(t *testing.T) {
@@ -200,7 +217,23 @@ func TestApplySELinux_Mount(t *testing.T) {
 
 	result := ApplySELinux(units, cfg)
 	sec := result[0].Sections[0]
-	assertDirectiveValue(t, sec, "Mount", "type=bind,source=/data,destination=/data,relabel=shared")
+	assertDirectiveValue(t, sec, "Mount", "type=bind,source=/data,destination=/data,relabel=private")
+}
+
+func TestApplySELinux_Mount_Shared(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Mount", "type=bind,source=/shared/data,destination=/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SharedVolumes = map[string]bool{"/shared/data": true}
+
+	result := ApplySELinux(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Mount", "type=bind,source=/shared/data,destination=/data,relabel=shared")
 }
 
 func TestApplySELinux_AlreadySet(t *testing.T) {
@@ -232,7 +265,7 @@ func TestApplySELinux_NoFalsePositive(t *testing.T) {
 
 	result := ApplySELinux(units, cfg)
 	sec := result[0].Sections[0]
-	assertDirectiveValue(t, sec, "Volume", "/data:zoo:/mnt,z")
+	assertDirectiveValue(t, sec, "Volume", "/data:zoo:/mnt,Z")
 }
 
 func TestApplyLabels(t *testing.T) {
@@ -704,4 +737,113 @@ func TestWarnDangerousBindMounts_NamedVolume(t *testing.T) {
 	if len(cfg.Warnings) != 0 {
 		t.Fatalf("expected no warnings for named volumes, got %d", len(cfg.Warnings))
 	}
+}
+
+func TestApplySpecifiers_Disabled(t *testing.T) {
+	homeDir := "/home/testuser"
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Mount", "type=bind,source="+homeDir+"/data,destination=/app/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SystemdSpecifiers = false
+
+	result := ApplySpecifiers(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Mount", "type=bind,source="+homeDir+"/data,destination=/app/data")
+}
+
+func TestApplySpecifiers_MountPath(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+	if homeDir == "" {
+		t.Skip("could not determine home directory")
+	}
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Mount", "type=bind,source="+homeDir+"/data,destination=/app/data"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SystemdSpecifiers = true
+
+	result := ApplySpecifiers(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Mount", "type=bind,source=%h/data,destination=/app/data")
+}
+
+func TestApplySpecifiers_VolumePath(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+	if homeDir == "" {
+		t.Skip("could not determine home directory")
+	}
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", homeDir+"/config:/etc/app:ro"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SystemdSpecifiers = true
+
+	result := ApplySpecifiers(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Volume", "%h/config:/etc/app:ro")
+}
+
+func TestApplySpecifiers_NonHomePath(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Mount", "type=bind,source=/etc/config,destination=/app/config"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SystemdSpecifiers = true
+
+	result := ApplySpecifiers(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Mount", "type=bind,source=/etc/config,destination=/app/config")
+}
+
+func TestApplySpecifiers_ExactHomePath(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+	if homeDir == "" {
+		t.Skip("could not determine home directory")
+	}
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Mount", "type=bind,source="+homeDir+",destination=/app"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SystemdSpecifiers = true
+
+	result := ApplySpecifiers(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Mount", "type=bind,source=%h,destination=/app")
+}
+
+func TestApplySpecifiers_NamedVolumeUnchanged(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "data.volume:/app/data:z"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SystemdSpecifiers = true
+
+	result := ApplySpecifiers(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Volume", "data.volume:/app/data:z")
 }

@@ -53,9 +53,11 @@ The conversion also applies comquad-specific behavior, including:
 - Container names and service network aliases
 - A default network when a service has no explicit network
 - Absolute paths for relative bind mounts
-- SELinux mount relabeling when applicable
+- SELinux mount relabeling: `:Z` (private) for single-service volumes, `:z` (shared) for volumes used by multiple services
 - Rootless port offsets
 - Image and build unit generation
+- Image name normalization (bare names → `docker.io/library/`), skippable via `COMQUAD_SKIP_REGISTRY_NORMALIZATION`
+- Optional systemd specifier shortening (`%h` for `$HOME` paths), enabled via `COMQUAD_SYSTEMD_SPECIFIERS`
 - comquad management and project labels
 
 The conversion library is documented separately in [compose2quadlet/ARCHITECTURE.md](./compose2quadlet/ARCHITECTURE.md) and [compose2quadlet/doc/mapping.md](./compose2quadlet/doc/mapping.md).
@@ -165,7 +167,19 @@ The output package (`internal/output`) provides:
 - Error envelope: `{"version": "1.0", "error": {"code": "...", "message": "..."}}`
 - Schema definitions for each command's output structure
 
-Commands check `output.IsJSONMode()` and emit JSON instead of human-readable tables or text. Currently supported commands: `list`, `ps`.
+Commands check `output.IsJSONMode()` and emit JSON instead of human-readable tables or text. Supported commands:
+
+| Command | Schema | Description |
+|---|---|---|
+| `list` | `ProjectListData` | List all deployed projects |
+| `ps` | `PSData` | List containers for a project |
+| `view` | `ViewData` or `UnitFileJSON` | Project overview or single unit file |
+| `start` | `LifecycleData` | Start action result |
+| `stop` | `LifecycleData` | Stop action result |
+| `restart` | `LifecycleData` | Restart action result |
+| `down` | `DownData` | Removal summary |
+| `up` | `UpData` | Deployment summary |
+| `logs` | `LogsData` | Structured log entries (batch mode) |
 
 When adding JSON support to a new command:
 
@@ -173,6 +187,21 @@ When adding JSON support to a new command:
 2. Check `output.IsJSONMode()` in the command or orchestrator method
 3. Convert internal data structures to JSON schema types
 4. Call `output.PrintJSON()` with the schema-wrapped data
+
+In JSON mode, operational messages (logger output) are suppressed to keep stdout clean for JSON parsing. Only the final JSON result is emitted.
+
+## Cockpit Plugin
+
+The `cockpit-comquad/` directory contains a Cockpit web UI plugin for managing comquad projects. The plugin communicates with comquad via `cockpit.spawn()` calls to the CLI with `--json` flag. It does not require a separate backend daemon.
+
+The plugin provides:
+
+- Stack dashboard with project status and service counts
+- Project detail view with services, containers, and resources tabs
+- Stack deployment via directory browser
+- Lifecycle management (start/stop/restart/remove) with confirmation dialogs
+
+See [cockpit-comquad/README.md](./cockpit-comquad/README.md) for development and usage details.
 
 ## Failure Boundaries
 

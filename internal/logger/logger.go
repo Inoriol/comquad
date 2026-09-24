@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 const (
@@ -53,24 +55,24 @@ func IsQuiet() bool {
 }
 
 // Print outputs a plain (uncolored, unprefixed) operational message.
-// It is suppressed when quiet mode is active, but does not require verbose.
+// It is suppressed when quiet mode or JSON mode is active, but does not require verbose.
 // Use this for normal runtime messages like "Starting unit: foo".
 func Print(msg string) {
 	mu.Lock()
 	q := quiet
 	mu.Unlock()
-	if q {
+	if q || output.IsJSONMode() {
 		return
 	}
 	fmt.Println(msg)
 }
 
-// Printf formats and prints a plain message, suppressed when quiet mode is active.
+// Printf formats and prints a plain message, suppressed when quiet mode or JSON mode is active.
 func Printf(format string, args ...interface{}) {
 	mu.Lock()
 	q := quiet
 	mu.Unlock()
-	if q {
+	if q || output.IsJSONMode() {
 		return
 	}
 	fmt.Printf(format, args...)
@@ -91,33 +93,37 @@ func colorize(colorCode, msg string) string {
 }
 
 func Info(msg string) {
-	if !IsVerbose() || IsQuiet() {
+	if !IsVerbose() || IsQuiet() || output.IsJSONMode() {
 		return
 	}
 	fmt.Println(colorize(cyan, "comquad: "+msg))
 }
 
 func Success(msg string) {
-	if IsQuiet() {
+	if IsQuiet() || output.IsJSONMode() {
 		return
 	}
 	fmt.Println(colorize(green, "comquad: "+msg))
 }
 
 func Warn(msg string) {
-	if IsQuiet() {
+	if IsQuiet() || output.IsJSONMode() {
 		return
 	}
 	fmt.Println(colorize(yellow, "comquad: "+msg))
 }
 
 // Error always prints to stderr regardless of verbose or quiet mode.
+// However, it is suppressed in JSON mode to avoid mixing with JSON output.
 func Error(msg string) {
+	if output.IsJSONMode() {
+		return
+	}
 	fmt.Fprintln(os.Stderr, colorize(red, "comquad: "+msg))
 }
 
 func Action(msg string) {
-	if IsQuiet() {
+	if IsQuiet() || output.IsJSONMode() {
 		return
 	}
 	fmt.Println(colorize(blue, "comquad: "+msg))

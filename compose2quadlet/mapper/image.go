@@ -16,7 +16,11 @@ func Images(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 			continue
 		}
 		var dirs []c2qtypes.Directive
-		dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{normalizeImage(svc.Image)}})
+		img := svc.Image
+		if !cfg.SkipImageNormalization {
+			img = normalizeImage(img)
+		}
+		dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{img}})
 
 		if svc.PullPolicy != "" {
 			policy := composePolicyToQuadlet(svc.PullPolicy)

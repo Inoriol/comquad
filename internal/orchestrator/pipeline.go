@@ -8,6 +8,7 @@ import (
 
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
@@ -94,7 +95,9 @@ func (o *Orchestrator) prepareUnits(projectFiles []string, res reconcile.Result)
 		if unitName == "" {
 			continue
 		}
-		logger.Action("Stopping removed unit: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Action("Stopping removed unit: " + unitName)
+		}
 		if err := dbusMgr.StopUnit(unitName); err != nil {
 			logger.Warn(fmt.Sprintf("failed to stop removed unit %s: %v", unitName, err))
 		}
@@ -125,7 +128,9 @@ func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Resu
 			continue
 		}
 		unitName := ContainerFileToUnitName(f)
-		logger.Action("Starting unit: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Action("Starting unit: " + unitName)
+		}
 
 		if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
 			return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
@@ -146,6 +151,9 @@ func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Resu
 }
 
 func (o *Orchestrator) reportReconcile(res reconcile.Result) {
+	if output.IsJSONMode() {
+		return
+	}
 	for _, c := range res.Conflicts {
 		logger.Warn(fmt.Sprintf("conflict in %s [%s] %s: keeping your edit %q, generated %q", c.Unit, c.Section, c.Key, c.User, c.Generated))
 	}

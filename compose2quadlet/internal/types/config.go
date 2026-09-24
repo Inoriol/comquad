@@ -24,12 +24,15 @@ type Config struct {
 	WorkingDirectory    string
 	SecretsDir          string
 	DryRun              bool
-	BuildCacheDir       string
-	NormalizeDockerfile bool
-	Info                func(string)
-	PatchedDockerfiles  map[string]string
-	ExternalNetworks    map[string]string
-	ExternalVolumes     map[string]string
+	BuildCacheDir          string
+	NormalizeDockerfile    bool
+	SkipImageNormalization bool
+	SystemdSpecifiers      bool
+	SharedVolumes          map[string]bool
+	Info                   func(string)
+	PatchedDockerfiles     map[string]string
+	ExternalNetworks       map[string]string
+	ExternalVolumes        map[string]string
 }
 
 type Version struct {
@@ -140,6 +143,14 @@ func WithBuildCacheDir(path string) Option {
 
 func WithDockerfileNormalization() Option {
 	return func(c *Config) { c.NormalizeDockerfile = true }
+}
+
+func WithoutImageNormalization() Option {
+	return func(c *Config) { c.SkipImageNormalization = true }
+}
+
+func WithSystemdSpecifiers() Option {
+	return func(c *Config) { c.SystemdSpecifiers = true }
 }
 
 func WithInfo(fn func(string)) Option {

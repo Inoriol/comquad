@@ -1,67 +1,31 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 
-	"github.com/Inoriol/comquad/internal/deploy"
-	"github.com/Inoriol/comquad/internal/logger"
-	"github.com/Inoriol/comquad/internal/output"
+	"github.com/Inoriol/comquad/internal/orchestrator"
 )
 
 var listCmd = &cobra.Command{
-	Use:     "list",
+	Use:     "list [project]",
 	Aliases: []string{"ls"},
 	Short:   "List all currently deployed projects",
+	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		stateMgr, err := deploy.NewStateManager()
+		if len(args) > 0 {
+			projectName = args[0]
+			o, err := orchestrator.NewOrchestrator(projectName)
+			if err != nil {
+				return err
+			}
+			return o.View("")
+		}
+
+		o, err := orchestrator.NewOrchestrator(projectName)
 		if err != nil {
 			return err
 		}
-
-		projects := stateMgr.ListProjects()
-
-		if output.IsJSONMode() {
-			jsonProjects := make([]output.ProjectJSON, 0)
-			for _, p := range projects {
-				if projectName != "" && p.ProjectName != projectName {
-					continue
-				}
-				jp := output.ProjectJSON{
-					Name:       p.ProjectName,
-					SourcePath: p.SourcePath,
-					Files:      len(p.Files),
-				}
-				if p.Resources != nil {
-					jp.Resources = &output.ResourcesJSON{
-						Containers: p.Resources.Containers,
-						Networks:   p.Resources.Networks,
-						Volumes:    p.Resources.Volumes,
-						Images:     p.Resources.Images,
-						Builds:     p.Resources.Builds,
-					}
-				}
-				jsonProjects = append(jsonProjects, jp)
-			}
-			return output.PrintJSON(&output.ProjectListData{Projects: jsonProjects})
-		}
-
-		if len(projects) == 0 {
-			logger.Print("No projects currently deployed.")
-			return nil
-		}
-
-		logger.Printf("%-20s %-40s %s\n", "PROJECT", "SOURCE", "FILES")
-		logger.Print(strings.Repeat("-", 72))
-		for _, p := range projects {
-			if projectName != "" && p.ProjectName != projectName {
-				continue
-			}
-			logger.Printf("%-20s %-40s %d units\n", p.ProjectName, p.SourcePath, len(p.Files))
-		}
-
-		return nil
+		return o.List(projectName)
 	},
 }
 

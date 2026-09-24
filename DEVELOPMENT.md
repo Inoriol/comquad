@@ -75,8 +75,9 @@ The conversion layer also:
 - Adds both service and project-qualified network aliases.
 - Keeps `.image` references in container units so Quadlet can build dependencies.
 - Preserves external network and volume names.
-- Normalizes unqualified images through compose-go/v2.
-- Applies `:z` or `relabel=shared` mount handling when SELinux support is detected.
+- Normalizes unqualified images through compose-go/v2. Image normalization can be disabled via `COMQUAD_SKIP_REGISTRY_NORMALIZATION` to respect `registries.conf`.
+- Applies differentiated SELinux mount handling: `:Z` (private) for single-service volumes, `:z` (shared) for volumes used by multiple services.
+- Optionally shortens paths using systemd specifiers (`%h` for `$HOME`) when `COMQUAD_SYSTEMD_SPECIFIERS` is set.
 - Offsets privileged rootless ports using `ROOTLESS_PORT_OFFSET` and resolves internal port conflicts.
 - Translates Compose secrets into native Podman secrets or `/run/secrets/<name>` mounts.
 

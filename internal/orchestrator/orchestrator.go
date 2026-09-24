@@ -14,6 +14,7 @@ import (
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
@@ -69,14 +70,18 @@ func (o *Orchestrator) ProjectName() string {
 }
 
 func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff bool) error {
-	logger.Action("Reading compose file...")
+	if !output.IsJSONMode() {
+		logger.Action("Reading compose file...")
+	}
 	composeFile := findComposeFile(o.cwd)
 	if composeFile == "" {
-		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
+		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml, podman-compose.yaml, podman-compose.yml)")
 	}
 
 	if !dryRun && !deploy.StateFileExists() {
-		logger.Action("First deployment detected — checking prerequisites...")
+		if !output.IsJSONMode() {
+			logger.Action("First deployment detected — checking prerequisites...")
+		}
 		if err := deploy.ValidatePodmanVersion(); err != nil {
 			return fmt.Errorf("prerequisite check failed: %w", err)
 		}
@@ -84,7 +89,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	podmanVersion, versionErr := deploy.DetectPodmanVersion()
 	if versionErr != nil {
-		if !dryRun {
+		if !dryRun && !output.IsJSONMode() {
 			logger.Warn("could not detect podman version, assuming latest: " + versionErr.Error())
 		}
 	}
@@ -107,8 +112,8 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		}
 	}
 
-	if selinuxEnabled {
-		logger.Action(fmt.Sprintf("SELinux detected, adding :z labels to all volumes"))
+	if selinuxEnabled && !output.IsJSONMode() {
+		logger.Action(fmt.Sprintf("SELinux detected, adding :z/:Z labels to volumes"))
 	}
 
 	secretsDir, err := resolveSecretsDir(o.projectName)
@@ -140,17 +145,29 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	if portOffset > 0 {
 		opts = append(opts, c2q.WithPortOffset(portOffset))
-		logger.Action(fmt.Sprintf("Applied port offset %d for rootless mode", portOffset))
+		if !output.IsJSONMode() {
+			logger.Action(fmt.Sprintf("Applied port offset %d for rootless mode", portOffset))
+		}
 	}
-	opts = append(opts, c2q.WithInfo(logger.Action))
+	if !output.IsJSONMode() {
+		opts = append(opts, c2q.WithInfo(logger.Action))
+	}
 	if !selinuxEnabled {
 		opts = append(opts, c2q.WithoutSELinux())
 	}
 	if dryRun {
 		opts = append(opts, c2q.WithDryRun())
 	}
+	if os.Getenv("COMQUAD_SKIP_REGISTRY_NORMALIZATION") != "" {
+		opts = append(opts, c2q.WithoutImageNormalization())
+	}
+	if os.Getenv("COMQUAD_SYSTEMD_SPECIFIERS") != "" {
+		opts = append(opts, c2q.WithSystemdSpecifiers())
+	}
 
-	logger.Action("Transpiling compose configuration...")
+	if !output.IsJSONMode() {
+		logger.Action("Transpiling compose configuration...")
+	}
 	units, err := c2q.TranspileFile(composeFile, opts...)
 	if err != nil {
 		return fmt.Errorf("transpilation failed: %w", err)
@@ -162,7 +179,9 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	}
 	setPolicyOnImageUnits(units, strat)
 	if versionErr == nil && !podmanVersion.AtLeast(5, 6) {
-		logger.Info("Policy= in .image units requires podman >= 5.6.0 — pull strategy may not be enforced")
+		if !output.IsJSONMode() {
+			logger.Info("Policy= in .image units requires podman >= 5.6.0 — pull strategy may not be enforced")
+		}
 	}
 
 	baselineDir, err := resolveBaselineDir(o.projectName)
@@ -181,20 +200,26 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	}
 
 	if !noDiff && o.projectDeployed() && plan.HasChanges() {
-		fmt.Print(colorizeDiff(plan.Diff()))
-		if isTerminal(os.Stdin) {
-			proceed, err := confirmUpdate()
-			if err != nil {
-				return err
-			}
-			if !proceed {
-				logger.Print("Update cancelled — no changes applied.")
-				return nil
+		if output.IsJSONMode() {
+			// In JSON mode, skip diff and confirmation
+		} else {
+			fmt.Print(colorizeDiff(plan.Diff()))
+			if isTerminal(os.Stdin) {
+				proceed, err := confirmUpdate()
+				if err != nil {
+					return err
+				}
+				if !proceed {
+					logger.Print("Update cancelled — no changes applied.")
+					return nil
+				}
 			}
 		}
 	}
 
-	logger.Action("Reconciling quadlet files...")
+	if !output.IsJSONMode() {
+		logger.Action("Reconciling quadlet files...")
+	}
 	result, err := reconcile.Apply(targetDir, baselineDir, plan)
 	if err != nil {
 		return fmt.Errorf("reconciling quadlet files: %w", err)
@@ -213,19 +238,25 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		return err
 	}
 
-	logger.Action("Preparing units...")
+	if !output.IsJSONMode() {
+		logger.Action("Preparing units...")
+	}
 	if err := o.prepareUnits(projectFiles, result); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
 
-	logger.Action("Handling images...")
+	if !output.IsJSONMode() {
+		logger.Action("Handling images...")
+	}
 	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
 
-	logger.Action("Handling builds...")
+	if !output.IsJSONMode() {
+		logger.Action("Handling builds...")
+	}
 	if err := o.handleBuilds(projectFiles); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
@@ -233,8 +264,30 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	deployTime := time.Now().Format("2006-01-02 15:04:05")
 
+	var unitsStarted []string
+	for _, f := range projectFiles {
+		if strings.HasSuffix(f, ".container") {
+			unitsStarted = append(unitsStarted, ContainerFileToUnitName(f))
+		}
+	}
+
+	var filesWritten []string
+	filesWritten = append(filesWritten, result.Created...)
+	filesWritten = append(filesWritten, result.Changed...)
+
+	upData := &output.UpData{
+		Project:      o.projectName,
+		SourcePath:   composeFile,
+		FilesWritten: baseNames(filesWritten),
+		FilesRemoved: baseNames(result.Removed),
+		UnitsStarted: unitsStarted,
+		Success:      true,
+	}
+
 	if follow {
-		logger.Print("Following logs for project: " + o.projectName)
+		if !output.IsJSONMode() {
+			logger.Print("Following logs for project: " + o.projectName)
+		}
 		logErrCh := make(chan error, 1)
 		go func() {
 			logErrCh <- o.FollowLogs(deployTime, "", false)
@@ -242,20 +295,32 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 		time.Sleep(500 * time.Millisecond)
 
-		logger.Action("Starting services...")
+		if !output.IsJSONMode() {
+			logger.Action("Starting services...")
+		}
 		if err := o.startContainers(projectFiles, result); err != nil {
 			o.rollbackDeploy(plan, priorState, hadPriorState)
 			return fmt.Errorf("failed to start services: %w", err)
+		}
+
+		if output.IsJSONMode() {
+			return output.PrintJSON(upData)
 		}
 
 		logger.Success("Successfully deployed project: " + o.projectName)
 		return <-logErrCh
 	}
 
-	logger.Action("Starting services...")
+	if !output.IsJSONMode() {
+		logger.Action("Starting services...")
+	}
 	if err := o.startContainers(projectFiles, result); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return fmt.Errorf("failed to start services: %w", err)
+	}
+
+	if output.IsJSONMode() {
+		return output.PrintJSON(upData)
 	}
 
 	logger.Success("Successfully deployed project: " + o.projectName)
@@ -266,7 +331,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 	logger.Action("Reading compose file...")
 	composeFile := findComposeFile(o.cwd)
 	if composeFile == "" {
-		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml)")
+		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml, podman-compose.yaml, podman-compose.yml)")
 	}
 
 	if !dryRun && !deploy.StateFileExists() {
@@ -302,7 +367,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 	}
 
 	if selinuxEnabled {
-		logger.Action(fmt.Sprintf("SELinux detected, adding :z labels to all volumes"))
+		logger.Action(fmt.Sprintf("SELinux detected, adding :z/:Z labels to volumes"))
 	}
 
 	secretsDir, err := resolveSecretsDir(o.projectName)
@@ -341,6 +406,12 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 	}
 	if dryRun {
 		opts = append(opts, c2q.WithDryRun())
+	}
+	if os.Getenv("COMQUAD_SKIP_REGISTRY_NORMALIZATION") != "" {
+		opts = append(opts, c2q.WithoutImageNormalization())
+	}
+	if os.Getenv("COMQUAD_SYSTEMD_SPECIFIERS") != "" {
+		opts = append(opts, c2q.WithSystemdSpecifiers())
 	}
 
 	logger.Action("Transpiling compose configuration...")
@@ -615,6 +686,8 @@ func findComposeFile(dir string) string {
 		"compose.yml",
 		"docker-compose.yaml",
 		"docker-compose.yml",
+		"podman-compose.yaml",
+		"podman-compose.yml",
 	}
 	for _, name := range candidates {
 		path := filepath.Join(dir, name)

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 func (o *Orchestrator) handleBuilds(projectFiles []string) error {
@@ -26,17 +27,23 @@ func (o *Orchestrator) handleBuilds(projectFiles []string) error {
 			continue
 		}
 
-		logger.Action("Building image: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Action("Building image: " + unitName)
+		}
 
 		if err := dbusMgr.StopUnit(unitName); err != nil {
-			logger.Info(fmt.Sprintf("build unit %s was not running: %v", unitName, err))
+			if !output.IsJSONMode() {
+				logger.Info(fmt.Sprintf("build unit %s was not running: %v", unitName, err))
+			}
 		}
 
 		if err := dbusMgr.StartUnit(unitName); err != nil {
 			return fmt.Errorf("failed to build image unit %s: %w", unitName, err)
 		}
 
-		logger.Success("Built image: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Success("Built image: " + unitName)
+		}
 	}
 
 	return nil

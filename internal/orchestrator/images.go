@@ -7,6 +7,7 @@ import (
 
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
@@ -80,7 +81,9 @@ func (o *Orchestrator) handleImages(projectFiles []string, units []c2q.QuadletUn
 		baseName := strings.TrimSuffix(filepath.Base(f), ".image")
 
 		if hasBuildUnitForName(units, baseName) {
-			logger.Info("Skipping image unit " + unitName + " (has corresponding .build unit)")
+			if !output.IsJSONMode() {
+				logger.Info("Skipping image unit " + unitName + " (has corresponding .build unit)")
+			}
 			continue
 		}
 
@@ -89,11 +92,15 @@ func (o *Orchestrator) handleImages(projectFiles []string, units []c2q.QuadletUn
 			continue
 		}
 
-		logger.Action("Handling image unit: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Action("Handling image unit: " + unitName)
+		}
 
 		switch strat {
 		case PullAlways:
-			logger.Action("Stopping image unit for re-pull: " + unitName)
+			if !output.IsJSONMode() {
+				logger.Action("Stopping image unit for re-pull: " + unitName)
+			}
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				logger.Warn(fmt.Sprintf("failed to stop image unit %s: %v", unitName, err))
 			}
@@ -113,7 +120,9 @@ func (o *Orchestrator) handleImages(projectFiles []string, units []c2q.QuadletUn
 						return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
 					}
 				} else {
-					logger.Info("Image unit already pulled: " + unitName)
+					if !output.IsJSONMode() {
+						logger.Info("Image unit already pulled: " + unitName)
+					}
 				}
 			}
 		case PullNever:
