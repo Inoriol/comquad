@@ -11,6 +11,7 @@ import (
 
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 type unitStatus struct {
@@ -119,6 +120,15 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 	}
 
 	if len(unitMap) == 0 {
+	if output.IsJSONMode() {
+		return output.PrintJSON(&output.ViewData{
+			Project:    o.projectName,
+			SourcePath: state.SourcePath,
+			Status:     "unknown",
+			Services:   []output.ServiceJSON{},
+			Resources:  []output.ResourceJSON{},
+		})
+	}
 		logger.Printf("No units found for project %s\n", o.projectName)
 		return nil
 	}
@@ -134,6 +144,8 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 
 	var services []serviceRow
 	var resources []resourceRow
+	var jsonServices []output.ServiceJSON
+	var jsonResources []output.ResourceJSON
 
 	for _, f := range state.Files {
 		base := filepath.Base(f)
@@ -157,18 +169,22 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 			}
 
 			row := serviceRow{name: short, status: status}
+			jsonSvc := output.ServiceJSON{Name: short, Status: status}
 
 			content := fileContents[f]
 			for _, line := range strings.Split(content, "\n") {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "Image=") {
-					row.image = displayImage(strings.TrimPrefix(trimmed, "Image="), fileContents)
+					img := displayImage(strings.TrimPrefix(trimmed, "Image="), fileContents)
+					row.image = img
+					jsonSvc.Image = img
 				}
 				if strings.HasPrefix(trimmed, "Network=") {
 					netRef := strings.TrimPrefix(trimmed, "Network=")
 					netRef = strings.TrimSuffix(netRef, ".network")
 					netShort := strings.TrimPrefix(netRef, prefix)
 					row.nets = append(row.nets, netShort)
+					jsonSvc.Networks = append(jsonSvc.Networks, netShort)
 				}
 				if strings.HasPrefix(trimmed, "Volume=") {
 					volRef := strings.TrimPrefix(trimmed, "Volume=")
@@ -176,13 +192,17 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 					volName := strings.TrimSuffix(parts[0], ".volume")
 					volShort := strings.TrimPrefix(volName, prefix)
 					row.vols = append(row.vols, volShort)
+					jsonSvc.Volumes = append(jsonSvc.Volumes, volShort)
 				}
 				if strings.HasPrefix(trimmed, "Mount=") {
 					mountVal := strings.TrimPrefix(trimmed, "Mount=")
-					row.vols = append(row.vols, mountDestination(mountVal))
+					dest := mountDestination(mountVal)
+					row.vols = append(row.vols, dest)
+					jsonSvc.Volumes = append(jsonSvc.Volumes, dest)
 				}
 			}
 			services = append(services, row)
+			jsonServices = append(jsonServices, jsonSvc)
 		}
 
 		if strings.HasSuffix(base, ".image") {
@@ -194,19 +214,29 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 				}
 			}
 			resources = append(resources, resourceRow{name: short + ".image", kind: "image", info: img})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".image", Type: "image", Info: img})
 		}
 
 		if strings.HasSuffix(base, ".network") {
 			resources = append(resources, resourceRow{name: short + ".network", kind: "network", info: "—"})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".network", Type: "network"})
 		}
 
 		if strings.HasSuffix(base, ".volume") {
 			resources = append(resources, resourceRow{name: short + ".volume", kind: "volume", info: "—"})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".volume", Type: "volume"})
+		}
+
+		if strings.HasSuffix(base, ".build") {
+			resources = append(resources, resourceRow{name: short + ".build", kind: "build", info: "—"})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".build", Type: "build"})
 		}
 	}
 
 	sort.Slice(services, func(i, j int) bool { return services[i].name < services[j].name })
 	sort.Slice(resources, func(i, j int) bool { return resources[i].name < resources[j].name })
+	sort.Slice(jsonServices, func(i, j int) bool { return jsonServices[i].Name < jsonServices[j].Name })
+	sort.Slice(jsonResources, func(i, j int) bool { return jsonResources[i].Name < jsonResources[j].Name })
 
 	activeCount := 0
 	for _, s := range services {
@@ -222,6 +252,16 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 		status = "stopped"
 	} else if activeCount < len(services) {
 		status = "degraded"
+	}
+
+	if output.IsJSONMode() {
+		return output.PrintJSON(&output.ViewData{
+			Project:    o.projectName,
+			SourcePath: state.SourcePath,
+			Status:     status,
+			Services:   jsonServices,
+			Resources:  jsonResources,
+		})
 	}
 
 	logger.Printf("Project:  %s\n", o.projectName)
@@ -289,6 +329,13 @@ func (o *Orchestrator) printFile(path string) error {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", path, err)
+	}
+
+	if output.IsJSONMode() {
+		return output.PrintJSON(&output.UnitFileJSON{
+			Filename: filepath.Base(path),
+			Content:  string(content),
+		})
 	}
 
 	logger.Printf("── %s ──\n", filepath.Base(path))

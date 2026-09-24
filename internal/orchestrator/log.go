@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 const (
@@ -238,6 +239,28 @@ func (o *Orchestrator) Logs(services []string, follow bool, tail, since string, 
 			return err
 		}
 		allEntries = append(allEntries, entries...)
+	}
+
+	if output.IsJSONMode() {
+		sort.Slice(allEntries, func(i, j int) bool {
+			return allEntries[i].timestamp < allEntries[j].timestamp
+		})
+		jsonEntries := make([]output.LogEntryJSON, len(allEntries))
+		for i, e := range allEntries {
+			sec := e.timestamp / 1e6
+			nsec := (e.timestamp % 1e6) * 1e6
+			t := time.Unix(sec, nsec).UTC()
+			jsonEntries[i] = output.LogEntryJSON{
+				Timestamp: t.Format(time.RFC3339Nano),
+				Unit:      e.unit,
+				Priority:  e.priority,
+				Message:   e.message,
+			}
+		}
+		return output.PrintJSON(&output.LogsData{
+			Project: o.projectName,
+			Entries: jsonEntries,
+		})
 	}
 
 	flushEntries(allEntries, showTime)

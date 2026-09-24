@@ -7,6 +7,7 @@ import (
 
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 // resolveUnits resolves unit names from the project state.
@@ -96,6 +97,14 @@ func (o *Orchestrator) Start(services []string, dryRun bool) error {
 	}
 
 	if dryRun {
+		if output.IsJSONMode() {
+			return output.PrintJSON(&output.LifecycleData{
+				Action:  "start",
+				Project: o.projectName,
+				Units:   units,
+				Success: true,
+			})
+		}
 		logger.Printf("Dry run: would start %d unit(s):\n", len(units))
 		for _, unitName := range units {
 			logger.Print("  " + unitName)
@@ -110,10 +119,21 @@ func (o *Orchestrator) Start(services []string, dryRun bool) error {
 	defer dbusMgr.Close()
 
 	for _, unitName := range units {
-		logger.Print("Starting unit: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Print("Starting unit: " + unitName)
+		}
 		if err := dbusMgr.StartUnit(unitName); err != nil {
 			return fmt.Errorf("failed to start unit %s: %w", unitName, err)
 		}
+	}
+
+	if output.IsJSONMode() {
+		return output.PrintJSON(&output.LifecycleData{
+			Action:  "start",
+			Project: o.projectName,
+			Units:   units,
+			Success: true,
+		})
 	}
 
 	if len(services) == 0 {
@@ -133,6 +153,14 @@ func (o *Orchestrator) Stop(services []string, dryRun bool) error {
 	}
 
 	if dryRun {
+		if output.IsJSONMode() {
+			return output.PrintJSON(&output.LifecycleData{
+				Action:  "stop",
+				Project: o.projectName,
+				Units:   units,
+				Success: true,
+			})
+		}
 		logger.Printf("Dry run: would stop %d unit(s):\n", len(units))
 		for _, unitName := range units {
 			logger.Print("  " + unitName)
@@ -147,7 +175,9 @@ func (o *Orchestrator) Stop(services []string, dryRun bool) error {
 	defer dbusMgr.Close()
 
 	for _, unitName := range units {
-		logger.Print("Stopping unit: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Print("Stopping unit: " + unitName)
+		}
 		if err := dbusMgr.StopUnit(unitName); err != nil {
 			return fmt.Errorf("failed to stop unit %s: %w", unitName, err)
 		}
@@ -156,6 +186,15 @@ func (o *Orchestrator) Stop(services []string, dryRun bool) error {
 	// Verify units are actually stopped (reuse the existing D-Bus connection)
 	if err := o.verifyUnitsStoppedByNames(dbusMgr, units); err != nil {
 		return err
+	}
+
+	if output.IsJSONMode() {
+		return output.PrintJSON(&output.LifecycleData{
+			Action:  "stop",
+			Project: o.projectName,
+			Units:   units,
+			Success: true,
+		})
 	}
 
 	if len(services) == 0 {
@@ -175,6 +214,14 @@ func (o *Orchestrator) Restart(services []string, dryRun bool) error {
 	}
 
 	if dryRun {
+		if output.IsJSONMode() {
+			return output.PrintJSON(&output.LifecycleData{
+				Action:  "restart",
+				Project: o.projectName,
+				Units:   units,
+				Success: true,
+			})
+		}
 		logger.Printf("Dry run: would restart %d unit(s):\n", len(units))
 		for _, unitName := range units {
 			logger.Print("  " + unitName)
@@ -189,10 +236,21 @@ func (o *Orchestrator) Restart(services []string, dryRun bool) error {
 	defer dbusMgr.Close()
 
 	for _, unitName := range units {
-		logger.Print("Restarting unit: " + unitName)
+		if !output.IsJSONMode() {
+			logger.Print("Restarting unit: " + unitName)
+		}
 		if err := dbusMgr.RestartUnit(unitName); err != nil {
 			return fmt.Errorf("failed to restart unit %s: %w", unitName, err)
 		}
+	}
+
+	if output.IsJSONMode() {
+		return output.PrintJSON(&output.LifecycleData{
+			Action:  "restart",
+			Project: o.projectName,
+			Units:   units,
+			Success: true,
+		})
 	}
 
 	if len(services) == 0 {

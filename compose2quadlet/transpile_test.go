@@ -1,6 +1,7 @@
 package compose2quadlet_test
 
 import (
+	"strings"
 	"testing"
 
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
@@ -346,5 +347,81 @@ func TestTranspile_XExtensions(t *testing.T) {
 	}
 	if !hasDirectiveValue(volSec.Directives, "Group", "1000") {
 		t.Fatal("expected Group=1000 from x-volume")
+	}
+}
+
+func TestTranspile_SharedVolumesSELinux(t *testing.T) {
+	project := loadProject(t, "testdata/shared-volumes.yaml")
+	units, err := c2q.Transpile(project,
+		c2q.WithProjectName("test"),
+		c2q.WithoutPrefix(),
+		c2q.WithoutDefaultNetwork(),
+		c2q.WithoutNetworkAliases(),
+		c2q.WithoutInstallSection(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	webUnit, ok := findUnit(units, "test-web", c2q.UnitContainer)
+	if !ok {
+		t.Fatal("expected test-web.container unit")
+	}
+	webSec, ok := hasSection(webUnit, c2q.SectionContainer)
+	if !ok {
+		t.Fatal("expected [Container] section")
+	}
+
+	foundSharedVol := false
+	foundBindMount := false
+	for _, d := range webSec.Directives {
+		if d.Key == "Volume" {
+			for _, v := range d.Values {
+				if strings.HasPrefix(v, "test-shared-data.volume:/app/data") && strings.HasSuffix(v, ",z") {
+					foundSharedVol = true
+				}
+			}
+		}
+		if d.Key == "Mount" {
+			for _, v := range d.Values {
+				if strings.Contains(v, "relabel=shared") {
+					foundBindMount = true
+				}
+			}
+		}
+	}
+	if !foundSharedVol {
+		t.Fatal("expected shared named volume with :z label")
+	}
+	if !foundBindMount {
+		t.Fatal("expected shared bind mount with relabel=shared")
+	}
+}
+
+func TestTranspile_SkipImageNormalization(t *testing.T) {
+	project := loadProject(t, "testdata/simple-web.yaml")
+	units, err := c2q.Transpile(project,
+		c2q.WithProjectName("test"),
+		c2q.WithoutPrefix(),
+		c2q.WithoutDefaultNetwork(),
+		c2q.WithoutSELinux(),
+		c2q.WithoutNetworkAliases(),
+		c2q.WithoutInstallSection(),
+		c2q.WithoutImageNormalization(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	imgUnit, ok := findUnit(units, "test-web", c2q.UnitImage)
+	if !ok {
+		t.Fatal("expected test-web.image unit")
+	}
+	imgSec, ok := hasSection(imgUnit, c2q.SectionImage)
+	if !ok {
+		t.Fatal("expected [Image] section")
+	}
+	if !hasDirectiveValue(imgSec.Directives, "Image", "nginx:latest") {
+		t.Fatal("expected unnormalized image name nginx:latest")
 	}
 }

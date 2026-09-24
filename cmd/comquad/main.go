@@ -58,7 +58,11 @@ func main() {
 	rootCmd.AddCommand(execCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if output.IsJSONMode() {
+			output.PrintError("COMMAND_FAILED", err.Error())
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
 		os.Exit(1)
 	}
 }

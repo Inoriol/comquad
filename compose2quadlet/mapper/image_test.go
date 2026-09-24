@@ -153,3 +153,42 @@ func TestImages_Multiple(t *testing.T) {
 		t.Fatal("expected web and db image units")
 	}
 }
+
+func TestImages_SkipNormalization(t *testing.T) {
+	services := types.Services{
+		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest"},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SkipImageNormalization = true
+	units := Images(services, cfg)
+
+	if len(units) != 1 {
+		t.Fatalf("expected 1 image unit, got %d", len(units))
+	}
+	dirs := units[0].Sections[0].Directives
+	assertDirective(t, dirs, "Image", "nginx:latest")
+}
+
+func TestImages_SkipNormalization_UserImage(t *testing.T) {
+	services := types.Services{
+		"web": types.ServiceConfig{Name: "web", Image: "myuser/myimage:v1"},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SkipImageNormalization = true
+	units := Images(services, cfg)
+
+	dirs := units[0].Sections[0].Directives
+	assertDirective(t, dirs, "Image", "myuser/myimage:v1")
+}
+
+func TestImages_SkipNormalization_CustomRegistry(t *testing.T) {
+	services := types.Services{
+		"web": types.ServiceConfig{Name: "web", Image: "ghcr.io/owner/image:tag"},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.SkipImageNormalization = true
+	units := Images(services, cfg)
+
+	dirs := units[0].Sections[0].Directives
+	assertDirective(t, dirs, "Image", "ghcr.io/owner/image:tag")
+}

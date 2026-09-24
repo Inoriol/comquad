@@ -1,12 +1,16 @@
 package orchestrator
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 // ---------------------------------------------------------------------------
@@ -317,5 +321,58 @@ func TestRestart_ProjectNotDeployed(t *testing.T) {
 	err := o.Restart(nil, false)
 	if err == nil || !strings.Contains(err.Error(), "not deployed") {
 		t.Errorf("expected 'not deployed' error, got %v", err)
+	}
+}
+
+func TestStart_JSON(t *testing.T) {
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	dir := t.TempDir()
+	files := []string{
+		filepath.Join(dir, "cq-myapp-web.container"),
+		filepath.Join(dir, "cq-myapp-db.container"),
+	}
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, files),
+	})
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", dir, state, sys)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	if err := o.Start(nil, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	var envelope output.Envelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, buf.String())
+	}
+
+	raw, _ := json.Marshal(envelope.Data)
+	var data output.LifecycleData
+	if err := json.Unmarshal(raw, &data); err != nil {
+		t.Fatalf("failed to parse LifecycleData: %v", err)
+	}
+
+	if data.Action != "start" {
+		t.Errorf("expected action 'start', got %q", data.Action)
+	}
+	if data.Project != "myapp" {
+		t.Errorf("expected project 'myapp', got %q", data.Project)
+	}
+	if !data.Success {
+		t.Error("expected success true")
+	}
+	if len(data.Units) != 2 {
+		t.Errorf("expected 2 units, got %d", len(data.Units))
 	}
 }

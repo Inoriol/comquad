@@ -86,7 +86,7 @@ func main() {
   - `dockerfile.go` — `PatchDockerfileFROM()` normalizes bare image names in Dockerfile FROM lines
   - `extensions.go` — x-extension extraction for quadlet-only directives
   - `validation.go` — directive validation for x-extensions
-- **`opinionated/`** — Composable post-processing transforms (prefix, references including external resources, container name, SELinux relabeling, labels, default network, network aliases, port offset, auto-update, install section)
+- **`opinionated/`** — Composable post-processing transforms (prefix, references including external resources, container name, SELinux relabeling with `:Z`/`:z` differentiation, systemd specifier shortening, labels, default network, network aliases, port offset, auto-update, install section)
 - **`serialization/`** — `Marshal()`, `Write()`, `WriteUnits()`, `Unmarshal()` for ini-format serialization
 
 Warnings from degraded or skipped mappings are sent through the `WithInfo` callback when configured. Fatal mappings still return an error. Environment-secret and patched-Dockerfile write failures are reported as degraded warnings.

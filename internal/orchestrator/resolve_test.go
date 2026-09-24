@@ -58,6 +58,15 @@ func TestFindComposeFile_FindsDockerComposeYml(t *testing.T) {
 	}
 }
 
+func TestFindComposeFile_FindsPodmanComposeYaml(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "podman-compose.yaml"), "services: {}")
+	got := findComposeFile(dir)
+	if got != filepath.Join(dir, "podman-compose.yaml") {
+		t.Errorf("expected podman-compose.yaml, got %q", got)
+	}
+}
+
 func TestFindComposeFile_PrefersComposeYamlOverDockerCompose(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "compose.yaml"), "")

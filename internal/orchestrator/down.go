@@ -9,6 +9,7 @@ import (
 
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 // Down stops all units, removes quadlet files, removes networks, and unregisters the project.
@@ -20,6 +21,14 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 	}
 
 	if dryRun {
+		if output.IsJSONMode() {
+			return output.PrintJSON(&output.DownData{
+				Project:         o.projectName,
+				RemovedFiles:    state.Files,
+				RemovedNetworks: o.collectResources(state, ".network"),
+				Success:         true,
+			})
+		}
 		logger.Printf("Dry run: project '%s' — would:\n", o.projectName)
 		logger.Printf("  Stop %d unit(s)\n", len(state.Files))
 		for _, f := range state.Files {
@@ -47,30 +56,40 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 		return fmt.Errorf("failed to stop all container units: %w", err)
 	}
 
+	var removedNetworks []string
 	for _, f := range state.Files {
 		if strings.HasSuffix(f, ".network") {
 			unitName := NetworkFileToUnitName(f)
-			logger.Print("Stopping unit: " + unitName)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				logger.Warn("Failed to stop network unit " + unitName + ": " + err.Error())
 			}
+			removedNetworks = append(removedNetworks, strings.TrimSuffix(filepath.Base(f), ".network"))
 		}
 	}
 
+	var removedVolumes []string
 	for _, f := range state.Files {
 		if strings.HasSuffix(f, ".volume") {
 			unitName := VolumeFileToUnitName(f)
-			logger.Print("Stopping unit: " + unitName)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				logger.Warn("Failed to stop volume unit " + unitName + ": " + err.Error())
 			}
+			removedVolumes = append(removedVolumes, strings.TrimSuffix(filepath.Base(f), ".volume"))
 		}
 	}
 
 	for _, f := range state.Files {
 		if strings.HasSuffix(f, ".image") {
 			unitName := ImageFileToUnitName(f)
-			logger.Print("Stopping unit: " + unitName)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				logger.Warn("Failed to stop image unit " + unitName + ": " + err.Error())
 			}
@@ -80,7 +99,9 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 	for _, f := range state.Files {
 		if strings.HasSuffix(f, ".build") {
 			unitName := BuildFileToUnitName(f)
-			logger.Print("Stopping unit: " + unitName)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				logger.Warn("Failed to stop build unit " + unitName + ": " + err.Error())
 			}
@@ -123,15 +144,48 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 		os.RemoveAll(baselineDir)
 	}
 
+	if output.IsJSONMode() {
+		data := &output.DownData{
+			Project:         o.projectName,
+			RemovedFiles:    baseNames(state.Files),
+			RemovedNetworks: removedNetworks,
+			Success:         true,
+		}
+		if removeVolumes {
+			data.RemovedVolumes = removedVolumes
+		}
+		return output.PrintJSON(data)
+	}
+
 	logger.Success("Successfully removed project: " + o.projectName)
 	return nil
+}
+
+func (o *Orchestrator) collectResources(state deploy.ProjectState, suffix string) []string {
+	var resources []string
+	for _, f := range state.Files {
+		if strings.HasSuffix(f, suffix) {
+			resources = append(resources, strings.TrimSuffix(filepath.Base(f), suffix))
+		}
+	}
+	return resources
+}
+
+func baseNames(paths []string) []string {
+	names := make([]string, len(paths))
+	for i, p := range paths {
+		names[i] = filepath.Base(p)
+	}
+	return names
 }
 
 func (o *Orchestrator) stopUnits(dbusMgr deploy.SystemdClient, projectFiles []string) error {
 	for _, f := range projectFiles {
 		if strings.HasSuffix(f, ".container") {
 			unitName := ContainerFileToUnitName(f)
-			logger.Print("Stopping unit: " + unitName)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
 			if err := dbusMgr.StopUnit(unitName); err != nil {
 				return fmt.Errorf("failed to stop unit %s: %w", unitName, err)
 			}

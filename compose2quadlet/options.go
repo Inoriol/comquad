@@ -33,6 +33,8 @@ func WithSecretsDirectory(p string) types.Option      { return types.WithSecrets
 func WithDryRun() types.Option                        { return types.WithDryRun() }
 func WithBuildCacheDir(p string) types.Option         { return types.WithBuildCacheDir(p) }
 func WithDockerfileNormalization() types.Option       { return types.WithDockerfileNormalization() }
+func WithoutImageNormalization() types.Option          { return types.WithoutImageNormalization() }
+func WithSystemdSpecifiers() types.Option              { return types.WithSystemdSpecifiers() }
 func WithInfo(fn func(string)) types.Option             { return types.WithInfo(fn) }
 
 func PatchDockerfileFile(path string) (string, error) {
@@ -40,7 +42,7 @@ func PatchDockerfileFile(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	patched, err := mapper.PatchDockerfileFROM(bytes.NewReader(data))
+	patched, err := mapper.PatchDockerfileFROM(bytes.NewReader(data), false)
 	if err != nil {
 		return "", err
 	}

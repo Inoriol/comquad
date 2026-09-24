@@ -36,7 +36,7 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 			}
 			content, err := os.ReadFile(dockerfilePath)
 			if err == nil {
-				patched, err := PatchDockerfileFROM(bytes.NewReader(content))
+				patched, err := PatchDockerfileFROM(bytes.NewReader(content), cfg.SkipImageNormalization)
 				if err == nil {
 					patchedPath := filepath.Join(cfg.BuildCacheDir, name+".Dockerfile")
 					patchedOK := true

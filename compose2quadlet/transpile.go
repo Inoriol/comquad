@@ -41,6 +41,8 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 		}
 	}
 
+	cfg.SharedVolumes = analyzeSharedVolumes(project.Services)
+
 	var units []QuadletUnit
 
 	for name := range project.Services {
@@ -133,4 +135,42 @@ func TranspileFile(composePath string, opts ...TranspileOption) ([]QuadletUnit, 
 	)
 
 	return Transpile(project, opts...)
+}
+
+func analyzeSharedVolumes(services types.Services) map[string]bool {
+	namedVolRefs := make(map[string]int)
+	bindMountRefs := make(map[string]int)
+
+	for _, svc := range services {
+		seenNamed := make(map[string]bool)
+		seenBind := make(map[string]bool)
+		for _, v := range svc.Volumes {
+			if v.Type == types.VolumeTypeBind {
+				source := v.Source
+				if !seenBind[source] {
+					bindMountRefs[source]++
+					seenBind[source] = true
+				}
+			} else if v.Type != types.VolumeTypeTmpfs {
+				name := v.Source
+				if !seenNamed[name] {
+					namedVolRefs[name]++
+					seenNamed[name] = true
+				}
+			}
+		}
+	}
+
+	shared := make(map[string]bool)
+	for name, count := range namedVolRefs {
+		if count > 1 {
+			shared[name] = true
+		}
+	}
+	for path, count := range bindMountRefs {
+		if count > 1 {
+			shared[path] = true
+		}
+	}
+	return shared
 }

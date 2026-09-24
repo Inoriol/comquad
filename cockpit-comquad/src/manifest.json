@@ -1,0 +1,13 @@
+{
+    "menu": {
+        "index": {
+            "label": "Comquad Stacks",
+            "order": 55,
+            "keywords": [
+                {
+                    "matches": ["comquad", "stack", "compose", "project", "quadlet"]
+                }
+            ]
+        }
+    }
+}

@@ -97,7 +97,9 @@ compose2quadlet/
 │   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, Image=, Mount= references; preserve external names
 │   ├── containername.go      # ApplyContainerName() — default ContainerName=<project>-<service>
 │   ├── aliases.go            # ApplyNetworkAliases() — inject NetworkAlias=<service>, <project>-<service>
-│   ├── selinux.go            # ApplySELinux() — add relabel=shared to Mount=, :z to Volume=
+│   ├── selinux.go            # ApplySELinux() — add relabel=shared/private to Mount=, :z/:Z to Volume= based on shared volume analysis
+│   ├── specifiers.go         # ApplySpecifiers() — replace $HOME prefix in paths with %h systemd specifier
+│   ├── dangerous.go          # WarnDangerousBindMounts() — warn on SELinux relabeling of sensitive host paths
 │   ├── labels.go             # ApplyLabels() — inject consumer-provided labels (Container/Network/Volume/Build only)
 │   ├── network.go            # ApplyDefaultNetwork() — inject default network for services without explicit networks
 │   ├── ports.go              # ApplyPortOffset() — apply port offset with Info callback logging
@@ -194,9 +196,11 @@ Transpile(project, opts...)
     │       ├── references.go:    rewrite Network=, Volume=, Image=, Mount=, After= references
     │       ├── containername.go: default ContainerName=<project>-<service> when unspecified
     │       ├── aliases.go:       inject NetworkAlias=<service> (service name + project-service)
-    │       ├── selinux.go:       add relabel=shared to Mount=, :z to Volume=
+    │       ├── selinux.go:       add relabel=shared/private to Mount=, :z/:Z to Volume= based on shared volume analysis
+    │       ├── dangerous.go:     warn on SELinux relabeling of sensitive host paths
+    │       ├── specifiers.go:    replace $HOME prefix in paths with %h systemd specifier (opt-in)
     │       ├── labels.go:        inject consumer-provided labels (skips [Service], [Unit], [Image])
-│       ├── network.go:       inject default network for services without explicit networks
+ │       ├── network.go:       inject default network for services without explicit networks
     │       ├── ports.go:         apply port offset
     │       ├── autoupdate.go:    add AutoUpdate=registry
     │       └── install.go:       add [Install] section
@@ -276,7 +280,8 @@ All transforms are **enabled by default** and can be individually disabled via `
 | Reference rewriting | *(always on)* | Rewrites `Network=`, `Volume=`, `Image=`, `After=`, `Requires=` to prefixed names; handles colon-separated values (e.g. `name.volume:/path`) |
 | ContainerName injection | *(always on)* | Adds the default `ContainerName=<project>-<service>` only when `container_name` is unspecified |
 | NetworkAlias injection | `WithoutNetworkAliases()` | Adds `NetworkAlias=<service>` and `NetworkAlias=<project>-<service>` for DNS-based service discovery |
-| SELinux labeling | `WithoutSELinux()` | Appends `relabel=shared` to `Mount=` bind-mount directives and `,z` to `Volume=` directives |
+| SELinux labeling | `WithoutSELinux()` | Appends `relabel=shared`/`relabel=private` to `Mount=` and `,z`/`,Z` to `Volume=` based on whether the volume is shared between services |
+| Systemd specifiers | `WithSystemdSpecifiers()` | Replaces `$HOME` prefix in bind-mount paths with `%h` systemd specifier |
 | Managed label | `WithLabels(map)` | Adds consumer-provided labels to `[Container]`, `[Network]`, `[Volume]`, `[Build]` sections (not `[Service]`, `[Unit]`, `[Image]` which don't support `Label=`) |
 | Project label | `WithLabels(map)` + `WithProjectName` | Adds consumer-provided labels to every unit |
 | Default network | `WithoutDefaultNetwork()` | Injects `cq-default.network` when a service lacks an explicit network |
@@ -284,11 +289,11 @@ All transforms are **enabled by default** and can be individually disabled via `
 | AutoUpdate | `WithAutoUpdate()` | Adds `AutoUpdate=registry` to containers |
 | Install section | `WithoutInstallSection()` | Adds `[Install] WantedBy=default.target` |
 | Image retry | `WithImageRetry(N)` / `WithImageRetryDelay(S)` | Sets `Retry=`/`RetryDelay=` on `.image` units (default: 3 / 5s; RetryDelay uses duration string format e.g. `5s`) |
-| Image normalization | *(always on)* | Normalizes bare image names (`nginx:latest` → `docker.io/library/nginx:latest`) in `.image` units |
+| Image normalization | `WithoutImageNormalization()` | Normalizes bare image names (`nginx:latest` → `docker.io/library/nginx:latest`) in `.image` units and Dockerfile FROM lines |
 | Working directory | `WithWorkingDirectory(path)` | Resolves relative bind-mount volume paths against this directory |
 | Secrets directory | `WithSecretsDirectory(path)` | Enables environment-based secret resolution; writes managed files to this dir and warns on write failures |
 | Dry run | `WithDryRun()` | Skips writing managed secret files to disk (still generates directives) |
-| Dockerfile normalization | `WithDockerfileNormalization()` + `WithBuildCacheDir(path)` | Patches Dockerfile FROM lines to fully-qualified image names; writes patched copies to cache dir and warns on cache write failures |
+| Dockerfile normalization | `WithDockerfileNormalization()` + `WithBuildCacheDir(path)` | Patches Dockerfile FROM lines to fully-qualified image names (respects `WithoutImageNormalization()`); writes patched copies to cache dir and warns on cache write failures |
 | Info callback | `WithInfo(fn)` | Receives info-level messages and non-fatal mapping warnings for consumer logging |
 | Version parsing | `ParseVersion(s)` | Parses `"5.2.0"` or `"v4.8"` into `Version` for `WithPodmanVersion()` |
 | Batch write | `serialization.WriteUnits(dir, units)` | Writes all units to a directory with `<name>.<type>` filenames |
@@ -325,6 +330,7 @@ Podman resolves bare image names differently from Docker. When `WithDockerfileNo
 - Multi-stage build aliases are tracked and not normalized
 - `--platform` flags are preserved
 - `FROM scratch` is never normalized
+- Normalization is skipped when `WithoutImageNormalization()` is set (respects `registries.conf`)
 - Patched copies are written to `BuildCacheDir` as absolute paths before the `.build` quadlet is emitted
 - During dry-run, content is computed but not written to disk
 

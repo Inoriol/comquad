@@ -1,6 +1,8 @@
 package orchestrator
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/output"
 )
 
 func TestDown_ProjectNotDeployed(t *testing.T) {
@@ -288,5 +291,60 @@ func TestStopUnits_EmptyProjectFiles(t *testing.T) {
 	err := o.stopUnits(sys, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDown_JSON(t *testing.T) {
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	dir := t.TempDir()
+	containerFile := filepath.Join(dir, "cq-myapp-web.container")
+	writeFile(t, containerFile, "[Container]\nImage=nginx\n")
+	networkFile := filepath.Join(dir, "cq-myapp-default.network")
+	writeFile(t, networkFile, "[Network]\n")
+
+	files := []string{containerFile, networkFile}
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, files),
+	})
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", dir, state, sys)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	if err := o.Down(false, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	var envelope output.Envelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, buf.String())
+	}
+
+	raw, _ := json.Marshal(envelope.Data)
+	var data output.DownData
+	if err := json.Unmarshal(raw, &data); err != nil {
+		t.Fatalf("failed to parse DownData: %v", err)
+	}
+
+	if data.Project != "myapp" {
+		t.Errorf("expected project 'myapp', got %q", data.Project)
+	}
+	if !data.Success {
+		t.Error("expected success true")
+	}
+	if len(data.RemovedFiles) != 2 {
+		t.Errorf("expected 2 removed files, got %d", len(data.RemovedFiles))
+	}
+	if len(data.RemovedNetworks) != 1 || data.RemovedNetworks[0] != "cq-myapp-default" {
+		t.Errorf("expected network 'cq-myapp-default', got %v", data.RemovedNetworks)
 	}
 }

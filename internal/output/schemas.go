@@ -27,6 +27,8 @@ type ProjectJSON struct {
 	Name       string          `json:"name"`
 	SourcePath string          `json:"source_path"`
 	Files      int             `json:"files"`
+	Status     string          `json:"status"`
+	Services   string          `json:"services"`
 	Resources  *ResourcesJSON  `json:"resources,omitempty"`
 }
 
@@ -65,4 +67,67 @@ type PortJSON struct {
 	ContainerPort int    `json:"container_port"`
 	HostIP        string `json:"host_ip"`
 	HostPort      int    `json:"host_port"`
+}
+
+type ViewData struct {
+	Project    string         `json:"project"`
+	SourcePath string         `json:"source_path"`
+	Status     string         `json:"status"`
+	Services   []ServiceJSON  `json:"services"`
+	Resources  []ResourceJSON `json:"resources"`
+}
+
+type ServiceJSON struct {
+	Name     string   `json:"name"`
+	Status   string   `json:"status"`
+	Image    string   `json:"image"`
+	Networks []string `json:"networks"`
+	Volumes  []string `json:"volumes"`
+}
+
+type ResourceJSON struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Info string `json:"info,omitempty"`
+}
+
+type UnitFileJSON struct {
+	Filename string `json:"filename"`
+	Content  string `json:"content"`
+}
+
+type LifecycleData struct {
+	Action  string   `json:"action"`
+	Project string   `json:"project"`
+	Units   []string `json:"units"`
+	Success bool     `json:"success"`
+}
+
+type DownData struct {
+	Project         string   `json:"project"`
+	RemovedFiles    []string `json:"removed_files"`
+	RemovedNetworks []string `json:"removed_networks"`
+	RemovedVolumes  []string `json:"removed_volumes,omitempty"`
+	Success         bool     `json:"success"`
+}
+
+type UpData struct {
+	Project      string   `json:"project"`
+	SourcePath   string   `json:"source_path"`
+	FilesWritten []string `json:"files_written"`
+	FilesRemoved []string `json:"files_removed,omitempty"`
+	UnitsStarted []string `json:"units_started"`
+	Success      bool     `json:"success"`
+}
+
+type LogsData struct {
+	Project string         `json:"project"`
+	Entries []LogEntryJSON `json:"entries"`
+}
+
+type LogEntryJSON struct {
+	Timestamp string `json:"timestamp"`
+	Unit      string `json:"unit"`
+	Priority  int    `json:"priority"`
+	Message   string `json:"message"`
 }
