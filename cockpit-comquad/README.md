@@ -49,13 +49,17 @@ cockpit-comquad provides a web-based interface for managing Docker Compose proje
 - **Stack Dashboard**: View all deployed comquad projects with status, service counts, and source paths
 - **Project Detail**: Inspect services, containers, and resources for each project
 - **Stack Deployment**: Browse directories and deploy new compose.yaml projects
+- **Deploy Preview**: Preview changes before deploying with expandable file diffs
+- **Update Diff**: See what will change before applying updates
 - **Lifecycle Management**: Start, stop, restart, and remove stacks with confirmation dialogs
+- **Resource Viewer**: Click resource names to view generated quadlet file content
+- **Clickable Ports**: Port mappings are clickable links with per-port http/https toggle
 - **Resource Overview**: View networks, volumes, and images managed by each project
 
 ## Requirements
 
 - Cockpit installed and running
-- comquad CLI installed at `/usr/local/bin/comquad`
+- comquad CLI installed
 - Node.js 18+ and npm for development
 
 ## Development
@@ -101,8 +105,8 @@ The plugin communicates with comquad via `cockpit.spawn()` calls to the CLI with
 
 - **App**: Main application with routing between views
 - **ProjectsList**: Dashboard showing all deployed projects
-- **ProjectDetail**: Detailed view of a single project with services, containers, and resources
-- **StackDeploy**: Directory browser and deployment interface for new stacks
+- **ProjectDetail**: Detailed view of a single project with services, containers, resources, update diff preview, and resource unit viewer
+- **StackDeploy**: Directory browser and deployment interface with change preview
 - **client**: Wrapper around `cockpit.spawn()` calls to comquad CLI
 
 ### JSON API
@@ -112,8 +116,10 @@ The plugin relies on comquad's `--json` output mode for all commands:
 - `comquad list --json` - List all projects
 - `comquad ps --json` - List containers for a project
 - `comquad view --json` - View project details
+- `comquad view --json <resource>` - View individual resource unit file
 - `comquad start/stop/restart --json` - Lifecycle management
 - `comquad up --json --no-diff` - Deploy a stack
+- `comquad up --json --dry-run` - Preview changes before deploying
 - `comquad down --json -y` - Remove a stack
 - `comquad logs --json` - View logs (batch mode)
 

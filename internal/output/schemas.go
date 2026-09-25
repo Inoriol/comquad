@@ -131,3 +131,32 @@ type LogEntryJSON struct {
 	Priority  int    `json:"priority"`
 	Message   string `json:"message"`
 }
+
+type DryRunData struct {
+	Project      string           `json:"project"`
+	TargetDir    string           `json:"target_dir"`
+	PullStrategy string           `json:"pull_strategy"`
+	Images       []DryRunImage    `json:"images,omitempty"`
+	Builds       []DryRunBuild    `json:"builds,omitempty"`
+	Files        []DryRunFile     `json:"files,omitempty"`
+	HasChanges   bool             `json:"has_changes"`
+}
+
+type DryRunImage struct {
+	Name   string `json:"name"`
+	Ref    string `json:"ref"`
+	Action string `json:"action"`
+}
+
+type DryRunBuild struct {
+	Name     string `json:"name"`
+	ImageTag string `json:"image_tag"`
+}
+
+type DryRunFile struct {
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	Status     string `json:"status"`
+	Diff       string `json:"diff"`
+	NewContent string `json:"new_content,omitempty"`
+}

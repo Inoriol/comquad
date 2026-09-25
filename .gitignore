@@ -34,6 +34,9 @@ go.work.sum
 .env
 .DS_Store
 
+# Release artifacts
+extra-dist/
+
 # Editor/IDE
 # .idea/
 # .vscode/

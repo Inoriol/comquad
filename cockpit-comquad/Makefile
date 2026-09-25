@@ -12,12 +12,12 @@ watch:
 install:
 	mkdir -p $(DESTDIR)/usr/local/share/cockpit/comquad
 	cp -r dist/* $(DESTDIR)/usr/local/share/cockpit/comquad/
-	cp manifest.json $(DESTDIR)/usr/local/share/cockpit/comquad/
+	cp src/manifest.json $(DESTDIR)/usr/local/share/cockpit/comquad/
 
 user-install:
 	mkdir -p ~/.local/share/cockpit/comquad
 	cp -r dist/* ~/.local/share/cockpit/comquad/
-	cp manifest.json ~/.local/share/cockpit/comquad/
+	cp src/manifest.json ~/.local/share/cockpit/comquad/
 
 user-uninstall:
 	rm -rf ~/.local/share/cockpit/comquad

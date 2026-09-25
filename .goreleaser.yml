@@ -24,6 +24,10 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+release:
+  extra_files:
+    - glob: "extra-dist/cockpit-comquad-*.tar.gz"
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 

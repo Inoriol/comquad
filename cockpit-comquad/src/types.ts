@@ -132,3 +132,32 @@ export interface LogEntry {
     priority: number;
     message: string;
 }
+
+export interface DryRunData {
+    project: string;
+    target_dir: string;
+    pull_strategy: string;
+    images?: DryRunImage[];
+    builds?: DryRunBuild[];
+    files?: DryRunFile[];
+    has_changes: boolean;
+}
+
+export interface DryRunImage {
+    name: string;
+    ref: string;
+    action: string;
+}
+
+export interface DryRunBuild {
+    name: string;
+    image_tag: string;
+}
+
+export interface DryRunFile {
+    name: string;
+    path: string;
+    status: string;
+    diff: string;
+    new_content?: string;
+}

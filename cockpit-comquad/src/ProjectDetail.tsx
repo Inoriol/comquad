@@ -23,11 +23,13 @@ import {
     Spinner,
     EmptyState,
     EmptyStateBody,
+    ExpandableSection,
+    Tooltip,
 } from "@patternfly/react-core";
 import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
-import { ArrowLeftIcon, SyncIcon } from "@patternfly/react-icons";
+import { ArrowLeftIcon, SyncIcon, ExternalLinkAltIcon, LockIcon, UnlockIcon } from "@patternfly/react-icons";
 import * as client from "./client";
-import type { Project, ViewData, Container } from "./types";
+import type { Project, ViewData, Container, DryRunData } from "./types";
 
 interface ProjectDetailProps {
     project: Project;
@@ -53,6 +55,15 @@ const getStatusColor = (status: string): "green" | "grey" | "orange" | "red" | "
     }
 };
 
+const getFileStatusColor = (status: string): "green" | "blue" | "red" | "orange" => {
+    switch (status) {
+        case "created": return "green";
+        case "changed": return "blue";
+        case "removed": return "red";
+        default: return "orange";
+    }
+};
+
 export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onRefresh }) => {
     const [activeTab, setActiveTab] = useState(0);
     const [viewData, setViewData] = useState<ViewData | null>(null);
@@ -67,22 +78,28 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
         action: "",
         title: "",
     });
+    const [dryRun, setDryRun] = useState<DryRunData | null>(null);
+    const [dryRunLoading, setDryRunLoading] = useState(false);
+    const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+    const [resourceModal, setResourceModal] = useState<{ open: boolean; name: string; content: string; loading: boolean }>({
+        open: false,
+        name: "",
+        content: "",
+        loading: false,
+    });
+    const [httpsPorts, setHttpsPorts] = useState<Set<string>>(new Set());
 
     const loadData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            console.log("Loading project details for:", project.source_path);
             const [view, ps] = await Promise.all([
                 client.viewProject(project.source_path),
                 client.projectPs(project.source_path),
             ]);
-            console.log("View data:", view);
-            console.log("Containers:", ps);
             setViewData(view);
             setContainers(ps);
         } catch (err) {
-            console.error("Error loading project details:", err);
             setError(err instanceof Error ? err.message : "Failed to load project details");
         } finally {
             setLoading(false);
@@ -92,6 +109,21 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    const fetchDryRun = useCallback(async () => {
+        setDryRunLoading(true);
+        setDryRun(null);
+        try {
+            const data = await client.dryRunProject(project.source_path);
+            setDryRun(data);
+            const allFiles = new Set(data.files?.map(f => f.name) || []);
+            setExpandedFiles(allFiles);
+        } catch {
+            // silently fail - user can still proceed without preview
+        } finally {
+            setDryRunLoading(false);
+        }
+    }, [project.source_path]);
 
     const handleAction = async (action: "update" | "stop" | "remove") => {
         setActionLoading(true);
@@ -117,11 +149,65 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
             setActionLoading(false);
             setConfirmModal({ open: false, action: "", title: "" });
             setDeleteVolumes(false);
+            setDryRun(null);
+            setExpandedFiles(new Set());
         }
     };
 
     const openConfirmModal = (action: string, title: string) => {
         setConfirmModal({ open: true, action, title });
+        if (action === "update") {
+            fetchDryRun();
+        }
+    };
+
+    const closeModal = () => {
+        setConfirmModal({ open: false, action: "", title: "" });
+        setDryRun(null);
+        setExpandedFiles(new Set());
+        setDeleteVolumes(false);
+    };
+
+    const toggleFile = (name: string) => {
+        setExpandedFiles(prev => {
+            const next = new Set(prev);
+            if (next.has(name)) {
+                next.delete(name);
+            } else {
+                next.add(name);
+            }
+            return next;
+        });
+    };
+
+    const handleResourceClick = async (resourceName: string) => {
+        setResourceModal({ open: true, name: resourceName, content: "", loading: true });
+        try {
+            const unit = await client.viewUnit(project.source_path, resourceName);
+            setResourceModal({ open: true, name: unit.filename, content: unit.content, loading: false });
+        } catch {
+            setResourceModal({ open: true, name: resourceName, content: "Failed to load unit file.", loading: false });
+        }
+    };
+
+    const getPortUrl = (hostIp: string, hostPort: number, portKey: string) => {
+        const host = (!hostIp || hostIp === "0.0.0.0" || hostIp === "::")
+            ? window.location.hostname
+            : hostIp;
+        const scheme = httpsPorts.has(portKey) ? "https" : "http";
+        return `${scheme}://${host}:${hostPort}`;
+    };
+
+    const togglePortScheme = (portKey: string) => {
+        setHttpsPorts(prev => {
+            const next = new Set(prev);
+            if (next.has(portKey)) {
+                next.delete(portKey);
+            } else {
+                next.add(portKey);
+            }
+            return next;
+        });
     };
 
     if (loading) {
@@ -302,7 +388,37 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                                                 </Td>
                                                 <Td dataLabel="Ports">
                                                     {container.ports && container.ports.length > 0
-                                                        ? container.ports.map(p => `${p.host_port}:${p.container_port}`).join(", ")
+                                                        ? container.ports.map((p, i) => {
+                                                            const portKey = `${container.name}-${p.host_port}-${p.container_port}-${i}`;
+                                                            const isHttps = httpsPorts.has(portKey);
+                                                            return (
+                                                                <React.Fragment key={portKey}>
+                                                                    {i > 0 && ", "}
+                                                                    <a
+                                                                        href={getPortUrl(p.host_ip, p.host_port, portKey)}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        style={{ textDecoration: "none" }}
+                                                                    >
+                                                                        {p.host_port}:{p.container_port}
+                                                                        <ExternalLinkAltIcon style={{ marginLeft: "0.25rem", fontSize: "0.75rem" }} />
+                                                                    </a>
+                                                                    <Tooltip content={isHttps ? "Switch to http" : "Switch to https"}>
+                                                                        <Button
+                                                                            variant="plain"
+                                                                            isInline
+                                                                            onClick={() => togglePortScheme(portKey)}
+                                                                            aria-label={isHttps ? "Switch to http" : "Switch to https"}
+                                                                            style={{ padding: "0 0.25rem", marginLeft: "0.125rem" }}
+                                                                        >
+                                                                            {isHttps
+                                                                                ? <LockIcon style={{ fontSize: "0.75rem" }} />
+                                                                                : <UnlockIcon style={{ fontSize: "0.75rem" }} />}
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                </React.Fragment>
+                                                            );
+                                                        })
                                                         : "—"}
                                                 </Td>
                                             </Tr>
@@ -330,7 +446,16 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                                     <Tbody>
                                         {viewData.resources.map((resource) => (
                                             <Tr key={resource.name}>
-                                                <Td dataLabel="Name">{resource.name}</Td>
+                                                <Td dataLabel="Name">
+                                                    <Button
+                                                        variant="link"
+                                                        isInline
+                                                        onClick={() => handleResourceClick(resource.name)}
+                                                        style={{ padding: 0 }}
+                                                    >
+                                                        {resource.name}
+                                                    </Button>
+                                                </Td>
                                                 <Td dataLabel="Type">
                                                     <Label>{resource.type}</Label>
                                                 </Td>
@@ -350,17 +475,17 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
             </PageSection>
 
             <Modal
-                variant={ModalVariant.medium}
+                variant={ModalVariant.large}
                 isOpen={confirmModal.open}
-                onClose={() => setConfirmModal({ open: false, action: "", title: "" })}
+                onClose={closeModal}
             >
                 <ModalHeader title={confirmModal.title} />
                 <ModalBody>
-                    <div style={{ fontSize: "1.1rem", padding: "1rem 0" }}>
+                    <div style={{ fontSize: "1.1rem", padding: "0.5rem 0" }}>
                         Are you sure you want to {confirmModal.action} project <strong>{project.name}</strong>?
                     </div>
                     {confirmModal.action === "remove" && (
-                        <div style={{ marginTop: "1rem" }}>
+                        <div style={{ marginTop: "0.5rem" }}>
                             <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
                                 <input
                                     type="checkbox"
@@ -372,12 +497,94 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                             </label>
                         </div>
                     )}
+                    {confirmModal.action === "update" && (
+                        <div style={{ marginTop: "1rem" }}>
+                            {dryRunLoading && (
+                                <div style={{ textAlign: "center", padding: "1rem" }}>
+                                    <Spinner size="md" />
+                                    <div style={{ marginTop: "0.5rem" }}>Computing changes...</div>
+                                </div>
+                            )}
+                            {dryRun && !dryRunLoading && (
+                                <div>
+                                    {dryRun.images && dryRun.images.length > 0 && (
+                                        <div style={{ marginBottom: "0.75rem" }}>
+                                            <strong>Images:</strong>
+                                            <ul style={{ margin: "0.25rem 0", paddingLeft: "1.5rem", fontSize: "0.875rem" }}>
+                                                {dryRun.images.map(img => (
+                                                    <li key={img.name}>
+                                                        <code>{img.name}</code> — {img.ref} ({img.action})
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {dryRun.builds && dryRun.builds.length > 0 && (
+                                        <div style={{ marginBottom: "0.75rem" }}>
+                                            <strong>Builds:</strong>
+                                            <ul style={{ margin: "0.25rem 0", paddingLeft: "1.5rem", fontSize: "0.875rem" }}>
+                                                {dryRun.builds.map(b => (
+                                                    <li key={b.name}>
+                                                        <code>{b.name}</code> — {b.image_tag}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {!dryRun.has_changes && (
+                                        <Alert variant="info" title="No changes" isInline isPlain>
+                                            Quadlet files are up to date.
+                                        </Alert>
+                                    )}
+                                    {dryRun.files && dryRun.files.length > 0 && (
+                                        <div>
+                                            <strong>File changes ({dryRun.files.length}):</strong>
+                                            <div style={{ marginTop: "0.5rem", maxHeight: "300px", overflow: "auto" }}>
+                                                {dryRun.files.map(file => (
+                                                    <ExpandableSection
+                                                        key={file.name}
+                                                        toggleText={
+                                                            <span>
+                                                                <Label color={getFileStatusColor(file.status)} isCompact>
+                                                                    {file.status}
+                                                                </Label>
+                                                                {" "}<code>{file.name}</code>
+                                                            </span>
+                                                        }
+                                                        isExpanded={expandedFiles.has(file.name)}
+                                                        onToggle={() => toggleFile(file.name)}
+                                                        style={{ marginBottom: "0.25rem" }}
+                                                    >
+                                                        <pre style={{
+                                                            background: "var(--pf-v5-global--BackgroundColor--200)",
+                                                            padding: "0.5rem",
+                                                            borderRadius: "4px",
+                                                            overflow: "auto",
+                                                            maxHeight: "200px",
+                                                            fontSize: "0.75rem",
+                                                            lineHeight: "1.4",
+                                                            whiteSpace: "pre-wrap",
+                                                            wordBreak: "break-all",
+                                                        }}>
+                                                            {file.status === "created" && file.new_content
+                                                                ? file.new_content
+                                                                : file.diff}
+                                                        </pre>
+                                                    </ExpandableSection>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </ModalBody>
                 <ModalFooter>
                     <Button
                         key="cancel"
                         variant="link"
-                        onClick={() => setConfirmModal({ open: false, action: "", title: "" })}
+                        onClick={closeModal}
                         isDisabled={actionLoading}
                     >
                         Cancel
@@ -389,6 +596,43 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                         isLoading={actionLoading}
                     >
                         {confirmModal.action === "remove" ? "Remove" : confirmModal.action === "stop" ? "Stop" : "Update"}
+                    </Button>
+                </ModalFooter>
+            </Modal>
+
+            <Modal
+                variant={ModalVariant.large}
+                isOpen={resourceModal.open}
+                onClose={() => setResourceModal({ open: false, name: "", content: "", loading: false })}
+            >
+                <ModalHeader title={resourceModal.name} />
+                <ModalBody>
+                    {resourceModal.loading ? (
+                        <div style={{ textAlign: "center", padding: "2rem" }}>
+                            <Spinner size="lg" />
+                        </div>
+                    ) : (
+                        <pre style={{
+                            background: "var(--pf-v5-global--BackgroundColor--200)",
+                            padding: "1rem",
+                            borderRadius: "4px",
+                            overflow: "auto",
+                            maxHeight: "500px",
+                            fontSize: "0.8125rem",
+                            lineHeight: "1.5",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all",
+                        }}>
+                            {resourceModal.content}
+                        </pre>
+                    )}
+                </ModalBody>
+                <ModalFooter>
+                    <Button
+                        variant="primary"
+                        onClick={() => setResourceModal({ open: false, name: "", content: "", loading: false })}
+                    >
+                        Close
                     </Button>
                 </ModalFooter>
             </Modal>

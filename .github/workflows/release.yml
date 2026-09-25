@@ -12,11 +12,11 @@ jobs:
   cockpit-plugin:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
           cache: 'npm'
@@ -40,7 +40,7 @@ jobs:
           tar -czf cockpit-comquad-${VERSION}.tar.gz cockpit-comquad-${VERSION}
           echo "TARBALL=cockpit-comquad-${VERSION}.tar.gz" >> $GITHUB_ENV
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: cockpit-comquad-tarball
           path: cockpit-comquad-*.tar.gz
@@ -49,19 +49,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: cockpit-plugin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: cockpit-comquad-tarball
-          path: dist
+          path: extra-dist
 
       - uses: goreleaser/goreleaser-action@v7
         with:

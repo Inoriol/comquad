@@ -198,8 +198,13 @@ The plugin provides:
 
 - Stack dashboard with project status and service counts
 - Project detail view with services, containers, and resources tabs
-- Stack deployment via directory browser
+- Stack deployment via directory browser with change preview (dry-run)
 - Lifecycle management (start/stop/restart/remove) with confirmation dialogs
+- Update diff preview showing file changes before applying
+- Resource unit file viewer (click resource names to view quadlet content)
+- Clickable port links with per-port http/https toggle
+
+The plugin uses `comquad up --dry-run --json` for preview functionality, which returns structured diff data including file changes, image pull plans, and build plans.
 
 See [cockpit-comquad/README.md](./cockpit-comquad/README.md) for development and usage details.
 

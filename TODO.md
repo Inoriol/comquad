@@ -166,6 +166,19 @@ Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Port
 - [ ] Test scenarios: list projects, view detail, start/stop, deploy
 - [ ] Follow cockpit-podman test patterns
 
+#### 2.10 JSON API: `up --dry-run --json`
+- [x] Add `DryRunData`, `DryRunImage`, `DryRunBuild`, `DryRunFile` schemas to `internal/output/schemas.go`
+- [x] Add JSON branch to `printDryRun()` in `internal/orchestrator/images.go`
+- [x] Return structured data: project, target_dir, pull_strategy, images, builds, files (with diff), has_changes
+- [x] Test with `comquad up --dry-run --json`
+
+#### 2.11 Cockpit plugin enhancements
+- [x] Add dry-run preview to StackDeploy.tsx (Preview Changes button before deploy)
+- [x] Add diff preview to Update confirmation modal in ProjectDetail.tsx
+- [x] Add resource unit viewer modal (click resource name to view quadlet content)
+- [x] Add clickable port links with per-port http/https toggle (lock/unlock icon)
+- [x] Fix Makefile manifest.json path (src/manifest.json)
+
 ### Execution Order
 
 1. ✅ Phase 1.1: `view --json` (validates schema design)
@@ -178,8 +191,10 @@ Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Port
 8. ✅ Phase 1.4: `up --json` (needed for deploy)
 9. ✅ Phase 2.6: Stack deploy (depends on `up --json`)
 10. ✅ Phase 1.5: `logs --json` (needed for logs viewer)
-11. ⏳ Phase 2.7: Logs viewer (deferred - lower priority)
-12. ⏳ Phase 1.7 + 2.9: Testing (ongoing, but formalize at end)
+11. ✅ Phase 2.10: `up --dry-run --json` (needed for preview features)
+12. ✅ Phase 2.11: Cockpit plugin enhancements (preview, resource viewer, clickable ports)
+13. ⏳ Phase 2.7: Logs viewer (deferred - lower priority)
+14. ⏳ Phase 2.9: Testing (ongoing, but formalize at end)
 
 ### References
 
