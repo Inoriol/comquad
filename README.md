@@ -171,8 +171,10 @@ A web-based UI plugin for Cockpit is available in the `cockpit-comquad/` directo
 
 - Stack dashboard with project status and service counts
 - Project detail view with services, containers, and resources
-- Stack deployment via directory browser
-- Lifecycle management (start/stop/restart/remove)
+- Stack deployment via directory browser with change preview
+- Lifecycle management (start/stop/restart/remove) with update diff preview
+- Resource unit file viewer (click resource names to view quadlet content)
+- Clickable port links with per-port http/https toggle
 
 See [cockpit-comquad/README.md](./cockpit-comquad/README.md) for details.
 

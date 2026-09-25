@@ -11,6 +11,7 @@ import (
 
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
 	"github.com/Inoriol/comquad/internal/deploy"
+	"github.com/Inoriol/comquad/internal/output"
 	"github.com/Inoriol/comquad/internal/reconcile"
 )
 
@@ -454,5 +455,105 @@ func TestPrintDryRun_ResolvesImageRef(t *testing.T) {
 
 	if !strings.Contains(out, "docker.io/library/nginx:latest") {
 		t.Errorf("expected resolved image name in output, got:\n%s", out)
+	}
+}
+
+func TestPrintDryRun_JSON_Output(t *testing.T) {
+	units := makeTestUnits()
+	targetDir := "/fake/target"
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	out := captureStdout(t, func() {
+		if err := o.printDryRun(units, targetDir, "missing", dryRunPlan(t, targetDir, units)); err != nil {
+			t.Errorf("printDryRun error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, `"version": "1.0"`) {
+		t.Errorf("expected JSON version in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"project": "myapp"`) {
+		t.Errorf("expected project name in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"target_dir": "/fake/target"`) {
+		t.Errorf("expected target_dir in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"pull_strategy": "missing"`) {
+		t.Errorf("expected pull_strategy in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"has_changes": true`) {
+		t.Errorf("expected has_changes in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"status": "created"`) {
+		t.Errorf("expected file status in JSON output, got:\n%s", out)
+	}
+}
+
+func TestPrintDryRun_JSON_IncludesImages(t *testing.T) {
+	units := makeTestUnits()
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	out := captureStdout(t, func() {
+		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
+	})
+
+	if !strings.Contains(out, `"images"`) {
+		t.Errorf("expected images array in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"ref": "docker.io/library/nginx"`) {
+		t.Errorf("expected image ref in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"action": "would re-pull: always"`) {
+		t.Errorf("expected image action in JSON output, got:\n%s", out)
+	}
+}
+
+func TestPrintDryRun_JSON_IncludesBuilds(t *testing.T) {
+	units := makeBuildTestUnits()
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	out := captureStdout(t, func() {
+		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
+	})
+
+	if !strings.Contains(out, `"builds"`) {
+		t.Errorf("expected builds array in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"image_tag": "myapp-web:latest"`) {
+		t.Errorf("expected build image_tag in JSON output, got:\n%s", out)
+	}
+}
+
+func TestPrintDryRun_JSON_MixedBuildAndImage(t *testing.T) {
+	units := makeMixedTestUnits()
+	o := newTestOrchestrator("myapp", t.TempDir(), newMockStateStore(nil), newMockSystemdClient())
+
+	output.SetJSONMode(true)
+	defer output.SetJSONMode(false)
+
+	out := captureStdout(t, func() {
+		o.printDryRun(units, t.TempDir(), "always", dryRunPlan(t, t.TempDir(), units))
+	})
+
+	if !strings.Contains(out, `"builds"`) {
+		t.Errorf("expected builds array in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"images"`) {
+		t.Errorf("expected images array in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"name": "cq-myapp-web.build"`) {
+		t.Errorf("expected build name in JSON output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"name": "cq-myapp-db.image"`) {
+		t.Errorf("expected image name in JSON output, got:\n%s", out)
 	}
 }

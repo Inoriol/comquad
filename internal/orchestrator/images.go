@@ -193,13 +193,17 @@ func hasBuildUnit(units []c2q.QuadletUnit, containerName string) bool {
 }
 
 func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pullStrategy string, plan reconcile.Plan) error {
-	logger.Printf("Dry run — project: %s\n", o.projectName)
-	logger.Printf("Target directory: %s\n\n", targetDir)
-
 	strat, err := ParsePullStrategy(pullStrategy)
 	if err != nil {
 		return err
 	}
+
+	if output.IsJSONMode() {
+		return o.printDryRunJSON(units, targetDir, strat, plan)
+	}
+
+	logger.Printf("Dry run — project: %s\n", o.projectName)
+	logger.Printf("Target directory: %s\n\n", targetDir)
 
 	for _, unit := range units {
 		if unit.Type != c2q.UnitImage {
@@ -286,4 +290,86 @@ func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pu
 
 	logger.Print("Dry run complete — nothing was written, no units started.")
 	return nil
+}
+
+func (o *Orchestrator) printDryRunJSON(units []c2q.QuadletUnit, targetDir string, strat PullStrategy, plan reconcile.Plan) error {
+	data := output.DryRunData{
+		Project:      o.projectName,
+		TargetDir:    targetDir,
+		PullStrategy: string(strat),
+	}
+
+	for _, unit := range units {
+		if unit.Type != c2q.UnitImage {
+			continue
+		}
+		image := getDirective(unit, c2q.SectionImage, "Image")
+		if image == "" {
+			continue
+		}
+		action := "would verify local image"
+		if hasBuildUnitForName(units, unit.Name) {
+			action = "would be built locally, no pull"
+		} else {
+			switch strat {
+			case PullAlways:
+				action = "would re-pull: always"
+			case PullMissing:
+				action = "would pull if not already pulled"
+			case PullNever:
+				action = "would verify local image"
+			}
+		}
+		data.Images = append(data.Images, output.DryRunImage{
+			Name:   unit.Name + ".image",
+			Ref:    image,
+			Action: action,
+		})
+	}
+
+	for _, unit := range units {
+		if unit.Type != c2q.UnitBuild {
+			continue
+		}
+		if hasImageUnitForName(units, unit.Name) {
+			continue
+		}
+		imageTag := getDirective(unit, c2q.SectionBuild, "ImageTag")
+		if imageTag == "" {
+			imageTag = "unknown"
+		}
+		data.Builds = append(data.Builds, output.DryRunBuild{
+			Name:     unit.Name + ".build",
+			ImageTag: imageTag,
+		})
+	}
+
+	for _, fp := range plan.Files {
+		if fp.Status == reconcile.StatusUnchanged {
+			continue
+		}
+		var status string
+		switch fp.Status {
+		case reconcile.StatusCreated:
+			status = "created"
+		case reconcile.StatusChanged:
+			status = "changed"
+		case reconcile.StatusRemoved:
+			status = "removed"
+		}
+		df := output.DryRunFile{
+			Name:   fp.Name,
+			Path:   fp.TargetPath,
+			Status: status,
+			Diff:   fp.Diff(),
+		}
+		if fp.Status == reconcile.StatusCreated {
+			df.NewContent = fp.NewContent
+		}
+		data.Files = append(data.Files, df)
+	}
+
+	data.HasChanges = len(data.Files) > 0
+
+	return output.PrintJSON(data)
 }

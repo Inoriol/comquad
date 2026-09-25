@@ -7,6 +7,7 @@ import type {
     DownData,
     UpData,
     LogsData,
+    DryRunData,
 } from "./types";
 
 // Use the global cockpit object loaded by ../base1/cockpit.js
@@ -146,6 +147,11 @@ export async function removeProject(projectPath: string, deleteVolumes: boolean 
 export async function deployProject(projectPath: string): Promise<UpData> {
     const output = await runComquad(["comquad", "up", "--json", "--no-diff"], { directory: projectPath });
     return parseResponse<UpData>(output);
+}
+
+export async function dryRunProject(projectPath: string): Promise<DryRunData> {
+    const output = await runComquad(["comquad", "up", "--json", "--dry-run"], { directory: projectPath });
+    return parseResponse<DryRunData>(output);
 }
 
 export async function projectLogs(projectPath: string, service?: string): Promise<LogsData> {
