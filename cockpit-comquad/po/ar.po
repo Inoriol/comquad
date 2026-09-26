@@ -1,0 +1,357 @@
+# Arabic translation for cockpit-comquad.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "أكوام كومكواد"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "نشر الكوم"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "تحديث"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "خطأ في تحميل المشاريع"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "إعادة المحاولة"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "جارٍ تحميل المشاريع..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "لم يتم نشر أي أكوام"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "انشر أول ملف compose.yaml للبدء."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "فشل تحميل المشاريع"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "جدول المشاريع"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "الاسم"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "الحالة"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "الخدمات"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "مسار المصدر"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "الملفات"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "جارٍ تحميل تفاصيل المشروع..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "خطأ في تحميل تفاصيل المشروع"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "العودة إلى المشاريع"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "رجوع"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "تحديث"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "تحديث المشروع"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "إيقاف"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "إيقاف المشروع"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "إزالة"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "إزالة المشروع"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "فشل الإجراء"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "جدول الخدمات"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "الصورة"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "الشبكات"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "وحدات التخزين"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "لم يتم العثور على خدمات"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "الحاويات"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "جدول الحاويات"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "الخدمة"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "الحالة"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "المنافذ"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "لم يتم العثور على حاويات"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "الموارد"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "جدول الموارد"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "النوع"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "معلومات"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "لم يتم العثور على موارد"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "التبديل إلى http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "التبديل إلى https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "هل أنت متأكد أنك تريد ${action} المشروع"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "حذف وحدات التخزين (خيار -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "جارٍ حساب التغييرات..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "الصور"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "عمليات البناء"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "لا توجد تغييرات"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "ملفات Quadlet محدثة."
+
+#: src/ProjectDetail.tsx
+msgid "File changes (${count})"
+msgstr "تغييرات الملفات (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "إلغاء"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "إغلاق"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "فشل تحميل تفاصيل المشروع"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "فشل ${action} المشروع"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "فشل تحميل ملف الوحدة."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "يرجى اختيار دليل"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "فشل نشر الكوم"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "فشل معاينة التغييرات"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "تم نشر الكوم بنجاح"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "تم نشر الكوم وهو يعمل الآن."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "دليل المشروع"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "اختر الدليل الذي يحتوي على ملف compose.yaml الخاص بك"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "تصفح"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "فشل النشر"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "فشلت المعاينة"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "جارٍ المعاينة..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "معاينة التغييرات"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "جارٍ النشر..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "معاينة"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "الهدف"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "سحب"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "ملفات Quadlet محدثة. لا شيء لنشره."
+
+#: src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "تغييرات الملفات (${count})"
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "اختر دليل المشروع"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "الانتقال لأعلى"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "خطأ"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "لم يتم العثور على أدلة"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "المسار الحالي:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "اختر هذا الدليل"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "فشل تحميل الدليل"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "حدث خطأ ما"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "حاول مرة أخرى"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "حدث خطأ غير متوقع"

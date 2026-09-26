@@ -1,0 +1,353 @@
+# Chinese Simplified translations for cockpit-comquad package.
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Chinese Simplified\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Comquad 堆栈"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "部署堆栈"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "刷新"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "加载项目时出错"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "重试"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "正在加载项目..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "没有已部署的堆栈"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "部署您的第一个 compose.yaml 以开始使用。"
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "加载项目失败"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "项目表"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "名称"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "状态"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "服务"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "源路径"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "文件"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "正在加载项目详情..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "加载项目详情时出错"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "返回项目"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "返回"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "更新"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "更新项目"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "停止"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "停止项目"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "移除"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "移除项目"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "操作失败"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "服务表"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "镜像"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "网络"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "卷"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "未找到服务"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "容器"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "容器表"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "服务"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "状态"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "端口"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "未找到容器"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "资源"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "资源表"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "类型"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "信息"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "未找到资源"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "切换到 http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "切换到 https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "您确定要${action}项目吗"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "删除卷（-d 标志）"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "正在计算更改..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "镜像"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "构建"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "无更改"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Quadlet 文件已是最新。"
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "文件更改（${count}）"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "取消"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "关闭"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "加载项目详情失败"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "${action}项目失败"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "加载单元文件失败。"
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "请选择一个目录"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "部署堆栈失败"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "预览更改失败"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "堆栈部署成功"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "堆栈已部署，正在运行中。"
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "项目目录"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "选择包含 compose.yaml 文件的目录"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "浏览"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "部署失败"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "预览失败"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "正在预览..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "预览更改"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "正在部署..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "预览"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "目标"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "拉取"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Quadlet 文件已是最新。无需部署。"
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "选择项目目录"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "向上"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "错误"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "未找到目录"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "当前路径："
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "选择此目录"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "加载目录失败"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "出了点问题"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "重试"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "发生了意外错误"

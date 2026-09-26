@@ -1,0 +1,353 @@
+# Ukrainian translations for cockpit-comquad package.
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Ukrainian\n"
+"Language: uk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Стеки Comquad"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Розгорнути стек"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Оновити"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Помилка завантаження проєктів"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Повторити"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Завантаження проєктів..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Немає розгорнутих стеків"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Розгорніть перший compose.yaml для початку роботи."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Не вдалося завантажити проєкти"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Таблиця проєктів"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Назва"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Статус"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Сервіси"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Шлях до джерела"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Файли"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Завантаження відомостей про проєкт..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Помилка завантаження відомостей про проєкт"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Назад до проєктів"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Назад"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Оновити"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Оновити проєкт"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Зупинити"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Зупинити проєкт"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Видалити"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Видалити проєкт"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Дію не виконано"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Таблиця сервісів"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Образ"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Мережі"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Томи"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Сервіси не знайдено"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Контейнери"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Таблиця контейнерів"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Сервіс"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Стан"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Порти"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Контейнери не знайдено"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Ресурси"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Таблиця ресурсів"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Тип"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Інформація"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Ресурси не знайдено"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Перемкнути на http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Перемкнути на https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Ви впевнені, що хочете ${action} проєкт"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Видалити томи (прапорець -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Обчислення змін..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Образи"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Збірки"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Немає змін"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Файли Quadlet актуальні."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Зміни файлів (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Скасувати"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Закрити"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Не вдалося завантажити відомості про проєкт"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Не вдалося ${action} проєкт"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Не вдалося завантажити файл модуля."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Будь ласка, виберіть каталог"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Не вдалося розгорнути стек"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Не вдалося переглянути зміни"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Стек успішно розгорнуто"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Стек розгорнуто і зараз працює."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Каталог проєкту"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Виберіть каталог, що містить файл compose.yaml"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Огляд"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Розгортання не вдалося"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Попередній перегляд не вдався"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Попередній перегляд..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Попередній перегляд змін"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Розгортання..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Попередній перегляд"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Ціль"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Завантажити"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Файли Quadlet актуальні. Нічого розгортати."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Вибрати каталог проєкту"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Вгору"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Помилка"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Каталоги не знайдено"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Поточний шлях:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Вибрати цей каталог"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Не вдалося завантажити каталог"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Щось пішло не так"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Спробувати знову"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Сталася неочікувана помилка"

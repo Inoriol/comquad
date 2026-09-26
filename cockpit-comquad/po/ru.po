@@ -1,0 +1,353 @@
+# Russian translations for cockpit-comquad package.
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Стеки Comquad"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Развернуть стек"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Обновить"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Ошибка загрузки проектов"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Повторить"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Загрузка проектов..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Нет развернутых стеков"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Разверните первый compose.yaml для начала работы."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Не удалось загрузить проекты"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Таблица проектов"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Имя"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Статус"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Сервисы"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Исходный путь"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Файлы"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Загрузка сведений о проекте..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Ошибка загрузки сведений о проекте"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Назад к проектам"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Назад"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Обновить"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Обновить проект"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Остановить"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Остановить проект"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Удалить"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Удалить проект"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Действие не выполнено"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Таблица сервисов"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Образ"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Сети"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Тома"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Сервисы не найдены"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Контейнеры"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Таблица контейнеров"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Сервис"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Состояние"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Порты"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Контейнеры не найдены"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Ресурсы"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Таблица ресурсов"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Тип"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Информация"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Ресурсы не найдены"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Переключить на http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Переключить на https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Вы уверены, что хотите ${action} проект"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Удалить тома (флаг -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Вычисление изменений..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Образы"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Сборки"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Нет изменений"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Файлы Quadlet актуальны."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Изменения файлов (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Отмена"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Закрыть"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Не удалось загрузить сведения о проекте"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Не удалось ${action} проект"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Не удалось загрузить файл модуля."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Пожалуйста, выберите каталог"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Не удалось развернуть стек"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Не удалось просмотреть изменения"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Стек успешно развернут"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Стек развернут и сейчас работает."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Каталог проекта"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Выберите каталог, содержащий файл compose.yaml"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Обзор"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Развертывание не удалось"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Предпросмотр не удался"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Предпросмотр..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Предпросмотр изменений"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Развертывание..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Предпросмотр"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Цель"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Загрузить"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Файлы Quadlet актуальны. Нечего развертывать."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Выбрать каталог проекта"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Вверх"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Ошибка"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Каталоги не найдены"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Текущий путь:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Выбрать этот каталог"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Не удалось загрузить каталог"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Что-то пошло не так"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Попробовать снова"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Произошла непредвиденная ошибка"

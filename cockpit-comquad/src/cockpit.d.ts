@@ -22,6 +22,9 @@ declare const cockpit: {
         close: () => void;
     };
     gettext: (str: string) => string;
+    ngettext: (singular: string, plural: string, n: number) => string;
+    format: (fmt: string, ...args: any[]) => string;
+    locale: (data: string) => void;
 };
 
 export default cockpit;

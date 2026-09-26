@@ -161,10 +161,10 @@ Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Port
 - [x] Status badge colors (healthy=green, stopped=gray, degraded=orange, failed=red)
 
 #### 2.9 Testing
-- [ ] Set up test infrastructure (test VM with comquad installed)
-- [ ] Integration tests using Chrome DevTools Protocol
-- [ ] Test scenarios: list projects, view detail, start/stop, deploy
-- [ ] Follow cockpit-podman test patterns
+- [x] Set up test infrastructure (vitest + React Testing Library for unit tests)
+- [x] Unit tests: 60 tests across 7 test files (client, components)
+- [x] Browser integration tests (Selenium + Chromium in container)
+- [x] Follow cockpit-podman test patterns (adapted for comquad)
 
 #### 2.10 JSON API: `up --dry-run --json`
 - [x] Add `DryRunData`, `DryRunImage`, `DryRunBuild`, `DryRunFile` schemas to `internal/output/schemas.go`
@@ -193,8 +193,9 @@ Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Port
 10. ✅ Phase 1.5: `logs --json` (needed for logs viewer)
 11. ✅ Phase 2.10: `up --dry-run --json` (needed for preview features)
 12. ✅ Phase 2.11: Cockpit plugin enhancements (preview, resource viewer, clickable ports)
-13. ⏳ Phase 2.7: Logs viewer (deferred - lower priority)
-14. ⏳ Phase 2.9: Testing (ongoing, but formalize at end)
+13. ✅ Phase 2.9: Testing (unit tests + browser integration tests)
+14. ✅ Internationalization (i18n) - all strings wrapped, po/ infrastructure, build integration
+15. ⏳ Phase 2.7: Logs viewer (deferred - lower priority)
 
 ### References
 

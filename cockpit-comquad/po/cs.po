@@ -1,0 +1,357 @@
+# Czech translation for cockpit-comquad.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Czech\n"
+"Language: cs\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Comquad zásobníky"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Nasadit zásobník"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Obnovit"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Chyba při načítání projektů"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Zkusit znovu"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Načítání projektů..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Žádné nasazené zásobníky"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Pro začátek nasaďte svůj první compose.yaml."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Nepodařilo se načíst projekty"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Tabulka projektů"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Název"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Stav"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Služby"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Zdrojová cesta"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Soubory"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Načítání podrobností projektu..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Chyba při načítání podrobností projektu"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Zpět na projekty"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Zpět"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Aktualizovat"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Aktualizovat projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Zastavit"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Zastavit projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Odebrat"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Odebrat projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Akce se nezdařila"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Tabulka služeb"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Obraz"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Sítě"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Svazky"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Nenalezeny žádné služby"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Kontejnery"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Tabulka kontejnerů"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Služba"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Stav"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Porty"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Nenalezeny žádné kontejnery"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Zdroje"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Tabulka zdrojů"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Typ"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Informace"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Nenalezeny žádné zdroje"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Přepnout na http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Přepnout na https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Opravdu chcete ${action} projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Smazat svazky (příznak -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Výpočet změn..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Obrazy"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Sestavení"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Žádné změny"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Soubory Quadlet jsou aktuální."
+
+#: src/ProjectDetail.tsx
+msgid "File changes (${count})"
+msgstr "Změny souborů (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Zrušit"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Zavřít"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Nepodařilo se načíst podrobnosti projektu"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Nepodařilo se ${action} projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Nepodařilo se načíst soubor jednotky."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Vyberte prosím adresář"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Nepodařilo se nasadit zásobník"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Nepodařilo se zobrazit náhled změn"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Zásobník úspěšně nasazen"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Zásobník byl nasazen a nyní běží."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Adresář projektu"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Vyberte adresář obsahující soubor compose.yaml"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Procházet"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Nasazení se nezdařilo"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Náhled se nezdařil"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Zobrazování náhledu..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Náhled změn"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Nasazování..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Náhled"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Cíl"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Stáhnout"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Soubory Quadlet jsou aktuální. Není co nasazovat."
+
+#: src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Změny souborů (${count})"
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Vybrat adresář projektu"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Nahoru"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Chyba"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Nenalezeny žádné adresáře"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Aktuální cesta:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Vybrat tento adresář"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Nepodařilo se načíst adresář"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Něco se pokazilo"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Zkusit znovu"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Došlo k neočekávané chybě"

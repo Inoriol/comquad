@@ -1,5 +1,6 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
-import { Alert, Page, PageSection, Button } from "@patternfly/react-core";
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Alert, Page, PageSection, Button } from '@patternfly/react-core';
+import { _ } from './i18n';
 
 interface Props {
     children: ReactNode;
@@ -14,18 +15,18 @@ interface State {
 export class ErrorBoundary extends Component<Props, State> {
     public state: State = {
         hasError: false,
-        error: null,
+        error: null
     };
 
-    public static getDerivedStateFromError(error: Error): State {
+    public static getDerivedStateFromError (error: Error): State {
         return { hasError: true, error };
     }
 
-    public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error("ErrorBoundary caught an error:", error, errorInfo);
+    public componentDidCatch (error: Error, errorInfo: ErrorInfo) {
+        console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 
-    public render() {
+    public render () {
         if (this.state.hasError) {
             if (this.props.fallback) {
                 return this.props.fallback;
@@ -35,21 +36,21 @@ export class ErrorBoundary extends Component<Props, State> {
                 <Page>
                     <PageSection>
                         <Alert
-                            variant="danger"
-                            title="Something went wrong"
+                            variant='danger'
+                            title={_('Something went wrong')}
                             actionClose={
                                 <Button
-                                    variant="link"
+                                    variant='link'
                                     onClick={() => this.setState({ hasError: false, error: null })}
-                                >
-                                    Try again
-                                </Button>
+                              >
+                                    {_('Try again')}
+                              </Button>
                             }
-                        >
-                            {this.state.error?.message || "An unexpected error occurred"}
-                        </Alert>
-                    </PageSection>
-                </Page>
+                      >
+                            {this.state.error?.message || _('An unexpected error occurred')}
+                      </Alert>
+                  </PageSection>
+              </Page>
             );
         }
 

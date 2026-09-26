@@ -1,0 +1,342 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ka\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Comquad სტეკები"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "სტეკის განთავსება"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "განახლება"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "შეცდომა პროექტების ჩატვირთვისას"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "ხელახლა ცდა"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "პროექტების ჩატვირთვა..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "განთავსებული სტეკები არ არის"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "განათავსეთ თქვენი პირველი compose.yaml დასაწყებად."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "პროექტების ჩატვირთვა ვერ მოხერხდა"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "პროექტების ცხრილი"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "სახელი"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "სტატუსი"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "სერვისები"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "წყაროს გზა"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "ფაილები"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "პროექტის დეტალების ჩატვირთვა..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "შეცდომა პროექტის დეტალების ჩატვირთვისას"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "პროექტებზე დაბრუნება"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "უკან"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "განახლება"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "პროექტის განახლება"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "შეჩერება"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "პროექტის შეჩერება"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "წაშლა"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "პროექტის წაშლა"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "მოქმედება ვერ შესრულდა"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "სერვისების ცხრილი"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "სურათი"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "ქსელები"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "ტომები"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "სერვისები ვერ მოიძებნა"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "კონტეინერები"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "კონტეინერების ცხრილი"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "სერვისი"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "მდგომარეობა"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "პორტები"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "კონტეინერები ვერ მოიძებნა"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "რესურსები"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "რესურსების ცხრილი"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "ტიპი"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "ინფორმაცია"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "რესურსები ვერ მოიძებნა"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "http-ზე გადართვა"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "https-ზე გადართვა"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "დარწმუნებული ხართ, რომ გსურთ პროექტის ${action}"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "ტომების წაშლა (-d დროშა)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "ცვლილებების გამოთვლა..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "სურათები"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "აგებები"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "ცვლილებები არ არის"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Quadlet ფაილები განახლებულია."
+
+#: src/ProjectDetail.tsx
+msgid "File changes (${count})"
+msgstr "ფაილის ცვლილებები (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "გაუქმება"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "დახურვა"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "პროექტის დეტალების ჩატვირთვა ვერ მოხერხდა"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "პროექტის ${action} ვერ მოხერხდა"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "ერთეულის ფაილის ჩატვირთვა ვერ მოხერხდა."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "გთხოვთ აირჩიეთ დირექტორია"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "სტეკის განთავსება ვერ მოხერხდა"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "ცვლილებების გადახედვა ვერ მოხერხდა"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "სტეკი წარმატებით განთავსდა"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "სტეკი განთავსდა და ახლა გაშვებულია."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "პროექტის დირექტორია"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "აირჩიეთ დირექტორია, რომელიც შეიცავს თქვენს compose.yaml ფაილს"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "დათვალიერება"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "განთავსება ვერ მოხერხდა"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "გადახედვა ვერ მოხერხდა"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "გადახედვა..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "ცვლილებების გადახედვა"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "განთავსება..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "გადახედვა"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "სამიზნე"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "პული"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Quadlet ფაილები განახლებულია. განსათავსებელი არაფერია."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "პროექტის დირექტორიის არჩევა"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "ზემოთ"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "შეცდომა"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "დირექტორიები ვერ მოიძებნა"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "მიმდინარე გზა:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "ამ დირექტორიის არჩევა"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "დირექტორიის ჩატვირთვა ვერ მოხერხდა"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "რაღაც მოხდა"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "სცადეთ ხელახლა"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "მოხდა მოულოდნელი შეცდომა"

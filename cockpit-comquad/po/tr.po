@@ -1,0 +1,353 @@
+# Turkish translations for cockpit-comquad package.
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Turkish\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Comquad Yığınları"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Yığın Dağıt"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Yenile"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Projeler yüklenirken hata oluştu"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Yeniden Dene"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Projeler yükleniyor..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Dağıtılmış yığın yok"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Başlamak için ilk compose.yaml dosyanızı dağıtın."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Projeler yüklenemedi"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Projeler tablosu"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Ad"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Durum"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Servisler"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Kaynak Yolu"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Dosyalar"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Proje ayrıntıları yükleniyor..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Proje ayrıntıları yüklenirken hata oluştu"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Projelere Geri Dön"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Geri"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Güncelle"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Projeyi Güncelle"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Durdur"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Projeyi Durdur"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Kaldır"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Projeyi Kaldır"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "İşlem başarısız oldu"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Servisler tablosu"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "İmaj"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Ağlar"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Hacimler"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Servis bulunamadı"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Konteynerler"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Konteynerler tablosu"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Servis"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Durum"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Portlar"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Konteyner bulunamadı"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Kaynaklar"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Kaynaklar tablosu"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Tür"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Bilgi"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Kaynak bulunamadı"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Http'ye geç"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Https'ye geç"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Projeyi ${action} yapmak istediğinizden emin misiniz"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Hacimleri sil (-d bayrağı)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Değişiklikler hesaplanıyor..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "İmajlar"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Derlemeler"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Değişiklik yok"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Quadlet dosyaları güncel."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Dosya değişiklikleri (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "İptal"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Kapat"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Proje ayrıntıları yüklenemedi"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Projeyi ${action} işlemi başarısız oldu"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Birim dosyası yüklenemedi."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Lütfen bir dizin seçin"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Yığın dağıtımı başarısız oldu"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Değişiklikleri önizleme başarısız oldu"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Yığın başarıyla dağıtıldı"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Yığın dağıtıldı ve şu anda çalışıyor."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Proje Dizini"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "compose.yaml dosyanızı içeren dizini seçin"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Gözat"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Dağıtım başarısız oldu"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Önizleme başarısız oldu"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Önizleniyor..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Değişiklikleri Önizle"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Dağıtılıyor..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Önizle"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Hedef"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Çek"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Quadlet dosyaları güncel. Dağıtılacak bir şey yok."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Proje Dizini Seç"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Yukarı Git"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Hata"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Dizin bulunamadı"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Geçerli yol:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Bu Dizini Seç"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Dizin yüklenemedi"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Bir şeyler ters gitti"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Tekrar dene"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Beklenmeyen bir hata oluştu"
