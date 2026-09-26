@@ -1,0 +1,342 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: id\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Tumpukan Comquad"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Terapkan Tumpukan"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Segarkan"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Kesalahan saat memuat proyek"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Coba lagi"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Memuat proyek..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Tidak ada tumpukan yang diterapkan"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Terapkan compose.yaml pertama Anda untuk memulai."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Gagal memuat proyek"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Tabel proyek"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Nama"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Status"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Layanan"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Jalur Sumber"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "File"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Memuat detail proyek..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Kesalahan saat memuat detail proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Kembali ke Proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Kembali"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Perbarui"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Perbarui Proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Hentikan"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Hentikan Proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Hapus"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Hapus Proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Tindakan gagal"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Tabel layanan"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Gambar"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Jaringan"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Volume"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Tidak ada layanan yang ditemukan"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Kontainer"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Tabel kontainer"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Layanan"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Status"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Port"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Tidak ada kontainer yang ditemukan"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Sumber Daya"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Tabel sumber daya"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Tipe"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Info"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Tidak ada sumber daya yang ditemukan"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Beralih ke http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Beralih ke https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Apakah Anda yakin ingin ${action} proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Hapus volume (flag -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Menghitung perubahan..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Gambar"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Build"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Tidak ada perubahan"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "File Quadlet sudah terbaru."
+
+#: src/ProjectDetail.tsx
+msgid "File changes (${count})"
+msgstr "Perubahan file (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Batal"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Tutup"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Gagal memuat detail proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Gagal ${action} proyek"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Gagal memuat file unit."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Silakan pilih direktori"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Gagal menerapkan tumpukan"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Gagal mempratinjau perubahan"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Tumpukan berhasil diterapkan"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Tumpukan telah diterapkan dan sekarang berjalan."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Direktori Proyek"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Pilih direktori yang berisi file compose.yaml Anda"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Telusuri"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Penerapan gagal"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Pratinjau gagal"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Mempratinjau..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Pratinjau Perubahan"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Menerapkan..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Pratinjau"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Target"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Tarik"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "File Quadlet sudah terbaru. Tidak ada yang perlu diterapkan."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Pilih Direktori Proyek"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Naik"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Kesalahan"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Tidak ada direktori yang ditemukan"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Jalur saat ini:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Pilih Direktori Ini"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Gagal memuat direktori"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Terjadi kesalahan"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Coba lagi"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Terjadi kesalahan yang tidak terduga"

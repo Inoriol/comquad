@@ -175,6 +175,8 @@ A web-based UI plugin for Cockpit is available in the `cockpit-comquad/` directo
 - Lifecycle management (start/stop/restart/remove) with update diff preview
 - Resource unit file viewer (click resource names to view quadlet content)
 - Clickable port links with per-port http/https toggle
+- Internationalization (i18n) support with gettext
+- Comprehensive test suite (unit tests + browser integration tests)
 
 See [cockpit-comquad/README.md](./cockpit-comquad/README.md) for details.
 

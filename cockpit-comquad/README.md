@@ -97,6 +97,123 @@ This creates a symlink from `~/.local/share/cockpit/comquad` to the `dist/` dire
 make devel-uninstall
 ```
 
+## Testing
+
+The plugin has a two-tier testing architecture:
+
+### Unit Tests (vitest + React Testing Library)
+
+Run the test suite:
+
+```bash
+npm test
+```
+
+This runs 60 tests across 7 test files covering:
+- Client API functions
+- All React components (App, ProjectsList, ProjectDetail, StackDeploy, DirectoryPicker, ErrorBoundary)
+- Error handling and edge cases
+
+Tests use mocked cockpit API for isolated testing without requiring a real cockpit environment.
+
+### Browser Integration Tests (Selenium + Chromium)
+
+Run browser-based integration tests:
+
+```bash
+# Build test container (requires comquad-test:latest)
+make test-browser-image
+
+# Run browser tests
+make test-browser
+```
+
+Or from the repository root:
+
+```bash
+make integration-cockpit
+```
+
+The browser tests run in a containerized environment with:
+- systemd as PID 1
+- podman + comquad installed
+- cockpit-ws running
+- chromium-headless for automation
+
+Tests cover:
+- Stack dashboard page loads and displays projects
+- Project detail view with services/containers/resources tabs
+- Navigation and action buttons
+- Status badges and refresh functionality
+
+See [TESTING.md](./TESTING.md) for detailed testing documentation.
+
+## Internationalization (i18n)
+
+The plugin supports multiple languages using cockpit's gettext system. Translations are automatically loaded based on the browser's language setting.
+
+### Supported Languages
+
+The plugin includes translations for 20 core cockpit languages:
+- Arabic (ar), Czech (cs), German (de), Spanish (es), Finnish (fi)
+- French (fr), Indonesian (id), Italian (it), Japanese (ja), Georgian (ka)
+- Korean (ko), Lao (lo), Polish (pl), Brazilian Portuguese (pt_BR), Romanian (ro)
+- Russian (ru), Swedish (sv), Turkish (tr), Ukrainian (uk), Chinese Simplified (zh_CN)
+
+### Adding New Translations
+
+1. Copy the translation template:
+   ```bash
+   cp po/comquad.pot po/<lang>.po
+   ```
+   (e.g., `cp po/comquad.pot po/es.po` for Spanish)
+
+2. Edit the `.po` file and translate the `msgstr` values
+
+3. Add the language code to `po/LINGUAS`:
+   ```bash
+   echo "<lang>" >> po/LINGUAS
+   ```
+
+4. Build the translations:
+   ```bash
+   make po-build
+   ```
+
+This compiles `.po` files to JavaScript in `dist/po.<lang>.js`. The plugin automatically loads the appropriate translation file based on the browser's language.
+
+### Extracting New Strings
+
+If you add new translatable strings to the code:
+
+1. Wrap strings with `_()`:
+   ```typescript
+   import { _ } from './i18n';
+   const message = _('Hello, world!');
+   ```
+
+2. Update the translation template:
+   ```bash
+   make po-pot
+   ```
+
+3. Update existing translations:
+   ```bash
+   make po-update
+   ```
+
+### Translation Workflow
+
+- `make po-pot` - Extract strings to `po/comquad.pot`
+- `make po-update` - Update `.po` files from `.pot`
+- `make po-build` - Compile `.po` to JavaScript for distribution
+
+The build process generates:
+- `po.<lang>.js` files containing `cockpit.locale()` calls with translation data
+- `po.js` loader that auto-detects browser language and loads the appropriate translation
+
+See [TESTING.md](./TESTING.md) for more details on the i18n implementation.
+
 ## Architecture
 
 The plugin communicates with comquad via `cockpit.spawn()` calls to the CLI with `--json` flag. It does not require a separate backend daemon.

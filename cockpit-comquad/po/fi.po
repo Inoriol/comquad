@@ -1,0 +1,357 @@
+# Finnish translation for cockpit-comquad.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Finnish\n"
+"Language: fi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Comquad-pinot"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Ota pino käyttöön"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Päivitä"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Virhe projektien lataamisessa"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Yritä uudelleen"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Ladataan projekteja..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Ei käyttöönotettuja pinoja"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Ota ensimmäinen compose.yaml käyttöön aloittaaksesi."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Projektien lataaminen epäonnistui"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Projektien taulukko"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Nimi"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Tila"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Palvelut"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Lähdepolku"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Tiedostot"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Ladataan projektin tietoja..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Virhe projektin tietojen lataamisessa"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Takaisin projekteihin"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Takaisin"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Päivitä"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Päivitä projekti"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Pysäytä"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Pysäytä projekti"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Poista"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Poista projekti"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Toiminto epäonnistui"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Palvelujen taulukko"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Levykuva"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Verkot"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Taltiot"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Palveluita ei löytynyt"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Kontit"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Konttien taulukko"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Palvelu"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Tila"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Portit"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Kontteja ei löytynyt"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Resurssit"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Resurssien taulukko"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Tyyppi"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Tiedot"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Resursseja ei löytynyt"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Vaihda http:hen"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Vaihda https:ään"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Haluatko varmasti ${action} projektin"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Poista taltiot (-d-lippu)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Lasketaan muutoksia..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Levykuvat"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Käännökset"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Ei muutoksia"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Quadlet-tiedostot ovat ajan tasalla."
+
+#: src/ProjectDetail.tsx
+msgid "File changes (${count})"
+msgstr "Tiedostomuutokset (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Peruuta"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Sulje"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Projektin tietojen lataaminen epäonnistui"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Projektin ${action} epäonnistui"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Yksikkötiedoston lataaminen epäonnistui."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Valitse hakemisto"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Pinon käyttöönotto epäonnistui"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Muutosten esikatselu epäonnistui"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Pino otettu käyttöön onnistuneesti"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Pino on otettu käyttöön ja se on nyt käynnissä."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Projektihakemisto"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Valitse compose.yaml-tiedoston sisältävä hakemisto"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Selaa"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Käyttöönotto epäonnistui"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Esikatselu epäonnistui"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Esikatsellaan..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Esikatsele muutokset"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Otetaan käyttöön..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Esikatselu"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Kohde"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Vedä"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Quadlet-tiedostot ovat ajan tasalla. Ei käyttöönotettavaa."
+
+#: src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Tiedostomuutokset (${count})"
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Valitse projektihakemisto"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Ylös"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Virhe"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Hakemistoja ei löytynyt"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Nykyinen polku:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Valitse tämä hakemisto"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Hakemiston lataaminen epäonnistui"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Jokin meni pieleen"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Yritä uudelleen"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Odottamaton virhe tapahtui"

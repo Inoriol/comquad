@@ -203,8 +203,39 @@ The plugin provides:
 - Update diff preview showing file changes before applying
 - Resource unit file viewer (click resource names to view quadlet content)
 - Clickable port links with per-port http/https toggle
+- Internationalization (i18n) support using cockpit's gettext system
 
 The plugin uses `comquad up --dry-run --json` for preview functionality, which returns structured diff data including file changes, image pull plans, and build plans.
+
+### Testing
+
+The cockpit plugin has a two-tier testing architecture:
+
+**Tier 1: Unit Tests (vitest + React Testing Library)**
+- 60 tests across 7 test files covering all components
+- Mocked cockpit API for isolated testing
+- Run with `npm test` in `cockpit-comquad/`
+
+**Tier 2: Browser Integration Tests (Selenium + Chromium)**
+- Container-based testing environment extending `comquad-test:latest`
+- Python test suite with Selenium WebDriver
+- Tests cover stack dashboard, project detail view, navigation, and action buttons
+- Run with `make integration-cockpit` from the repository root
+
+See [cockpit-comquad/TESTING.md](./cockpit-comquad/TESTING.md) for detailed testing documentation.
+
+### Internationalization
+
+The plugin supports internationalization using cockpit's gettext system:
+
+- All user-facing strings wrapped with `_()` function
+- Translation template in `cockpit-comquad/po/comquad.pot`
+- Build system compiles `.po` files to JavaScript in `dist/po.<lang>.js`
+- Language auto-detection via `po.js` loader based on browser language
+- 20 core cockpit languages supported (ar, cs, de, es, fi, fr, id, it, ja, ka, ko, lo, pl, pt_BR, ro, ru, sv, tr, uk, zh_CN)
+- Add new translations by copying `.pot` to `.po` and translating
+
+See [cockpit-comquad/README.md](./cockpit-comquad/README.md) for translation workflow.
 
 See [cockpit-comquad/README.md](./cockpit-comquad/README.md) for development and usage details.
 

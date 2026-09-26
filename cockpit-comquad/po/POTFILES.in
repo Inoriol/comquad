@@ -1,0 +1,6 @@
+src/app.tsx
+src/ProjectsList.tsx
+src/ProjectDetail.tsx
+src/StackDeploy.tsx
+src/DirectoryPicker.tsx
+src/ErrorBoundary.tsx

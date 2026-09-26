@@ -1,0 +1,13 @@
+#!/bin/bash
+set -eu
+
+# Run browser tests for cockpit-comquad
+# This script is meant to be run inside the test container
+
+cd /workspace
+
+# Install comquad and plugin
+/vm.install
+
+# Run the Python test
+python3 /test-comquad.py "$@"

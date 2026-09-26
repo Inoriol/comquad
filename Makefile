@@ -64,3 +64,20 @@ integration-rootless: build
 
 .PHONY: integration
 integration: build test-image integration-root integration-rootless
+
+# ── Cockpit plugin tests ──────────────────────────────────────────────────────
+
+.PHONY: test-image-cockpit
+test-image-cockpit: test-image
+	podman build -t cockpit-comquad-test:latest -f cockpit-comquad/test/browser/Containerfile .
+
+.PHONY: integration-cockpit
+integration-cockpit: build test-image-cockpit
+	cd cockpit-comquad && npm install && npm run build
+	podman run --rm --privileged \
+		--cgroupns=host \
+		-v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+		-v $(shell pwd):/workspace:z \
+		-w /workspace \
+		cockpit-comquad-test:latest \
+		/bin/bash -c "cockpit-comquad/test/browser/vm.install && python3 cockpit-comquad/test/browser/test-comquad.py"

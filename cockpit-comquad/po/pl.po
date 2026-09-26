@@ -1,0 +1,353 @@
+# Polish translation for cockpit-comquad
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Polish\n"
+"Language: pl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Stosy Comquad"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Wdróż stos"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Odśwież"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Błąd ładowania projektów"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Ponów"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Ładowanie projektów..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Brak wdrożonych stosów"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Wdróż swój pierwszy plik compose.yaml, aby rozpocząć."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Nie udało się załadować projektów"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Tabela projektów"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Nazwa"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Stan"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Usługi"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Ścieżka źródłowa"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Pliki"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Ładowanie szczegółów projektu..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Błąd ładowania szczegółów projektu"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Powrót do projektów"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Wstecz"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Aktualizuj"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Aktualizuj projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Zatrzymaj"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Zatrzymaj projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Usuń"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Usuń projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Akcja nie powiodła się"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Tabela usług"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Obraz"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Sieci"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Wolumeny"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Nie znaleziono usług"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Kontenery"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Tabela kontenerów"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Usługa"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Stan"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Porty"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Nie znaleziono kontenerów"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Zasoby"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Tabela zasobów"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Typ"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Informacje"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Nie znaleziono zasobów"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Przełącz na http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Przełącz na https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Czy na pewno chcesz ${action} projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Usuń wolumeny (flaga -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Obliczanie zmian..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Obrazy"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Kompilacje"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Brak zmian"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Pliki Quadlet są aktualne."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Zmiany plików (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Anuluj"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Zamknij"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Nie udało się załadować szczegółów projektu"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Nie udało się ${action} projektu"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Nie udało się załadować pliku jednostki."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Proszę wybrać katalog"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Nie udało się wdrożyć stosu"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Nie udało się wyświetlić podglądu zmian"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Stos został pomyślnie wdrożony"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Stos został wdrożony i jest teraz uruchomiony."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Katalog projektu"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Wybierz katalog zawierający plik compose.yaml"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Przeglądaj"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Wdrożenie nie powiodło się"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Podgląd nie powiódł się"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Podgląd..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Podgląd zmian"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Wdrażanie..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Podgląd"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Cel"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Pobierz"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Pliki Quadlet są aktualne. Nie ma nic do wdrożenia."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Wybierz katalog projektu"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Przejdź wyżej"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Błąd"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Nie znaleziono katalogów"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Bieżąca ścieżka:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Wybierz ten katalog"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Nie udało się załadować katalogu"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Coś poszło nie tak"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Spróbuj ponownie"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Wystąpił nieoczekiwany błąd"

@@ -1,0 +1,353 @@
+# Brazilian Portuguese translation for cockpit-comquad
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Brazilian Portuguese\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Pilhas Comquad"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Implantar pilha"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Atualizar"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Erro ao carregar projetos"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Tentar novamente"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Carregando projetos..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Nenhuma pilha implantada"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Implante seu primeiro compose.yaml para começar."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Falha ao carregar projetos"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Tabela de projetos"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Nome"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Status"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Serviços"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Caminho de origem"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Arquivos"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Carregando detalhes do projeto..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Erro ao carregar detalhes do projeto"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Voltar aos projetos"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Voltar"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Atualizar"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Atualizar projeto"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Parar"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Parar projeto"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Remover"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Remover projeto"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Ação falhou"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Tabela de serviços"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Imagem"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Redes"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Volumes"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Nenhum serviço encontrado"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Contêineres"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Tabela de contêineres"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Serviço"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Estado"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Portas"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Nenhum contêiner encontrado"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Recursos"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Tabela de recursos"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Tipo"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Informações"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Nenhum recurso encontrado"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Mudar para http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Mudar para https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Tem certeza de que deseja ${action} o projeto"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Excluir volumes (flag -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Calculando alterações..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Imagens"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Compilações"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Sem alterações"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Os arquivos Quadlet estão atualizados."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Alterações de arquivos (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Fechar"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Falha ao carregar detalhes do projeto"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Falha ao ${action} o projeto"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Falha ao carregar arquivo de unidade."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Por favor, selecione um diretório"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Falha ao implantar pilha"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Falha ao visualizar alterações"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Pilha implantada com sucesso"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "A pilha foi implantada e está em execução."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Diretório do projeto"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Selecione o diretório contendo seu arquivo compose.yaml"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Navegar"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Falha na implantação"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Falha na visualização"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Visualizando..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Visualizar alterações"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Implantando..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Visualizar"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Destino"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Baixar"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Os arquivos Quadlet estão atualizados. Nada para implantar."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Selecionar diretório do projeto"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Subir"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Erro"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Nenhum diretório encontrado"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Caminho atual:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Selecionar este diretório"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Falha ao carregar diretório"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Algo deu errado"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Tentar novamente"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Ocorreu um erro inesperado"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
     Modal,
     ModalVariant,
@@ -9,10 +9,11 @@ import {
     Breadcrumb,
     BreadcrumbItem,
     Spinner,
-    Alert,
-} from "@patternfly/react-core";
-import { FolderIcon, FolderOpenIcon } from "@patternfly/react-icons";
-import * as client from "./client";
+    Alert
+} from '@patternfly/react-core';
+import { FolderIcon, FolderOpenIcon } from '@patternfly/react-icons';
+import * as client from './client';
+import { _ } from './i18n';
 
 interface DirectoryPickerProps {
     isOpen: boolean;
@@ -25,7 +26,7 @@ export const DirectoryPicker: React.FC<DirectoryPickerProps> = ({
     isOpen,
     onClose,
     onSelect,
-    initialPath = "/home",
+    initialPath = '/home'
 }) => {
     const [currentPath, setCurrentPath] = useState(initialPath);
     const [directories, setDirectories] = useState<string[]>([]);
@@ -46,7 +47,7 @@ export const DirectoryPicker: React.FC<DirectoryPickerProps> = ({
             setDirectories(dirs);
             setCurrentPath(path);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to load directory");
+            setError(err instanceof Error ? err.message : _('Failed to load directory'));
             setDirectories([]);
         } finally {
             setLoading(false);
@@ -54,24 +55,24 @@ export const DirectoryPicker: React.FC<DirectoryPickerProps> = ({
     };
 
     const handleDirectoryClick = (dir: string) => {
-        const newPath = currentPath === "/" ? `/${dir}` : `${currentPath}/${dir}`;
+        const newPath = currentPath === '/' ? `/${dir}` : `${currentPath}/${dir}`;
         loadDirectory(newPath);
     };
 
     const handleNavigateUp = () => {
-        if (currentPath === "/") return;
-        const parts = currentPath.split("/").filter(Boolean);
+        if (currentPath === '/') return;
+        const parts = currentPath.split('/').filter(Boolean);
         parts.pop();
-        const parentPath = parts.length > 0 ? "/" + parts.join("/") : "/";
+        const parentPath = parts.length > 0 ? '/' + parts.join('/') : '/';
         loadDirectory(parentPath);
     };
 
     const handleBreadcrumbClick = (index: number) => {
         if (index === 0) {
-            loadDirectory("/");
+            loadDirectory('/');
         } else {
-            const parts = currentPath.split("/").filter(Boolean);
-            const newPath = "/" + parts.slice(0, index).join("/");
+            const parts = currentPath.split('/').filter(Boolean);
+            const newPath = '/' + parts.slice(0, index).join('/');
             loadDirectory(newPath);
         }
     };
@@ -81,107 +82,111 @@ export const DirectoryPicker: React.FC<DirectoryPickerProps> = ({
         onClose();
     };
 
-    const pathParts = currentPath.split("/").filter(Boolean);
+    const pathParts = currentPath.split('/').filter(Boolean);
 
     return (
         <Modal
             variant={ModalVariant.large}
             isOpen={isOpen}
             onClose={onClose}
-        >
-            <ModalHeader title="Select Project Directory" />
+      >
+            <ModalHeader title={_('Select Project Directory')} />
             <ModalBody>
-                <div style={{ marginBottom: "1rem", marginTop: "0.5rem" }}>
+                <div style={{ marginBottom: '1rem', marginTop: '0.5rem' }}>
                     <Breadcrumb>
                         <BreadcrumbItem
-                            to="#"
+                            to='#'
                             onClick={(e) => {
                                 e.preventDefault();
                                 handleBreadcrumbClick(0);
                             }}
-                        >
-                            /
-                        </BreadcrumbItem>
+                      >
+                          /
+                      </BreadcrumbItem>
                         {pathParts.map((part, index) => (
                             <BreadcrumbItem
                                 key={index}
-                                to="#"
+                                to='#'
                                 onClick={(e) => {
                                     e.preventDefault();
                                     handleBreadcrumbClick(index + 1);
                                 }}
-                            >
+                          >
                                 {part}
-                            </BreadcrumbItem>
+                          </BreadcrumbItem>
                         ))}
-                    </Breadcrumb>
-                </div>
+                  </Breadcrumb>
+              </div>
 
-                {currentPath !== "/" && (
-                    <div style={{ marginBottom: "1rem" }}>
+                {currentPath !== '/' && (
+                    <div style={{ marginBottom: '1rem' }}>
                         <Button
-                            variant="secondary"
+                            variant='secondary'
                             onClick={handleNavigateUp}
-                            style={{ marginTop: "0.5rem" }}
-                        >
-                            <FolderOpenIcon style={{ marginRight: "0.5rem" }} /> Go Up
-                        </Button>
-                    </div>
+                            style={{ marginTop: '0.5rem' }}
+                      >
+                            <FolderOpenIcon style={{ marginRight: '0.5rem' }} /> {_('Go Up')}
+                      </Button>
+                  </div>
                 )}
 
                 {error && (
-                    <Alert variant="danger" title="Error" style={{ marginBottom: "1rem" }}>
+                    <Alert variant='danger' title={_('Error')} style={{ marginBottom: '1rem' }}>
                         {error}
-                    </Alert>
+                  </Alert>
                 )}
 
-                {loading ? (
-                    <div style={{ textAlign: "center", padding: "2rem" }}>
-                        <Spinner size="lg" />
-                    </div>
-                ) : (
-                    <div style={{ maxHeight: "400px", overflow: "auto", border: "1px solid #ddd", padding: "0.5rem", borderRadius: "4px" }}>
-                        {directories.length === 0 ? (
-                            <div style={{ padding: "1rem", color: "#666" }}>No directories found</div>
-                        ) : (
-                            directories.map((dir) => (
-                                <div
-                                    key={dir}
-                                    style={{ 
-                                        cursor: "pointer", 
-                                        padding: "0.5rem 0.75rem",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        borderRadius: "4px"
-                                    }}
-                                    onClick={() => handleDirectoryClick(dir)}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = "#f0f0f0";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = "transparent";
-                                    }}
-                                >
-                                    <FolderIcon style={{ marginRight: "0.5rem" }} />
-                                    {dir}
-                                </div>
-                            ))
-                        )}
-                    </div>
-                )}
+                {loading
+                    ? (
+                        <div style={{ textAlign: 'center', padding: '2rem' }}>
+                            <Spinner size='lg' />
+                      </div>
+                    )
+                    : (
+                        <div style={{ maxHeight: '400px', overflow: 'auto', border: '1px solid #ddd', padding: '0.5rem', borderRadius: '4px' }}>
+                            {directories.length === 0
+                                ? (
+                                    <div style={{ padding: '1rem', color: '#666' }}>{_('No directories found')}</div>
+                                )
+                                : (
+                                    directories.map((dir) => (
+                                        <div
+                                            key={dir}
+                                            style={{
+                                                cursor: 'pointer',
+                                                padding: '0.5rem 0.75rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                borderRadius: '4px'
+                                            }}
+                                            onClick={() => handleDirectoryClick(dir)}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = '#f0f0f0';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'transparent';
+                                            }}
+                                      >
+                                            <FolderIcon style={{ marginRight: '0.5rem' }} />
+                                            {dir}
+                                      </div>
+                                    ))
+                                )}
+                      </div>
+                    )}
 
-                <div style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#666", padding: "0.5rem 0" }}>
-                    Current path: <strong>{currentPath}</strong>
-                </div>
-            </ModalBody>
+                <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666', padding: '0.5rem 0' }}>
+                    {_('Current path:')}: <strong>{currentPath}</strong>
+              </div>
+          </ModalBody>
             <ModalFooter>
-                <Button key="cancel" variant="link" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button key="select" variant="primary" onClick={handleSelect}>
-                    Select This Directory
-                </Button>
-            </ModalFooter>
-        </Modal>
+                <Button key='cancel' variant='link' onClick={onClose}>
+                    {_('Cancel')}
+              </Button>
+                <Button key='select' variant='primary' onClick={handleSelect}>
+                    {_('Select This Directory')}
+              </Button>
+          </ModalFooter>
+      </Modal>
     );
 };

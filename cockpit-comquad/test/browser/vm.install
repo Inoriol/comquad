@@ -1,0 +1,29 @@
+#!/bin/bash
+set -eu
+
+# Install comquad binary
+if [ -f /workspace/comquad ]; then
+    cp /workspace/comquad /usr/local/bin/comquad
+    chmod +x /usr/local/bin/comquad
+fi
+
+# Install cockpit-comquad plugin
+if [ -d /workspace/cockpit-comquad/dist ]; then
+    mkdir -p /usr/local/share/cockpit/comquad
+    cp -r /workspace/cockpit-comquad/dist/* /usr/local/share/cockpit/comquad/
+fi
+
+# Enable cockpit socket
+systemctl enable --now cockpit.socket
+
+# Wait for cockpit to be ready
+for i in $(seq 1 30); do
+    if curl -s http://localhost:9090 >/dev/null 2>&1; then
+        echo "Cockpit is ready"
+        exit 0
+    fi
+    sleep 1
+done
+
+echo "Cockpit failed to start"
+exit 1

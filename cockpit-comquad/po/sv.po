@@ -1,0 +1,353 @@
+# Swedish translations for cockpit-comquad package.
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Swedish\n"
+"Language: sv\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Comquad stackar"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Distribuera stack"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Uppdatera"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Fel vid laddning av projekt"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Försök igen"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Laddar projekt..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Inga stackar distribuerade"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Distribuera din första compose.yaml för att komma igång."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Misslyckades med att ladda projekt"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Projekttabell"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Namn"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Status"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Tjänster"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Källsökväg"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Filer"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Laddar projektdetaljer..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Fel vid laddning av projektdetaljer"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Tillbaka till projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Tillbaka"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Uppdatera"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Uppdatera projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Stopp"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Stoppa projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Ta bort"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Ta bort projekt"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Åtgärden misslyckades"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Tjänstetabell"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Avbildning"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Nätverk"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Volymer"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Inga tjänster hittades"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Behållare"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Behållartabell"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Tjänst"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Tillstånd"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Portar"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Inga behållare hittades"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Resurser"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Resurstabell"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Typ"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Info"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Inga resurser hittades"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Byt till http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Byt till https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Är du säker på att du vill ${action} projektet"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Ta bort volymer (-d flagga)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Beräknar ändringar..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Avbildningar"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Byggen"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Inga ändringar"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Quadlet-filerna är uppdaterade."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Filändringar (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Avbryt"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Stäng"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Misslyckades med att ladda projektdetaljer"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Misslyckades med att ${action} projektet"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Misslyckades med att ladda enhetsfil."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Välj en katalog"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Misslyckades med att distribuera stack"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Misslyckades med att förhandsgranska ändringar"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Stacken distribuerades"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Stacken har distribuerats och körs nu."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Projektkatalog"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Välj katalogen som innehåller din compose.yaml-fil"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Bläddra"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Distributionen misslyckades"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Förhandsgranskningen misslyckades"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Förhandsgranskar..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Förhandsgranska ändringar"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Distribuerar..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Förhandsgranska"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Mål"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Hämta"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Quadlet-filerna är uppdaterade. Inget att distribuera."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Välj projektkatalog"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Gå upp"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Fel"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Inga kataloger hittades"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Aktuell sökväg:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Välj denna katalog"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Misslyckades med att ladda katalog"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Något gick fel"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Försök igen"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "Ett oväntat fel uppstod"

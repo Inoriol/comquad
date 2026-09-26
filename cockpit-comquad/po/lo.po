@@ -1,0 +1,353 @@
+# Lao translation for cockpit-comquad
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Lao\n"
+"Language: lo\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Comquad ສະແຕັກ"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "ປະກອບສະແຕັກ"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "ໂຫຼດໃໝ່"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "ຂໍ້ຜິດພາດໃນການໂຫຼດໂປຣເຈັກ"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "ລອງໃໝ່"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "ກຳລັງໂຫຼດໂປຣເຈັກ..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "ບໍ່ມີສະແຕັກທີ່ຖືກປະກອບ"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "ປະກອບ compose.yaml ອັນທຳອິດຂອງທ່ານເພື່ອເລີ່ມຕົ້ນ."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "ໂຫຼດໂປຣເຈັກລົ້ມເຫຼວ"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "ຕາຕະລາງໂປຣເຈັກ"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "ຊື່"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "ສະຖານະ"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "ບໍລິການ"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "ເສັ້ນທາງແຫຼ່ງ"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "ໄຟລ໌"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "ກຳລັງໂຫຼດລາຍລະອຽດໂປຣເຈັກ..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "ຂໍ້ຜິດພາດໃນການໂຫຼດລາຍລະອຽດໂປຣເຈັກ"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "ກັບໄປໂປຣເຈັກ"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "ກັບຄືນ"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "ອັບເດດ"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "ອັບເດດໂປຣເຈັກ"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "ຢຸດ"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "ຢຸດໂປຣເຈັກ"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "ລຶບອອກ"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "ລຶບໂປຣເຈັກອອກ"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "ການດຳເນີນການລົ້ມເຫຼວ"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "ຕາຕະລາງບໍລິການ"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "ອິເມຈ"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "ເຄືອຂ່າຍ"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "ວໍລຸມ"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "ບໍ່ພົບບໍລິການ"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "ຄອນເທນເນີ"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "ຕາຕະລາງຄອນເທນເນີ"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "ບໍລິການ"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "ສະຖານະ"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "ພອດ"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "ບໍ່ພົບຄອນເທນເນີ"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "ຊັບພະຍາກອນ"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "ຕາຕະລາງຊັບພະຍາກອນ"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "ປະເພດ"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "ຂໍ້ມູນ"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "ບໍ່ພົບຊັບພະຍາກອນ"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "ສະຫຼັບເປັນ http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "ສະຫຼັບເປັນ https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການ${action}ໂປຣເຈັກ"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "ລຶບວໍລຸມ (-d ທຸງ)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "ກຳລັງຄຳນວນການປ່ຽນແປງ..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "ອິເມຈ"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "ການສ້າງ"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "ບໍ່ມີການປ່ຽນແປງ"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "ໄຟລ໌ Quadlet ເປັນປັດຈຸບັນແລ້ວ."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "ການປ່ຽນແປງໄຟລ໌ (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "ຍົກເລີກ"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "ປິດ"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "ໂຫຼດລາຍລະອຽດໂປຣເຈັກລົ້ມເຫຼວ"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "${action}ໂປຣເຈັກລົ້ມເຫຼວ"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "ໂຫຼດໄຟລ໌ຫົວໜ່ວຍລົ້ມເຫຼວ."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "ກະລຸນາເລືອກໄດເຣັກທໍຣີ"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "ປະກອບສະແຕັກລົ້ມເຫຼວ"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "ເບິ່ງຕົວຢ່າງການປ່ຽນແປງລົ້ມເຫຼວ"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "ປະກອບສະແຕັກສຳເລັດແລ້ວ"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "ສະແຕັກໄດ້ຖືກປະກອບແລ້ວ ແລະ ກຳລັງເຮັດວຽກຢູ່."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "ໄດເຣັກທໍຣີໂປຣເຈັກ"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "ເລືອກໄດເຣັກທໍຣີທີ່ມີໄຟລ໌ compose.yaml ຂອງທ່ານ"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "ເບິ່ງ"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "ການປະກອບລົ້ມເຫຼວ"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "ການເບິ່ງຕົວຢ່າງລົ້ມເຫຼວ"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "ກຳລັງເບິ່ງຕົວຢ່າງ..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "ເບິ່ງຕົວຢ່າງການປ່ຽນແປງ"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "ກຳລັງປະກອບ..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "ເບິ່ງຕົວຢ່າງ"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "ເປົ້າໝາຍ"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "ດຶງ"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "ໄຟລ໌ Quadlet ເປັນປັດຈຸບັນແລ້ວ. ບໍ່ມີຫຍັງໃຫ້ປະກອບ."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "ເລືອກໄດເຣັກທໍຣີໂປຣເຈັກ"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "ຂຶ້ນເທິງ"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "ຂໍ້ຜິດພາດ"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "ບໍ່ພົບໄດເຣັກທໍຣີ"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "ເສັ້ນທາງປັດຈຸບັນ:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "ເລືອກໄດເຣັກທໍຣີນີ້"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "ໂຫຼດໄດເຣັກທໍຣີລົ້ມເຫຼວ"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "ມີບາງຢ່າງຜິດພາດ"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "ລອງໃໝ່"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "ມີຂໍ້ຜິດພາດທີ່ບໍ່ຄາດຄິດເກີດຂຶ້ນ"

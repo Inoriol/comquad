@@ -1,0 +1,353 @@
+# Romanian translation for cockpit-comquad
+# Copyright (C) 2026 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the cockpit-comquad package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cockpit-comquad\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Romanian\n"
+"Language: ro\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < 20)) ? 1 : 2);\n"
+
+#: src/app.tsx
+msgid "Comquad Stacks"
+msgstr "Stive Comquad"
+
+#: src/app.tsx
+msgid "Deploy Stack"
+msgstr "Implementare stivă"
+
+#: src/app.tsx
+msgid "Refresh"
+msgstr "Reîmprospătare"
+
+#: src/app.tsx
+msgid "Error loading projects"
+msgstr "Eroare la încărcarea proiectelor"
+
+#: src/app.tsx
+msgid "Retry"
+msgstr "Reîncercare"
+
+#: src/app.tsx
+msgid "Loading projects..."
+msgstr "Se încarcă proiectele..."
+
+#: src/app.tsx
+msgid "No stacks deployed"
+msgstr "Nicio stivă implementată"
+
+#: src/app.tsx
+msgid "Deploy your first compose.yaml to get started."
+msgstr "Implementați primul dumneavoastră compose.yaml pentru a începe."
+
+#: src/app.tsx
+msgid "Failed to load projects"
+msgstr "Eșec la încărcarea proiectelor"
+
+#: src/ProjectsList.tsx
+msgid "Projects table"
+msgstr "Tabel proiecte"
+
+#: src/ProjectsList.tsx
+msgid "Name"
+msgstr "Nume"
+
+#: src/ProjectsList.tsx
+msgid "Status"
+msgstr "Stare"
+
+#: src/ProjectsList.tsx
+msgid "Services"
+msgstr "Servicii"
+
+#: src/ProjectsList.tsx
+msgid "Source Path"
+msgstr "Cale sursă"
+
+#: src/ProjectsList.tsx
+msgid "Files"
+msgstr "Fișiere"
+
+#: src/ProjectDetail.tsx
+msgid "Loading project details..."
+msgstr "Se încarcă detaliile proiectului..."
+
+#: src/ProjectDetail.tsx
+msgid "Error loading project details"
+msgstr "Eroare la încărcarea detaliilor proiectului"
+
+#: src/ProjectDetail.tsx
+msgid "Back to Projects"
+msgstr "Înapoi la proiecte"
+
+#: src/ProjectDetail.tsx
+msgid "Back"
+msgstr "Înapoi"
+
+#: src/ProjectDetail.tsx
+msgid "Update"
+msgstr "Actualizare"
+
+#: src/ProjectDetail.tsx
+msgid "Update Project"
+msgstr "Actualizare proiect"
+
+#: src/ProjectDetail.tsx
+msgid "Stop"
+msgstr "Oprire"
+
+#: src/ProjectDetail.tsx
+msgid "Stop Project"
+msgstr "Oprire proiect"
+
+#: src/ProjectDetail.tsx
+msgid "Remove"
+msgstr "Eliminare"
+
+#: src/ProjectDetail.tsx
+msgid "Remove Project"
+msgstr "Eliminare proiect"
+
+#: src/ProjectDetail.tsx
+msgid "Action failed"
+msgstr "Acțiunea a eșuat"
+
+#: src/ProjectDetail.tsx
+msgid "Services table"
+msgstr "Tabel servicii"
+
+#: src/ProjectDetail.tsx
+msgid "Image"
+msgstr "Imagine"
+
+#: src/ProjectDetail.tsx
+msgid "Networks"
+msgstr "Rețele"
+
+#: src/ProjectDetail.tsx
+msgid "Volumes"
+msgstr "Volume"
+
+#: src/ProjectDetail.tsx
+msgid "No services found"
+msgstr "Niciun serviciu găsit"
+
+#: src/ProjectDetail.tsx
+msgid "Containers"
+msgstr "Containere"
+
+#: src/ProjectDetail.tsx
+msgid "Containers table"
+msgstr "Tabel containere"
+
+#: src/ProjectDetail.tsx
+msgid "Service"
+msgstr "Serviciu"
+
+#: src/ProjectDetail.tsx
+msgid "State"
+msgstr "Stare"
+
+#: src/ProjectDetail.tsx
+msgid "Ports"
+msgstr "Porturi"
+
+#: src/ProjectDetail.tsx
+msgid "No containers found"
+msgstr "Niciun container găsit"
+
+#: src/ProjectDetail.tsx
+msgid "Resources"
+msgstr "Resurse"
+
+#: src/ProjectDetail.tsx
+msgid "Resources table"
+msgstr "Tabel resurse"
+
+#: src/ProjectDetail.tsx
+msgid "Type"
+msgstr "Tip"
+
+#: src/ProjectDetail.tsx
+msgid "Info"
+msgstr "Informații"
+
+#: src/ProjectDetail.tsx
+msgid "No resources found"
+msgstr "Nicio resursă găsită"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to http"
+msgstr "Comutare la http"
+
+#: src/ProjectDetail.tsx
+msgid "Switch to https"
+msgstr "Comutare la https"
+
+#: src/ProjectDetail.tsx
+msgid "Are you sure you want to ${action} project"
+msgstr "Sigur doriți să ${action} proiectul"
+
+#: src/ProjectDetail.tsx
+msgid "Delete volumes (-d flag)"
+msgstr "Ștergere volume (fanion -d)"
+
+#: src/ProjectDetail.tsx
+msgid "Computing changes..."
+msgstr "Se calculează modificările..."
+
+#: src/ProjectDetail.tsx
+msgid "Images"
+msgstr "Imagini"
+
+#: src/ProjectDetail.tsx
+msgid "Builds"
+msgstr "Compilări"
+
+#: src/ProjectDetail.tsx
+msgid "No changes"
+msgstr "Nicio modificare"
+
+#: src/ProjectDetail.tsx
+msgid "Quadlet files are up to date."
+msgstr "Fișierele Quadlet sunt actualizate."
+
+#: src/ProjectDetail.tsx src/StackDeploy.tsx
+msgid "File changes (${count})"
+msgstr "Modificări fișiere (${count})"
+
+#: src/ProjectDetail.tsx
+msgid "Cancel"
+msgstr "Anulare"
+
+#: src/ProjectDetail.tsx
+msgid "Close"
+msgstr "Închidere"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load project details"
+msgstr "Eșec la încărcarea detaliilor proiectului"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to ${action} project"
+msgstr "Eșec la ${action} proiectului"
+
+#: src/ProjectDetail.tsx
+msgid "Failed to load unit file."
+msgstr "Eșec la încărcarea fișierului unitate."
+
+#: src/StackDeploy.tsx
+msgid "Please select a directory"
+msgstr "Vă rugăm selectați un director"
+
+#: src/StackDeploy.tsx
+msgid "Failed to deploy stack"
+msgstr "Eșec la implementarea stivei"
+
+#: src/StackDeploy.tsx
+msgid "Failed to preview changes"
+msgstr "Eșec la previzualizarea modificărilor"
+
+#: src/StackDeploy.tsx
+msgid "Stack deployed successfully"
+msgstr "Stiva a fost implementată cu succes"
+
+#: src/StackDeploy.tsx
+msgid "The stack has been deployed and is now running."
+msgstr "Stiva a fost implementată și rulează acum."
+
+#: src/StackDeploy.tsx
+msgid "Project Directory"
+msgstr "Director proiect"
+
+#: src/StackDeploy.tsx
+msgid "Select the directory containing your compose.yaml file"
+msgstr "Selectați directorul care conține fișierul compose.yaml"
+
+#: src/StackDeploy.tsx
+msgid "Browse"
+msgstr "Răsfoire"
+
+#: src/StackDeploy.tsx
+msgid "Deployment failed"
+msgstr "Implementarea a eșuat"
+
+#: src/StackDeploy.tsx
+msgid "Preview failed"
+msgstr "Previzualizarea a eșuat"
+
+#: src/StackDeploy.tsx
+msgid "Previewing..."
+msgstr "Se previzualizează..."
+
+#: src/StackDeploy.tsx
+msgid "Preview Changes"
+msgstr "Previzualizare modificări"
+
+#: src/StackDeploy.tsx
+msgid "Deploying..."
+msgstr "Se implementează..."
+
+#: src/StackDeploy.tsx
+msgid "Preview"
+msgstr "Previzualizare"
+
+#: src/StackDeploy.tsx
+msgid "Target"
+msgstr "Țintă"
+
+#: src/StackDeploy.tsx
+msgid "Pull"
+msgstr "Descărcare"
+
+#: src/StackDeploy.tsx
+msgid "Quadlet files are up to date. Nothing to deploy."
+msgstr "Fișierele Quadlet sunt actualizate. Nimic de implementat."
+
+#: src/DirectoryPicker.tsx
+msgid "Select Project Directory"
+msgstr "Selectare director proiect"
+
+#: src/DirectoryPicker.tsx
+msgid "Go Up"
+msgstr "Sus"
+
+#: src/DirectoryPicker.tsx
+msgid "Error"
+msgstr "Eroare"
+
+#: src/DirectoryPicker.tsx
+msgid "No directories found"
+msgstr "Niciun director găsit"
+
+#: src/DirectoryPicker.tsx
+msgid "Current path:"
+msgstr "Calea curentă:"
+
+#: src/DirectoryPicker.tsx
+msgid "Select This Directory"
+msgstr "Selectare acest director"
+
+#: src/DirectoryPicker.tsx
+msgid "Failed to load directory"
+msgstr "Eșec la încărcarea directorului"
+
+#: src/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Ceva nu a mers bine"
+
+#: src/ErrorBoundary.tsx
+msgid "Try again"
+msgstr "Încercați din nou"
+
+#: src/ErrorBoundary.tsx
+msgid "An unexpected error occurred"
+msgstr "A apărut o eroare neașteptată"
