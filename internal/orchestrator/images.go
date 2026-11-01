@@ -73,12 +73,24 @@ func (o *Orchestrator) handleImages(projectFiles []string, units []c2q.QuadletUn
 	defer dbusMgr.Close()
 
 	for _, f := range projectFiles {
-		if !strings.HasSuffix(f, ".image") {
+		var unitName string
+		var isPseudo bool
+		switch {
+		case strings.HasSuffix(f, ".image"):
+			unitName = ImageFileToUnitName(f)
+		case strings.HasSuffix(f, ".cq-image"):
+			unitName = CQImageFileToUnitName(f)
+			isPseudo = true
+		default:
 			continue
 		}
 
-		unitName := ImageFileToUnitName(f)
-		baseName := strings.TrimSuffix(filepath.Base(f), ".image")
+		baseName := filepath.Base(f)
+		if strings.HasSuffix(baseName, ".cq-image") {
+			baseName = strings.TrimSuffix(baseName, ".cq-image")
+		} else {
+			baseName = strings.TrimSuffix(baseName, ".image")
+		}
 
 		if hasBuildUnitForName(units, baseName) {
 			if !output.IsJSONMode() {
@@ -96,38 +108,49 @@ func (o *Orchestrator) handleImages(projectFiles []string, units []c2q.QuadletUn
 			logger.Action("Handling image unit: " + unitName)
 		}
 
-		switch strat {
-		case PullAlways:
-			if !output.IsJSONMode() {
-				logger.Action("Stopping image unit for re-pull: " + unitName)
-			}
+		if isPseudo {
 			if err := dbusMgr.StopUnit(unitName); err != nil {
-				logger.Warn(fmt.Sprintf("failed to stop image unit %s: %v", unitName, err))
+				if !output.IsJSONMode() {
+					logger.Info(fmt.Sprintf("pseudo-image unit %s was not running: %v", unitName, err))
+				}
 			}
 			if err := dbusMgr.StartUnit(unitName); err != nil {
-				return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
+				return fmt.Errorf("failed to start pseudo-image unit %s: %w", unitName, err)
 			}
-		case PullMissing:
-			statuses, err := dbusMgr.ListUnitsByNames([]string{unitName})
-			if err != nil || len(statuses) == 0 {
+		} else {
+			switch strat {
+			case PullAlways:
+				if !output.IsJSONMode() {
+					logger.Action("Stopping image unit for re-pull: " + unitName)
+				}
+				if err := dbusMgr.StopUnit(unitName); err != nil {
+					logger.Warn(fmt.Sprintf("failed to stop image unit %s: %v", unitName, err))
+				}
 				if err := dbusMgr.StartUnit(unitName); err != nil {
 					return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
 				}
-			} else {
-				status := statuses[0]
-				if status.SubState != "exited" {
+			case PullMissing:
+				statuses, err := dbusMgr.ListUnitsByNames([]string{unitName})
+				if err != nil || len(statuses) == 0 {
 					if err := dbusMgr.StartUnit(unitName); err != nil {
 						return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
 					}
 				} else {
-					if !output.IsJSONMode() {
-						logger.Info("Image unit already pulled: " + unitName)
+					status := statuses[0]
+					if status.SubState != "exited" {
+						if err := dbusMgr.StartUnit(unitName); err != nil {
+							return fmt.Errorf("failed to start image unit %s: %w", unitName, err)
+						}
+					} else {
+						if !output.IsJSONMode() {
+							logger.Info("Image unit already pulled: " + unitName)
+						}
 					}
 				}
-			}
-		case PullNever:
-			if err := dbusMgr.StartUnit(unitName); err != nil {
-				return fmt.Errorf("failed to verify image unit %s: %w", unitName, err)
+			case PullNever:
+				if err := dbusMgr.StartUnit(unitName); err != nil {
+					return fmt.Errorf("failed to verify image unit %s: %w", unitName, err)
+				}
 			}
 		}
 
@@ -139,7 +162,7 @@ func (o *Orchestrator) handleImages(projectFiles []string, units []c2q.QuadletUn
 
 func hasBuildUnitForName(units []c2q.QuadletUnit, name string) bool {
 	for _, unit := range units {
-		if unit.Type == c2q.UnitBuild && unit.Name == name {
+		if (unit.Type == c2q.UnitBuild || unit.Type == c2q.UnitCQBuild) && unit.Name == name {
 			return true
 		}
 	}
@@ -148,7 +171,7 @@ func hasBuildUnitForName(units []c2q.QuadletUnit, name string) bool {
 
 func hasImageUnitForName(units []c2q.QuadletUnit, name string) bool {
 	for _, unit := range units {
-		if unit.Type == c2q.UnitImage && unit.Name == name {
+		if (unit.Type == c2q.UnitImage || unit.Type == c2q.UnitCQImage) && unit.Name == name {
 			return true
 		}
 	}
@@ -166,30 +189,6 @@ func getDirective(unit c2q.QuadletUnit, sectionName, key string) string {
 		}
 	}
 	return ""
-}
-
-func resolveImageRef(units []c2q.QuadletUnit, ref string) string {
-	if !strings.HasSuffix(ref, ".image") {
-		return ref
-	}
-	imageUnitName := strings.TrimSuffix(ref, ".image")
-	for _, unit := range units {
-		if unit.Name == imageUnitName && unit.Type == c2q.UnitImage {
-			if img := getDirective(unit, c2q.SectionImage, "Image"); img != "" {
-				return img
-			}
-		}
-	}
-	return ref
-}
-
-func hasBuildUnit(units []c2q.QuadletUnit, containerName string) bool {
-	for _, unit := range units {
-		if unit.Type == c2q.UnitBuild && unit.Name == containerName {
-			return true
-		}
-	}
-	return false
 }
 
 func (o *Orchestrator) printDryRun(units []c2q.QuadletUnit, targetDir string, pullStrategy string, plan reconcile.Plan) error {

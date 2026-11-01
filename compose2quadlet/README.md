@@ -82,11 +82,12 @@ func main() {
   - `unit.go` — `depends_on` → `[Unit]` dependencies and health polling hooks
   - `image.go`, `build.go` — companion `.image` and `.build` structural units
   - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
-  - `secrets.go` — pre-mapping interceptor for secrets and configs
+  - `secrets.go` — pre-mapping interceptor for secrets and configs; generates `.cq-secret` units for tmpfs staging
   - `dockerfile.go` — `PatchDockerfileFROM()` normalizes bare image names in Dockerfile FROM lines
   - `extensions.go` — x-extension extraction for quadlet-only directives
   - `validation.go` — directive validation for x-extensions
 - **`opinionated/`** — Composable post-processing transforms (prefix, references including external resources, container name, SELinux relabeling with `:Z`/`:z` differentiation, systemd specifier shortening, labels, default network, network aliases, port offset, auto-update, install section)
+- **`pseudo/`** — Pseudo-quadlet generator: converts `.cq-secret`, `.cq-image`, `.cq-build` units to `.service` units for features not natively supported by older Podman versions
 - **`serialization/`** — `Marshal()`, `Write()`, `WriteUnits()`, `Unmarshal()` for ini-format serialization
 
 Warnings from degraded or skipped mappings are sent through the `WithInfo` callback when configured. Fatal mappings still return an error. Environment-secret and patched-Dockerfile write failures are reported as degraded warnings.
@@ -152,6 +153,48 @@ volumes:
 ### Validation
 
 Unknown directives emit a warning but are still passed through. This allows forward compatibility with newer Podman versions that may add new directives.
+
+## Pseudo-Quadlet Fallback
+
+The library supports Podman versions back to 4.4.0 through pseudo-quadlet fallback. When targeting Podman versions below the native quadlet type requirements, the library generates pseudo-quadlet units (`.cq-image`, `.cq-build`) that are converted to standard `.service` units by the pseudo-quadlet generator.
+
+**Native quadlet type requirements:**
+- `.container`, `.network`, `.volume`: Podman 4.4.0+
+- `.image`: Podman 4.8.0+ (pseudo-quadlet `.cq-image` fallback for 4.4.0-4.7.x)
+- `.build`: Podman 5.2.0+ (pseudo-quadlet `.cq-build` fallback for 4.4.0-5.1.x)
+
+**Container references:**
+
+When pseudo-quadlets are used, container units reference the actual image instead of a quadlet reference:
+- Native: `Image=web.image` (quadlet translates to dependency)
+- Pseudo: `Image=docker.io/library/nginx:latest` + `After=web-image.service` + `Requires=web-image.service`
+
+This allows containers to work with both native and pseudo-quadlet image sources without conditional logic.
+
+**Service naming:**
+
+Pseudo-quadlet services follow the same naming convention as native quadlet services:
+- `.cq-image` → `-image.service` (matches native `.image` → `-image.service`)
+- `.cq-build` → `-build.service` (matches native `.build` → `-build.service`)
+- `.cq-secret` → `-secret.service` (comquad-specific)
+
+**Usage:**
+```go
+units, _ := c2q.Transpile(project,
+    c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 6}),
+)
+units = pseudo.ConvertPseudoUnits(units)  // Converts .cq-* → .service (preserving type for state tracking)
+```
+
+**Disable fallback:**
+```go
+units, _ := c2q.Transpile(project,
+    c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 6}),
+    c2q.WithoutPseudoQuadlet(),  // No fallback; .build causes fatal error
+)
+```
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md#pseudo-quadlet-generator) for details on the conversion process.
 
 ## Dependencies
 

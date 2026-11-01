@@ -73,6 +73,11 @@ func (o *Orchestrator) registerState(projectFiles []string) error {
 			name = strings.TrimSuffix(name, ".build")
 			resources.Builds = append(resources.Builds, name)
 		}
+		if strings.HasSuffix(base, ".cq-secret") {
+			name := strings.TrimPrefix(base, prefix)
+			name = strings.TrimSuffix(name, ".cq-secret")
+			resources.Secrets = append(resources.Secrets, name)
+		}
 	}
 
 	return stateMgr.RegisterProject(deploy.ProjectState{
@@ -160,6 +165,54 @@ func (o *Orchestrator) reportReconcile(res reconcile.Result) {
 	for _, f := range res.NoBaseline {
 		logger.Warn(fmt.Sprintf("no baseline for %s — overwriting with generated content", filepath.Base(f)))
 	}
+}
+
+func (o *Orchestrator) copyPseudoQuadlets(projectFiles []string) error {
+	for _, f := range projectFiles {
+		base := filepath.Base(f)
+		var serviceName string
+		switch {
+		case strings.HasSuffix(base, ".cq-secret"):
+			serviceName = CQSecretFileToUnitName(f)
+		case strings.HasSuffix(base, ".cq-image"):
+			serviceName = CQImageFileToUnitName(f)
+		case strings.HasSuffix(base, ".cq-build"):
+			serviceName = CQBuildFileToUnitName(f)
+		default:
+			continue
+		}
+		servicePath := filepath.Join(filepath.Dir(f), serviceName)
+		content, err := os.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("failed to read pseudo-quadlet %s: %w", f, err)
+		}
+		if err := os.WriteFile(servicePath, content, 0644); err != nil {
+			return fmt.Errorf("failed to write service file %s: %w", servicePath, err)
+		}
+	}
+	return nil
+}
+
+func (o *Orchestrator) removePseudoQuadletServices(projectFiles []string) error {
+	for _, f := range projectFiles {
+		base := filepath.Base(f)
+		var serviceName string
+		switch {
+		case strings.HasSuffix(base, ".cq-secret"):
+			serviceName = CQSecretFileToUnitName(f)
+		case strings.HasSuffix(base, ".cq-image"):
+			serviceName = CQImageFileToUnitName(f)
+		case strings.HasSuffix(base, ".cq-build"):
+			serviceName = CQBuildFileToUnitName(f)
+		default:
+			continue
+		}
+		servicePath := filepath.Join(filepath.Dir(f), serviceName)
+		if err := os.Remove(servicePath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove service file %s: %w", servicePath, err)
+		}
+	}
+	return nil
 }
 
 func stringSet(s []string) map[string]bool {

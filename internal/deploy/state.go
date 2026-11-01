@@ -15,6 +15,7 @@ type ResourceInfo struct {
 	Volumes    []string `json:"volumes"`
 	Images     []string `json:"images"`
 	Builds     []string `json:"builds"`
+	Secrets    []string `json:"secrets"`
 }
 
 // ProjectState represents the state of a single managed project

@@ -36,7 +36,7 @@ Use `comquad up --no-diff` to apply changes without displaying the diff or askin
 
 ## Requirements
 
-- Podman 4.8 or newer
+- Podman 4.4 or newer (4.8+ recommended for native `.image` quadlet support)
 - systemd with Quadlet support
 - Go 1.25 or newer when building from source
 
@@ -108,6 +108,7 @@ Some behavior is handled automatically:
 - Rootless privileged ports are shifted by `ROOTLESS_PORT_OFFSET`.
 - Image and build units are generated for systemd to manage.
 - SELinux labels added to volumes: `:Z` (private) for single-service volumes, `:z` (shared) for volumes used by multiple services.
+- Secrets are staged in RAM-backed tmpfs via systemd `LoadCredential=` (never written to persistent disk). Secrets with custom `uid`/`gid`/`mode` fall back to volume mounts.
 
 Native Quadlet directives that have no Compose equivalent can be set through x-extensions. Supported extensions: `x-container`, `x-image`, `x-build`, `x-network`, `x-volume`, and `x-systemd` (for `[Service]` and `[Unit]` sections). X-extensions override compose-generated directives when there's a conflict.
 

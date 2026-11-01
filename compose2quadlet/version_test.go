@@ -382,24 +382,46 @@ func TestVersion_MemorySectionSwitch(t *testing.T) {
 	})
 }
 
-func TestVersion_Build_FatalError(t *testing.T) {
+func TestVersion_Build_PseudoQuadlet(t *testing.T) {
 	project := loadProject(t, "testdata/version-build.yaml")
 
-	_, err := c2q.Transpile(project,
-		c2q.WithProjectName("test"),
-		c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 8}),
-		c2q.WithoutPrefix(),
-		c2q.WithoutDefaultNetwork(),
-		c2q.WithoutSELinux(),
-		c2q.WithoutNetworkAliases(),
-		c2q.WithoutInstallSection(),
-	)
-	if err == nil {
-		t.Fatal("expected fatal error for build at podman 4.8")
-	}
-	if !strings.Contains(err.Error(), "5.2.0") {
-		t.Fatalf("expected error mentioning 5.2.0, got: %v", err)
-	}
+	t.Run("podman_4_8_pseudo_build", func(t *testing.T) {
+		units, err := c2q.Transpile(project,
+			c2q.WithProjectName("test"),
+			c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 8}),
+			c2q.WithoutPrefix(),
+			c2q.WithoutDefaultNetwork(),
+			c2q.WithoutSELinux(),
+			c2q.WithoutNetworkAliases(),
+			c2q.WithoutInstallSection(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, ok := findUnit(units, "test-app", c2q.UnitCQBuild)
+		if !ok {
+			t.Fatal("expected test-app.cq-build unit at 4.8 with pseudo-quadlet")
+		}
+	})
+
+	t.Run("podman_4_8_no_pseudo", func(t *testing.T) {
+		_, err := c2q.Transpile(project,
+			c2q.WithProjectName("test"),
+			c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 8}),
+			c2q.WithoutPrefix(),
+			c2q.WithoutDefaultNetwork(),
+			c2q.WithoutSELinux(),
+			c2q.WithoutNetworkAliases(),
+			c2q.WithoutInstallSection(),
+			c2q.WithoutPseudoQuadlet(),
+		)
+		if err == nil {
+			t.Fatal("expected fatal error for build at podman 4.8 without pseudo-quadlet")
+		}
+		if !strings.Contains(err.Error(), "5.2.0") {
+			t.Fatalf("expected error mentioning 5.2.0, got: %v", err)
+		}
+	})
 }
 
 func TestVersion_Build_Available(t *testing.T) {
@@ -425,6 +447,72 @@ func TestVersion_Build_Available(t *testing.T) {
 	if !ok {
 		t.Fatal("expected test-app.container unit at 5.2")
 	}
+}
+
+func TestVersion_Image_PseudoQuadlet(t *testing.T) {
+	project := loadProject(t, "testdata/version-basic.yaml")
+
+	t.Run("podman_4_6_pseudo_image", func(t *testing.T) {
+		units, err := c2q.Transpile(project,
+			c2q.WithProjectName("test"),
+			c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 6}),
+			c2q.WithoutPrefix(),
+			c2q.WithoutDefaultNetwork(),
+			c2q.WithoutSELinux(),
+			c2q.WithoutNetworkAliases(),
+			c2q.WithoutInstallSection(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, ok := findUnit(units, "test-web", c2q.UnitCQImage)
+		if !ok {
+			t.Fatal("expected test-web.cq-image unit at 4.6 with pseudo-quadlet")
+		}
+	})
+
+	t.Run("podman_4_8_native_image", func(t *testing.T) {
+		units, err := c2q.Transpile(project,
+			c2q.WithProjectName("test"),
+			c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 8}),
+			c2q.WithoutPrefix(),
+			c2q.WithoutDefaultNetwork(),
+			c2q.WithoutSELinux(),
+			c2q.WithoutNetworkAliases(),
+			c2q.WithoutInstallSection(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, ok := findUnit(units, "test-web", c2q.UnitImage)
+		if !ok {
+			t.Fatal("expected test-web.image unit at 4.8 with native image")
+		}
+	})
+
+	t.Run("podman_4_6_no_pseudo", func(t *testing.T) {
+		units, err := c2q.Transpile(project,
+			c2q.WithProjectName("test"),
+			c2q.WithPodmanVersion(c2q.Version{Major: 4, Minor: 6}),
+			c2q.WithoutPrefix(),
+			c2q.WithoutDefaultNetwork(),
+			c2q.WithoutSELinux(),
+			c2q.WithoutNetworkAliases(),
+			c2q.WithoutInstallSection(),
+			c2q.WithoutPseudoQuadlet(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, ok := findUnit(units, "test-web", c2q.UnitImage)
+		if ok {
+			t.Fatal("expected no image unit at 4.6 without pseudo-quadlet")
+		}
+		_, ok = findUnit(units, "test-web", c2q.UnitCQImage)
+		if ok {
+			t.Fatal("expected no cq-image unit at 4.6 without pseudo-quadlet")
+		}
+	})
 }
 
 func TestVersion_WarningCollectionSmoke(t *testing.T) {

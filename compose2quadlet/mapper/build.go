@@ -16,7 +16,15 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 		if svc.Build == nil {
 			continue
 		}
-		if !cfg.PodmanVersion.AtLeast(5, 2) {
+		useNative := cfg.PodmanVersion.AtLeast(5, 2)
+		if !useNative && !cfg.PseudoQuadlet {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningFatal,
+				Service: name,
+				Field:   "build",
+				Message: "build requires podman >= 5.2.0 or pseudo-quadlet enabled",
+				Since:   "5.2.0",
+			})
 			continue
 		}
 		build := svc.Build
@@ -103,7 +111,7 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 			}
 		}
 		if len(build.Args) > 0 {
-			if cfg.PodmanVersion.AtLeast(5, 7) {
+			if useNative && cfg.PodmanVersion.AtLeast(5, 7) {
 				for _, k := range sortedKeys(build.Args) {
 					v := build.Args[k]
 					if v != nil {
@@ -113,13 +121,22 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 					}
 				}
 			} else {
-				cfg.Warn(c2qtypes.Warning{
-					Level:   c2qtypes.WarningSkipped,
-					Service: name,
-					Field:   "build.args",
-					Message: "requires podman >= 5.7.0",
-					Since:   "5.7.0",
-				})
+				if useNative {
+					cfg.Warn(c2qtypes.Warning{
+						Level:   c2qtypes.WarningSkipped,
+						Service: name,
+						Field:   "build.args",
+						Message: "requires podman >= 5.7.0",
+						Since:   "5.7.0",
+					})
+				} else {
+					cfg.Warn(c2qtypes.Warning{
+						Level:   c2qtypes.WarningSkipped,
+						Service: name,
+						Field:   "build.args",
+						Message: "build.args not supported in pseudo-build mode",
+					})
+				}
 			}
 		}
 
@@ -142,8 +159,20 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 
 		dirs = MergeDirectives(dirs, ExtractBuildExtensions(svc, cfg))
 
+		unitType := c2qtypes.UnitBuild
+		if !useNative {
+			unitType = c2qtypes.UnitCQBuild
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningDegraded,
+				Service: name,
+				Field:   "build",
+				Message: "using pseudo-quadlet .cq-build fallback (requires podman >= 5.2.0 for native .build)",
+				Since:   "5.2.0",
+			})
+		}
+
 		units = append(units, c2qtypes.QuadletUnit{
-			Type:     c2qtypes.UnitBuild,
+			Type:     unitType,
 			Name:     name,
 			Sections: []c2qtypes.Section{{Name: c2qtypes.SectionBuild, Directives: dirs}},
 		})

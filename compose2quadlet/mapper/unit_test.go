@@ -105,3 +105,48 @@ func TestUnit_DependsOn_MixedConditions(t *testing.T) {
 	}
 	assertDirective(t, serviceDirs, "ExecStartPre", "/bin/sh -c 'while ! /usr/bin/podman healthcheck run db; do sleep 1; done'")
 }
+
+func TestUnit_PseudoImage_Deps(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 6}
+	cfg.PseudoQuadlet = true
+	dirs := Unit(svc, cfg)
+	assertDirective(t, dirs, "After", "web.cq-image")
+	assertDirective(t, dirs, "Requires", "web.cq-image")
+}
+
+func TestUnit_PseudoBuild_Deps(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "app",
+		Build: &types.BuildConfig{},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 8}
+	cfg.PseudoQuadlet = true
+	dirs := Unit(svc, cfg)
+	assertDirective(t, dirs, "After", "app.cq-build")
+	assertDirective(t, dirs, "Requires", "app.cq-build")
+}
+
+func TestUnit_NativeImage_NoPseudoDeps(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 8}
+	cfg.PseudoQuadlet = false
+	dirs := Unit(svc, cfg)
+	if hasDirective(dirs, "After", "web.cq-image") {
+		t.Fatal("should not emit pseudo-quadlet deps for native image")
+	}
+}
+
+func TestUnit_PseudoQuadletDisabled_NoDeps(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 6}
+	cfg.PseudoQuadlet = false
+	dirs := Unit(svc, cfg)
+	if len(dirs) != 0 {
+		t.Fatalf("expected no directives when pseudo-quadlet disabled, got %v", dirs)
+	}
+}

@@ -24,7 +24,7 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	var dirs []c2qtypes.Directive
 
 	if svc.Build != nil {
-		if !cfg.PodmanVersion.AtLeast(5, 2) {
+		if !cfg.PodmanVersion.AtLeast(5, 2) && !cfg.PseudoQuadlet {
 			cfg.Warn(c2qtypes.Warning{
 				Level:   c2qtypes.WarningFatal,
 				Service: svc.Name,
@@ -35,6 +35,9 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		}
 		if cfg.PodmanVersion.AtLeast(5, 2) {
 			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Name + ".build"}})
+		} else if cfg.PseudoQuadlet {
+			img := buildImageTag(svc, cfg)
+			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{img}})
 		} else if svc.Image != "" {
 			if cfg.PodmanVersion.AtLeast(4, 8) {
 				dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Name + ".image"}})
@@ -47,7 +50,15 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Name + ".image"}})
 		}
 	} else if svc.Image != "" {
-		dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Image}})
+		if cfg.PseudoQuadlet {
+			img := svc.Image
+			if !cfg.SkipImageNormalization {
+				img = normalizeImage(img)
+			}
+			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{img}})
+		} else {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Image}})
+		}
 	}
 	if svc.ContainerName != "" {
 		dirs = append(dirs, c2qtypes.Directive{Key: "ContainerName", Values: []string{svc.ContainerName}})
@@ -704,4 +715,15 @@ func t3Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--cgroup-parent " + svc.CgroupParent}})
 	}
 	return dirs
+}
+
+func buildImageTag(svc types.ServiceConfig, cfg *c2qtypes.Config) string {
+	if svc.Build != nil && len(svc.Build.Tags) > 0 {
+		return svc.Build.Tags[0]
+	}
+	tag := svc.Name + ":latest"
+	if cfg.ProjectName != "" {
+		tag = cfg.ProjectName + "_" + svc.Name + ":latest"
+	}
+	return tag
 }

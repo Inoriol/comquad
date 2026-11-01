@@ -376,3 +376,29 @@ func TestStart_JSON(t *testing.T) {
 		t.Errorf("expected 2 units, got %d", len(data.Units))
 	}
 }
+
+func TestFileToUnitName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/path/to/cq-myapp-web.container", "cq-myapp-web.service"},
+		{"/path/to/cq-myapp-default.network", "cq-myapp-default-network.service"},
+		{"/path/to/cq-myapp-data.volume", "cq-myapp-data-volume.service"},
+		{"/path/to/cq-myapp-web.image", "cq-myapp-web-image.service"},
+		{"/path/to/cq-myapp-web.build", "cq-myapp-web-build.service"},
+		{"/path/to/cq-myapp-api.cq-secret", "cq-myapp-api-secret.service"},
+		{"/path/to/cq-myapp-web.cq-image", "cq-myapp-web-image.service"},
+		{"/path/to/cq-myapp-web.cq-build", "cq-myapp-web-build.service"},
+		{"/path/to/unknown.txt", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := fileToUnitName(tt.input)
+			if result != tt.expected {
+				t.Errorf("fileToUnitName(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

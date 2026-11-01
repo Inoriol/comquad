@@ -348,3 +348,38 @@ func TestDown_JSON(t *testing.T) {
 		t.Errorf("expected network 'cq-myapp-default', got %v", data.RemovedNetworks)
 	}
 }
+
+func TestDown_StopsPseudoImageAndBuildUnits(t *testing.T) {
+	dir := t.TempDir()
+	containerPath := filepath.Join(dir, "cq-myapp-web.container")
+	cqImagePath := filepath.Join(dir, "cq-myapp-web.cq-image")
+	cqBuildPath := filepath.Join(dir, "cq-myapp-web.cq-build")
+	cqSecretPath := filepath.Join(dir, "cq-myapp-api.cq-secret")
+	writeFile(t, containerPath, "[Container]\nImage=nginx\n")
+	writeFile(t, cqImagePath, "[Image]\nImage=nginx\n")
+	writeFile(t, cqBuildPath, "[Build]\nImageTag=myapp\n")
+	writeFile(t, cqSecretPath, "[Secret]\nSource=file\nPath=/tmp/secret\n")
+
+	state := newMockStateStore(map[string]deploy.ProjectState{
+		"myapp": makeProjectState("myapp", dir, []string{containerPath, cqImagePath, cqBuildPath, cqSecretPath}),
+	})
+	sys := newMockSystemdClient()
+	o := newTestOrchestrator("myapp", dir, state, sys)
+
+	if err := o.Down(false, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedStopped := map[string]bool{
+		"cq-myapp-web.service":         true,
+		"cq-myapp-web-image.service":   true,
+		"cq-myapp-web-build.service":   true,
+		"cq-myapp-api-secret.service":  true,
+	}
+	for _, stopped := range sys.stoppedUnits {
+		delete(expectedStopped, stopped)
+	}
+	if len(expectedStopped) > 0 {
+		t.Errorf("expected units not stopped: %v, got stopped: %v", expectedStopped, sys.stoppedUnits)
+	}
+}

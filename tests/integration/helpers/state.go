@@ -10,14 +10,17 @@ import (
 )
 
 type ProjectState struct {
-    ProjectName string   `json:"project_name"`
-    SourcePath  string   `json:"source_path"`
-    Files       []string `json:"files"`
-    Resources   struct {
-        Containers []string `json:"containers"`
-        Networks   []string `json:"networks"`
-        Volumes    []string `json:"volumes"`
-    } `json:"resources"`
+	ProjectName string   `json:"project_name"`
+	SourcePath  string   `json:"source_path"`
+	Files       []string `json:"files"`
+	Resources   struct {
+		Containers []string `json:"containers"`
+		Networks   []string `json:"networks"`
+		Volumes    []string `json:"volumes"`
+		Images     []string `json:"images"`
+		Builds     []string `json:"builds"`
+		Secrets    []string `json:"secrets"`
+	} `json:"resources"`
 }
 
 // ReadStateFile parses projects.json and returns all project entries.

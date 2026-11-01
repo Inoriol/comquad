@@ -19,8 +19,8 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 	refKeys := map[string][]string{
 		"Network": {".network"},
 		"Volume":  {".volume"},
-		"Image":   {".image", ".build"},
-		"Mount":   {".volume", ".image"},
+		"Image":   {".image", ".build", ".cq-image", ".cq-build"},
+		"Mount":   {".volume", ".image", ".cq-image"},
 	}
 	unitRefKeys := map[string]string{
 		"After":    ".container",
@@ -28,6 +28,10 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 		"Wants":    ".container",
 		"BindsTo":  ".container",
 		"PartOf":   ".container",
+	}
+	pseudoRefMap := map[string]string{
+		".cq-image": "-image.service",
+		".cq-build": "-build.service",
 	}
 
 	for ui := range units {
@@ -52,6 +56,12 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 								continue
 							}
 						}
+						if d.Key == "Volume" && strings.Contains(head, ".secretref") {
+							secretName := strings.TrimSuffix(head, ".secretref")
+							secretName = strings.TrimPrefix(secretName, "/run/credentials/")
+							d.Values[vi] = "/run/credentials/" + prefix + secretName + "-secret.service/" + secretName + tail
+							continue
+						}
 						for _, suffix := range suffixes {
 							if strings.HasSuffix(head, suffix) {
 								d.Values[vi] = prefix + head + tail
@@ -61,16 +71,23 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 					}
 				}
 
-				if suffix, ok := unitRefKeys[d.Key]; ok {
-					for vi := range d.Values {
-						if !strings.Contains(d.Values[vi], ".") {
-							d.Values[vi] = d.Values[vi] + suffix
-						}
-						if !strings.HasPrefix(d.Values[vi], prefix) {
-							d.Values[vi] = prefix + d.Values[vi]
+			if suffix, ok := unitRefKeys[d.Key]; ok {
+				for vi := range d.Values {
+					if !strings.Contains(d.Values[vi], ".") {
+						d.Values[vi] = d.Values[vi] + suffix
+					}
+					for cqExt, svcSuffix := range pseudoRefMap {
+						if strings.HasSuffix(d.Values[vi], cqExt) {
+							name := strings.TrimSuffix(d.Values[vi], cqExt)
+							d.Values[vi] = name + svcSuffix
+							break
 						}
 					}
+					if !strings.HasPrefix(d.Values[vi], prefix) {
+						d.Values[vi] = prefix + d.Values[vi]
+					}
 				}
+			}
 			}
 		}
 	}

@@ -33,6 +33,7 @@ export interface Resources {
     volumes: string[];
     images: string[];
     builds: string[];
+    secrets?: string[];
 }
 
 // Container list response
@@ -84,7 +85,7 @@ export interface Service {
 
 export interface Resource {
     name: string;
-    type: string; // "image", "network", "volume", "build"
+    type: string; // "image", "network", "volume", "build", "secret"
     info?: string;
 }
 

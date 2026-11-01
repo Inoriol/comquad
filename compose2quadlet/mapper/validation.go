@@ -176,6 +176,12 @@ var knownBuildDirectives = map[string]bool{
 	"Volume=":               true,
 }
 
+var knownSecretDirectives = map[string]bool{
+	"Source=":      true,
+	"Environment=": true,
+	"Path=":        true,
+}
+
 var knownServiceDirectives = map[string]bool{
 	"AllowedCPUs=":         true,
 	"AllowedMemoryNodes=":  true,
@@ -305,6 +311,8 @@ func isValidDirective(section, key string) bool {
 		return knownImageDirectives[key]
 	case c2qtypes.SectionBuild:
 		return knownBuildDirectives[key]
+	case c2qtypes.SectionSecret:
+		return knownSecretDirectives[key]
 	case c2qtypes.SectionService:
 		return knownServiceDirectives[key]
 	case c2qtypes.SectionUnit:

@@ -138,6 +138,58 @@ func TestApplyReferences_UnitDeps(t *testing.T) {
 	assertDirectiveValue(t, sec, "Requires", "cq-redis.container")
 }
 
+func TestApplyReferences_SecretVolume(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "prefixed-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Volume", "/run/credentials/db_password.secretref:/run/secrets/db_password:ro"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	result := ApplyReferences(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "Volume", "/run/credentials/cq-myapp-db_password-secret.service/db_password:/run/secrets/db_password:ro")
+}
+
+func TestApplyReferences_PseudoImage_ToService(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "prefixed-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionUnit, Directives: []c2qtypes.Directive{
+				mkDir("After", "web.cq-image"),
+				mkDir("Requires", "web.cq-image"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	result := ApplyReferences(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "After", "cq-myapp-web-image.service")
+	assertDirectiveValue(t, sec, "Requires", "cq-myapp-web-image.service")
+}
+
+func TestApplyReferences_PseudoBuild_ToService(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "prefixed-app", []c2qtypes.Section{
+			{Name: c2qtypes.SectionUnit, Directives: []c2qtypes.Directive{
+				mkDir("After", "app.cq-build"),
+				mkDir("Requires", "app.cq-build"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	result := ApplyReferences(units, cfg)
+	sec := result[0].Sections[0]
+	assertDirectiveValue(t, sec, "After", "cq-myapp-app-build.service")
+	assertDirectiveValue(t, sec, "Requires", "cq-myapp-app-build.service")
+}
+
 func TestApplyNetworkAliases(t *testing.T) {
 	units := []c2qtypes.QuadletUnit{
 		mkUnit(c2qtypes.UnitContainer, "web", []c2qtypes.Section{

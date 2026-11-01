@@ -121,3 +121,71 @@ services:
     command: ["sh", "-c", "exit 1"]
 `
 }
+
+// SecretEnvCompose returns a compose with an environment-based secret.
+func SecretEnvCompose(project string) string {
+	return `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    secrets:
+      - db_password
+secrets:
+  db_password:
+    environment: DB_PASSWORD
+`
+}
+
+// SecretFileCompose returns a compose with a file-based secret.
+func SecretFileCompose(project string) string {
+	return `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    secrets:
+      - api_key
+secrets:
+  api_key:
+    file: /tmp/test-api.key
+`
+}
+
+// SecretMultiCompose returns a compose with multiple services sharing a secret.
+func SecretMultiCompose(project string) string {
+	return `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    secrets:
+      - shared_secret
+  api:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    secrets:
+      - shared_secret
+secrets:
+  shared_secret:
+    environment: SHARED_SECRET
+`
+}
+
+// SecretCustomPermsCompose returns a compose with a secret that has custom permissions.
+func SecretCustomPermsCompose(project string) string {
+	return `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    secrets:
+      - source: custom_secret
+        target: /run/secrets/custom_secret
+        uid: "1000"
+        mode: 0400
+secrets:
+  custom_secret:
+    file: /tmp/test-custom.key
+`
+}
