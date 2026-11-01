@@ -117,6 +117,7 @@ func (o *Orchestrator) List(filter string) error {
 					Volumes:    p.Resources.Volumes,
 					Images:     p.Resources.Images,
 					Builds:     p.Resources.Builds,
+					Secrets:    p.Resources.Secrets,
 				}
 			}
 			jsonProjects = append(jsonProjects, jp)

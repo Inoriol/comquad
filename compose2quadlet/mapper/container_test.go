@@ -817,3 +817,54 @@ func TestContainer_CgroupParent_P3(t *testing.T) {
 	dirs := Container(svc, cfg)
 	assertDirective(t, dirs, "PodmanArgs", "--cgroup-parent myapp.slice")
 }
+
+func TestContainer_PseudoImage_ActualImageRef(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 6}
+	cfg.PseudoQuadlet = true
+	cfg.SkipImageNormalization = true
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Image", "nginx:latest")
+	if hasDirective(dirs, "Image", "web.cq-image") {
+		t.Fatal("should not emit .cq-image reference for pseudo-quadlet")
+	}
+}
+
+func TestContainer_PseudoImage_Normalized(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 6}
+	cfg.PseudoQuadlet = true
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Image", "docker.io/library/nginx:latest")
+}
+
+func TestContainer_PseudoBuild_ActualImageTag(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "app",
+		Build: &types.BuildConfig{Tags: []string{"myapp_app:latest"}},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 8}
+	cfg.PseudoQuadlet = true
+	cfg.ProjectName = "myapp"
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Image", "myapp_app:latest")
+	if hasDirective(dirs, "Image", "app.cq-build") {
+		t.Fatal("should not emit .cq-build reference for pseudo-quadlet")
+	}
+}
+
+func TestContainer_PseudoBuild_DefaultTag(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "app",
+		Build: &types.BuildConfig{},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 8}
+	cfg.PseudoQuadlet = true
+	cfg.ProjectName = "myapp"
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Image", "myapp_app:latest")
+}

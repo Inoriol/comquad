@@ -60,7 +60,8 @@ func (o *Orchestrator) resolveAllProjectFiles(state deploy.ProjectState) []strin
 	for _, f := range state.Files {
 		if strings.HasSuffix(f, ".container") || strings.HasSuffix(f, ".network") ||
 			strings.HasSuffix(f, ".volume") || strings.HasSuffix(f, ".image") ||
-			strings.HasSuffix(f, ".build") {
+			strings.HasSuffix(f, ".build") || strings.HasSuffix(f, ".cq-secret") ||
+			strings.HasSuffix(f, ".cq-image") || strings.HasSuffix(f, ".cq-build") {
 			files = append(files, f)
 		}
 	}
@@ -129,6 +130,34 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 		return nil
 	}
 
+	// Copy pseudo-quadlet files to their .service counterparts
+	var reloadFiles []string
+	reloadFiles = append(reloadFiles, changedFiles...)
+	for _, f := range changedFiles {
+		base := filepath.Base(f)
+		var serviceName string
+		switch {
+		case strings.HasSuffix(base, ".cq-secret"):
+			serviceName = strings.TrimSuffix(base, ".cq-secret") + "-secret.service"
+		case strings.HasSuffix(base, ".cq-image"):
+			serviceName = strings.TrimSuffix(base, ".cq-image") + "-image.service"
+		case strings.HasSuffix(base, ".cq-build"):
+			serviceName = strings.TrimSuffix(base, ".cq-build") + "-build.service"
+		default:
+			continue
+		}
+		servicePath := filepath.Join(filepath.Dir(f), serviceName)
+		content, err := os.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w", f, err)
+		}
+		if err := os.WriteFile(servicePath, content, 0644); err != nil {
+			return fmt.Errorf("failed to write service file %s: %w", servicePath, err)
+		}
+		reloadFiles = append(reloadFiles, servicePath)
+		logger.Printf("Updated service file: %s\n", serviceName)
+	}
+
 	// Reload systemd daemon
 	dbusMgr, err := o.newSystemd()
 	if err != nil {
@@ -137,7 +166,7 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 	defer dbusMgr.Close()
 
 	logger.Print("Reloading systemd daemon...")
-	if err := dbusMgr.ReloadDaemon(changedFiles...); err != nil {
+	if err := dbusMgr.ReloadDaemon(reloadFiles...); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
 
@@ -157,7 +186,30 @@ func (o *Orchestrator) openAndReload(files []string, noReload bool) error {
 		}
 	}
 
-	msg := fmt.Sprintf("Reloaded daemon, restarted %d container unit(s)", restartCount)
+	// Restart changed pseudo-quadlet services
+	for _, f := range changedFiles {
+		base := filepath.Base(f)
+		var unitName string
+		switch {
+		case strings.HasSuffix(base, ".cq-secret"):
+			unitName = CQSecretFileToUnitName(f)
+		case strings.HasSuffix(base, ".cq-image"):
+			unitName = CQImageFileToUnitName(f)
+		case strings.HasSuffix(base, ".cq-build"):
+			unitName = CQBuildFileToUnitName(f)
+		default:
+			continue
+		}
+		logger.Printf("Restarting unit: %s\n", unitName)
+		if err := dbusMgr.RestartUnit(unitName); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to restart unit %s: %v\n", unitName, err)
+			failedCount++
+		} else {
+			restartCount++
+		}
+	}
+
+	msg := fmt.Sprintf("Reloaded daemon, restarted %d unit(s)", restartCount)
 	if failedCount > 0 {
 		msg += fmt.Sprintf(", %d failed", failedCount)
 	}

@@ -24,6 +24,9 @@ const (
 	UnitVolume    UnitType = "volume"
 	UnitImage     UnitType = "image"
 	UnitBuild     UnitType = "build"
+	UnitCQSecret  UnitType = "cq-secret"
+	UnitCQImage   UnitType = "cq-image"
+	UnitCQBuild   UnitType = "cq-build"
 )
 
 type QuadletUnit struct {
@@ -51,4 +54,5 @@ const (
 	SectionVolume    = "Volume"
 	SectionImage     = "Image"
 	SectionBuild     = "Build"
+	SectionSecret    = "Secret"
 )

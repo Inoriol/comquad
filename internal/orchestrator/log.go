@@ -453,6 +453,12 @@ func (o *Orchestrator) FollowLogs(since, tail string, showTime bool) error {
 			unitName = ImageFileToUnitName(f)
 		case strings.HasSuffix(f, ".build"):
 			unitName = BuildFileToUnitName(f)
+		case strings.HasSuffix(f, ".cq-secret"):
+			unitName = CQSecretFileToUnitName(f)
+		case strings.HasSuffix(f, ".cq-image"):
+			unitName = CQImageFileToUnitName(f)
+		case strings.HasSuffix(f, ".cq-build"):
+			unitName = CQBuildFileToUnitName(f)
 		}
 		if unitName != "" {
 			unitNames = append(unitNames, unitName)

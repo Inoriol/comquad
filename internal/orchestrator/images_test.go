@@ -325,6 +325,7 @@ func TestHasBuildUnitForName(t *testing.T) {
 	units := []c2q.QuadletUnit{
 		{Type: c2q.UnitBuild, Name: "cq-myapp-web"},
 		{Type: c2q.UnitImage, Name: "cq-myapp-db"},
+		{Type: c2q.UnitCQBuild, Name: "cq-myapp-api"},
 	}
 
 	if !hasBuildUnitForName(units, "cq-myapp-web") {
@@ -336,12 +337,16 @@ func TestHasBuildUnitForName(t *testing.T) {
 	if hasBuildUnitForName(units, "cq-myapp-nonexistent") {
 		t.Error("expected hasBuildUnitForName to return false for nonexistent unit")
 	}
+	if !hasBuildUnitForName(units, "cq-myapp-api") {
+		t.Error("expected hasBuildUnitForName to return true for pseudo-build cq-myapp-api")
+	}
 }
 
 func TestHasImageUnitForName(t *testing.T) {
 	units := []c2q.QuadletUnit{
 		{Type: c2q.UnitImage, Name: "cq-myapp-web"},
 		{Type: c2q.UnitBuild, Name: "cq-myapp-db"},
+		{Type: c2q.UnitCQImage, Name: "cq-myapp-api"},
 	}
 
 	if !hasImageUnitForName(units, "cq-myapp-web") {
@@ -349,6 +354,9 @@ func TestHasImageUnitForName(t *testing.T) {
 	}
 	if hasImageUnitForName(units, "cq-myapp-db") {
 		t.Error("expected hasImageUnitForName to return false for cq-myapp-db")
+	}
+	if !hasImageUnitForName(units, "cq-myapp-api") {
+		t.Error("expected hasImageUnitForName to return true for pseudo-image cq-myapp-api")
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
+	"github.com/Inoriol/comquad/compose2quadlet/pseudo"
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
 	"github.com/Inoriol/comquad/internal/output"
@@ -173,6 +174,8 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		return fmt.Errorf("transpilation failed: %w", err)
 	}
 
+	units = pseudo.ConvertPseudoUnits(units)
+
 	strat, err := ParsePullStrategy(pullStrategy)
 	if err != nil {
 		return err
@@ -228,6 +231,10 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	projectFiles, err := o.collectProjectFiles(targetDir)
 	if err != nil {
+		return err
+	}
+
+	if err := o.copyPseudoQuadlets(projectFiles); err != nil {
 		return err
 	}
 
@@ -420,6 +427,8 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 		return fmt.Errorf("transpilation failed: %w", err)
 	}
 
+	units = pseudo.ConvertPseudoUnits(units)
+
 	strat, err := ParsePullStrategy(pullStrategy)
 	if err != nil {
 		return err
@@ -467,6 +476,10 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 
 	projectFiles, err := o.collectProjectFiles(targetDir)
 	if err != nil {
+		return err
+	}
+
+	if err := o.copyPseudoQuadlets(projectFiles); err != nil {
 		return err
 	}
 
@@ -660,6 +673,21 @@ func BuildFileToUnitName(filePath string) string {
 	base := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(base, ".build")
 	return nameWithoutExt + "-build.service"
+}
+
+func CQSecretFileToUnitName(filePath string) string {
+	base := filepath.Base(filePath)
+	return strings.TrimSuffix(base, ".cq-secret") + "-secret.service"
+}
+
+func CQImageFileToUnitName(filePath string) string {
+	base := filepath.Base(filePath)
+	return strings.TrimSuffix(base, ".cq-image") + "-image.service"
+}
+
+func CQBuildFileToUnitName(filePath string) string {
+	base := filepath.Base(filePath)
+	return strings.TrimSuffix(base, ".cq-build") + "-build.service"
 }
 
 func validateProjectName(name string) error {

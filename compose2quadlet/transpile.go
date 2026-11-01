@@ -44,12 +44,19 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 	cfg.SharedVolumes = analyzeSharedVolumes(project.Services)
 
 	var units []QuadletUnit
+	secretUnitMap := make(map[string]QuadletUnit)
 
 	for name := range project.Services {
 		svc := project.Services[name]
 
-		secretDirs := mapper.PremapSecrets(&svc, project.Secrets, project.Configs, cfg)
+		secretDirs, secretUnits := mapper.PremapSecrets(&svc, project.Secrets, project.Configs, cfg)
 		project.Services[name] = svc
+
+		for _, su := range secretUnits {
+			if _, exists := secretUnitMap[su.Name]; !exists {
+				secretUnitMap[su.Name] = su
+			}
+		}
 
 		var sections []Section
 
@@ -83,6 +90,10 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 			Name:     name,
 			Sections: sections,
 		})
+	}
+
+	for _, su := range secretUnitMap {
+		units = append(units, su)
 	}
 
 	imagUnits := mapper.Images(project.Services, cfg)

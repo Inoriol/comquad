@@ -22,8 +22,11 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 	if len(services) == 0 {
 		var units []string
 		for _, f := range state.Files {
-			if strings.HasSuffix(f, ".container") || strings.HasSuffix(f, ".image") || strings.HasSuffix(f, ".build") {
-				units = append(units, fileToUnitName(f))
+			if strings.HasSuffix(f, ".container") || strings.HasSuffix(f, ".image") || strings.HasSuffix(f, ".build") ||
+				strings.HasSuffix(f, ".cq-secret") || strings.HasSuffix(f, ".cq-image") || strings.HasSuffix(f, ".cq-build") {
+				if unitName := fileToUnitName(f); unitName != "" {
+					units = append(units, unitName)
+				}
 			}
 		}
 		return units, nil
@@ -33,7 +36,6 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 	var units []string
 	for _, svc := range services {
 		matches := MatchAllContainers(o.projectName, state, svc)
-		// Also match image and build files
 		for _, f := range state.Files {
 			base := filepath.Base(f)
 			var nameWithoutExt, ext string
@@ -43,14 +45,24 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 			} else if strings.HasSuffix(base, ".build") {
 				nameWithoutExt = strings.TrimSuffix(base, ".build")
 				ext = ".build"
+			} else if strings.HasSuffix(base, ".cq-secret") {
+				nameWithoutExt = strings.TrimSuffix(base, ".cq-secret")
+				ext = ".cq-secret"
+			} else if strings.HasSuffix(base, ".cq-image") {
+				nameWithoutExt = strings.TrimSuffix(base, ".cq-image")
+				ext = ".cq-image"
+			} else if strings.HasSuffix(base, ".cq-build") {
+				nameWithoutExt = strings.TrimSuffix(base, ".cq-build")
+				ext = ".cq-build"
 			} else {
 				continue
 			}
 			servicePrefix := "cq-" + o.projectName + "-"
+			extName := strings.TrimPrefix(ext, ".")
 			if base == svc ||
 				nameWithoutExt == svc ||
-				svc == nameWithoutExt+"-"+ext[1:]+".service" ||
-				strings.TrimSuffix(svc, ".service") == nameWithoutExt+"-"+ext[1:] ||
+				svc == nameWithoutExt+"-"+extName+".service" ||
+				strings.TrimSuffix(svc, ".service") == nameWithoutExt+"-"+extName ||
 				strings.TrimPrefix(nameWithoutExt, servicePrefix) == svc ||
 				strings.TrimPrefix(nameWithoutExt, "cq-") == svc {
 				matches = append(matches, f)
@@ -61,6 +73,9 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 		}
 		for _, f := range matches {
 			unitName := fileToUnitName(f)
+			if unitName == "" {
+				continue
+			}
 			if _, exists := seen[unitName]; !exists {
 				seen[unitName] = struct{}{}
 				units = append(units, unitName)
@@ -84,6 +99,12 @@ func fileToUnitName(f string) string {
 		return ImageFileToUnitName(f)
 	case strings.HasSuffix(f, ".build"):
 		return BuildFileToUnitName(f)
+	case strings.HasSuffix(f, ".cq-secret"):
+		return CQSecretFileToUnitName(f)
+	case strings.HasSuffix(f, ".cq-image"):
+		return CQImageFileToUnitName(f)
+	case strings.HasSuffix(f, ".cq-build"):
+		return CQBuildFileToUnitName(f)
 	default:
 		return ""
 	}

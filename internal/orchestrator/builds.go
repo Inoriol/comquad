@@ -16,11 +16,15 @@ func (o *Orchestrator) handleBuilds(projectFiles []string) error {
 	defer dbusMgr.Close()
 
 	for _, f := range projectFiles {
-		if !strings.HasSuffix(f, ".build") {
+		var unitName string
+		switch {
+		case strings.HasSuffix(f, ".build"):
+			unitName = BuildFileToUnitName(f)
+		case strings.HasSuffix(f, ".cq-build"):
+			unitName = CQBuildFileToUnitName(f)
+		default:
 			continue
 		}
-
-		unitName := BuildFileToUnitName(f)
 
 		if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
 			logger.Warn(fmt.Sprintf("build unit %s not produced by quadlet generator, skipping: %v", unitName, err))

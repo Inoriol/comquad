@@ -9,8 +9,31 @@ import (
 
 func Unit(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
 	dirs := dependsOn(svc.Name, svc.DependsOn)
+	dirs = append(dirs, pseudoQuadletDeps(svc, cfg)...)
 	_, unitExt := ExtractSystemdExtensions(svc, cfg)
 	return MergeDirectives(dirs, unitExt)
+}
+
+func pseudoQuadletDeps(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
+	if !cfg.PseudoQuadlet {
+		return nil
+	}
+	var after, requires []string
+	if svc.Build != nil && !cfg.PodmanVersion.AtLeast(5, 2) {
+		after = append(after, svc.Name+".cq-build")
+		requires = append(requires, svc.Name+".cq-build")
+	} else if svc.Image != "" && !cfg.PodmanVersion.AtLeast(4, 8) {
+		after = append(after, svc.Name+".cq-image")
+		requires = append(requires, svc.Name+".cq-image")
+	}
+	var dirs []c2qtypes.Directive
+	if len(requires) > 0 {
+		dirs = append(dirs, c2qtypes.Directive{Key: "Requires", Values: requires})
+	}
+	if len(after) > 0 {
+		dirs = append(dirs, c2qtypes.Directive{Key: "After", Values: after})
+	}
+	return dirs
 }
 
 func UnitService(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {

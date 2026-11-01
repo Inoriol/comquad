@@ -46,8 +46,24 @@ func TestBuilds_VersionGate(t *testing.T) {
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 1}
 	units := Builds(services, cfg)
+	if len(units) != 1 {
+		t.Fatal("expected 1 build unit with pseudo-quadlet fallback")
+	}
+	if units[0].Type != c2qtypes.UnitCQBuild {
+		t.Fatalf("expected cq-build unit type, got %s", units[0].Type)
+	}
+}
+
+func TestBuilds_VersionGate_NoPseudo(t *testing.T) {
+	services := types.Services{
+		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app"}},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 1}
+	cfg.PseudoQuadlet = false
+	units := Builds(services, cfg)
 	if len(units) != 0 {
-		t.Fatal("expected no build units before 5.2")
+		t.Fatal("expected no build units before 5.2 without pseudo-quadlet")
 	}
 }
 

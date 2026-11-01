@@ -35,7 +35,7 @@ type resourceRow struct {
 
 func shortName(fileName, projectPrefix string) string {
 	name := strings.TrimPrefix(fileName, projectPrefix)
-	for _, ext := range []string{".container", ".image", ".network", ".volume", ".build"} {
+	for _, ext := range []string{".container", ".image", ".network", ".volume", ".build", ".cq-secret", ".cq-image", ".cq-build"} {
 		name = strings.TrimSuffix(name, ext)
 	}
 	return name
@@ -230,6 +230,28 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 		if strings.HasSuffix(base, ".build") {
 			resources = append(resources, resourceRow{name: short + ".build", kind: "build", info: "—"})
 			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".build", Type: "build"})
+		}
+
+		if strings.HasSuffix(base, ".cq-secret") {
+			resources = append(resources, resourceRow{name: short + ".cq-secret", kind: "secret", info: "—"})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".cq-secret", Type: "secret"})
+		}
+
+		if strings.HasSuffix(base, ".cq-image") {
+			img := ""
+			for _, line := range strings.Split(fileContents[f], "\n") {
+				if strings.HasPrefix(strings.TrimSpace(line), "Image=") {
+					img = shortenImage(strings.TrimPrefix(strings.TrimSpace(line), "Image="))
+					break
+				}
+			}
+			resources = append(resources, resourceRow{name: short + ".cq-image", kind: "image", info: img})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".cq-image", Type: "image", Info: img})
+		}
+
+		if strings.HasSuffix(base, ".cq-build") {
+			resources = append(resources, resourceRow{name: short + ".cq-build", kind: "build", info: "—"})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".cq-build", Type: "build"})
 		}
 	}
 

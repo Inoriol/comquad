@@ -109,9 +109,49 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 	}
 
 	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".cq-secret") {
+			unitName := CQSecretFileToUnitName(f)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop secret unit " + unitName + ": " + err.Error())
+			}
+		}
+	}
+
+	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".cq-image") {
+			unitName := CQImageFileToUnitName(f)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop pseudo-image unit " + unitName + ": " + err.Error())
+			}
+		}
+	}
+
+	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".cq-build") {
+			unitName := CQBuildFileToUnitName(f)
+			if !output.IsJSONMode() {
+				logger.Print("Stopping unit: " + unitName)
+			}
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop pseudo-build unit " + unitName + ": " + err.Error())
+			}
+		}
+	}
+
+	for _, f := range state.Files {
 		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
 			logger.Warn("Failed to remove file " + f + ": " + err.Error())
 		}
+	}
+
+	if err := o.removePseudoQuadletServices(state.Files); err != nil {
+		logger.Warn("Failed to remove pseudo-quadlet service files: " + err.Error())
 	}
 
 	if err := dbusMgr.ReloadDaemon(); err != nil {

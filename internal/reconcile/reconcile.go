@@ -519,7 +519,7 @@ func dedupe(names []string) []string {
 }
 
 func isQuadletFile(name string) bool {
-	for _, ext := range []string{".container", ".network", ".volume", ".image", ".build"} {
+	for _, ext := range []string{".container", ".network", ".volume", ".image", ".build", ".cq-secret", ".cq-image", ".cq-build"} {
 		if strings.HasSuffix(name, ext) {
 			return true
 		}

@@ -132,9 +132,38 @@ Depending on the Compose file, comquad can generate:
 | Build block | `.build` |
 | Network | `.network` |
 | Named volume | `.volume` |
-| Secret | Native secret directives or secret mounts |
+| Secret (default) | `.cq-secret` → `.service` (pseudo-quadlet) |
+| Secret (custom perms) | `Volume=` mount (fallback) |
+| External secret | `Secret=` directive |
 
 Container units reference their companion image or build units. This lets Quadlet and systemd express dependencies between pulling or building an image and starting its container.
+
+### Pseudo-Quadlet Generator
+
+The pseudo-quadlet generator converts custom unit types (`.cq-*`) into standard `.service` units. Currently supports:
+
+- **`.cq-secret`**: Stages secrets in RAM-backed tmpfs (`/run/credentials/`) via systemd `LoadCredential=`. Never written to persistent disk.
+- **`.cq-image`**: Fallback for Podman < 4.8.0 — generates `.service` with `ExecStart=podman pull`.
+- **`.cq-build`**: Fallback for Podman < 5.2.0 — generates `.service` with `ExecStart=podman build`.
+- Environment secrets: `LoadCredential=<name>:/bin/sh -c 'printf "%s" "$ENV_VAR"'`
+- File secrets: `LoadCredential=<name>:<path>`
+- Custom permissions (`uid`/`gid`/`mode`): Falls back to direct `Volume=` mount
+
+Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit.
+
+**Service Naming Convention:**
+
+Pseudo-quadlet services follow a naming convention that matches native quadlet services:
+
+| Pseudo-quadlet file | Systemd service | Native equivalent |
+|---------------------|-----------------|-------------------|
+| `cq-project-web.cq-image` | `cq-project-web-image.service` | `cq-project-web.image` → `cq-project-web-image.service` |
+| `cq-project-app.cq-build` | `cq-project-app-build.service` | `cq-project-app.build` → `cq-project-app-build.service` |
+| `cq-project-db_password.cq-secret` | `cq-project-db_password-secret.service` | N/A (comquad-specific) |
+
+This naming convention ensures that when Podman is upgraded and native quadlet types become available, the service names remain consistent. Container units reference pseudo-quadlet services via `After=` and `Requires=` directives in the `[Unit]` section, pointing to the service name (e.g., `After=cq-project-web-image.service`).
+
+The `Image=` directive in container units always contains the actual image reference (e.g., `docker.io/library/nginx:latest`), not a quadlet reference. This allows containers to work with both native and pseudo-quadlet image sources without conditional logic.
 
 External networks and volumes are not generated or removed by comquad. They remain references to the externally managed Podman resources.
 

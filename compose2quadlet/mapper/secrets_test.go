@@ -16,7 +16,7 @@ func TestPremapSecrets_External(t *testing.T) {
 		"db_password": {Name: "my-secret", External: types.External(true)},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, secrets, nil, cfg)
+	dirs, _ := PremapSecrets(&svc, secrets, nil, cfg)
 
 	assertDirective(t, dirs, "Secret", "my-secret")
 	if len(svc.Secrets) != 0 {
@@ -33,7 +33,7 @@ func TestPremapSecrets_External_DefaultName(t *testing.T) {
 		"db_password": {External: types.External(true)},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, secrets, nil, cfg)
+	dirs, _ := PremapSecrets(&svc, secrets, nil, cfg)
 
 	assertDirective(t, dirs, "Secret", "db_password")
 }
@@ -47,9 +47,18 @@ func TestPremapSecrets_File(t *testing.T) {
 		"db_password": {File: "/etc/secrets/db_password.txt"},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, secrets, nil, cfg)
+	dirs, units := PremapSecrets(&svc, secrets, nil, cfg)
 
-	assertDirective(t, dirs, "Volume", "/etc/secrets/db_password.txt:/run/secrets/db_password:ro")
+	assertDirective(t, dirs, "Volume", "/run/credentials/db_password.secretref:/run/secrets/db_password:ro")
+	if len(units) != 1 {
+		t.Fatalf("expected 1 secret unit, got %d", len(units))
+	}
+	if units[0].Type != c2qtypes.UnitCQSecret {
+		t.Fatalf("expected cq-secret unit type, got %s", units[0].Type)
+	}
+	if units[0].Name != "db_password" {
+		t.Fatalf("expected secret name db_password, got %s", units[0].Name)
+	}
 }
 
 func TestPremapSecrets_CustomTarget(t *testing.T) {
@@ -61,9 +70,12 @@ func TestPremapSecrets_CustomTarget(t *testing.T) {
 		"db_password": {File: "/etc/secrets/db_password.txt"},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, secrets, nil, cfg)
+	dirs, units := PremapSecrets(&svc, secrets, nil, cfg)
 
-	assertDirective(t, dirs, "Volume", "/etc/secrets/db_password.txt:/custom/path/secret:ro")
+	assertDirective(t, dirs, "Volume", "/run/credentials/db_password.secretref:/custom/path/secret:ro")
+	if len(units) != 1 {
+		t.Fatalf("expected 1 secret unit, got %d", len(units))
+	}
 }
 
 func TestPremapSecrets_Environment(t *testing.T) {
@@ -75,13 +87,14 @@ func TestPremapSecrets_Environment(t *testing.T) {
 		"db_password": {Environment: "DB_PASSWORD"},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, secrets, nil, cfg)
+	dirs, units := PremapSecrets(&svc, secrets, nil, cfg)
 
-	if len(dirs) != 0 {
-		t.Fatal("expected no directives for environment secrets (not pre-resolved)")
+	assertDirective(t, dirs, "Volume", "/run/credentials/db_password.secretref:/run/secrets/db_password:ro")
+	if len(units) != 1 {
+		t.Fatalf("expected 1 secret unit, got %d", len(units))
 	}
-	if !hasWarning(cfg, "web", "secrets.db_password") {
-		t.Fatal("expected WarningDegraded for environment secret")
+	if units[0].Type != c2qtypes.UnitCQSecret {
+		t.Fatalf("expected cq-secret unit type, got %s", units[0].Type)
 	}
 }
 
@@ -91,7 +104,7 @@ func TestPremapSecrets_Undefined(t *testing.T) {
 		Secrets: []types.ServiceSecretConfig{{Source: "nonexistent"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, types.Secrets{}, nil, cfg)
+	dirs, _ := PremapSecrets(&svc, types.Secrets{}, nil, cfg)
 
 	if len(dirs) != 0 {
 		t.Fatal("expected no directives for undefined secret")
@@ -111,7 +124,7 @@ func TestPremapSecrets_ExternalUnavailable(t *testing.T) {
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 4}
-	dirs := PremapSecrets(&svc, secrets, nil, cfg)
+	dirs, _ := PremapSecrets(&svc, secrets, nil, cfg)
 
 	if hasDirective(dirs, "Secret", "") {
 		t.Fatal("should not emit Secret before 4.5")
@@ -130,7 +143,7 @@ func TestPremapConfigs_Basic(t *testing.T) {
 		"app_config": {File: "/etc/configs/app_config.yml"},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, nil, configs, cfg)
+	dirs, _ := PremapSecrets(&svc, nil, configs, cfg)
 
 	assertDirective(t, dirs, "Mount", "type=bind,source=/etc/configs/app_config.yml,destination=/etc/app/config.yml")
 	if len(svc.Configs) != 0 {
@@ -147,7 +160,7 @@ func TestPremapConfigs_DefaultTarget(t *testing.T) {
 		"app_config": {File: "/etc/configs/app_config.yml"},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, nil, configs, cfg)
+	dirs, _ := PremapSecrets(&svc, nil, configs, cfg)
 
 	assertDirective(t, dirs, "Mount", "type=bind,source=/etc/configs/app_config.yml,destination=/app_config")
 }
@@ -167,7 +180,7 @@ func TestPremapConfigs_WithUIDGID(t *testing.T) {
 		"app_config": {File: "/etc/configs/app_config.yml"},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, nil, configs, cfg)
+	dirs, _ := PremapSecrets(&svc, nil, configs, cfg)
 
 	assertDirective(t, dirs, "Mount", "type=bind,source=/etc/configs/app_config.yml,destination=/app_config,uid=1000,gid=1000,mode=0440")
 }
@@ -178,7 +191,7 @@ func TestPremapConfigs_Undefined(t *testing.T) {
 		Configs: []types.ServiceConfigObjConfig{{Source: "nonexistent"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, nil, types.Configs{}, cfg)
+	dirs, _ := PremapSecrets(&svc, nil, types.Configs{}, cfg)
 
 	if len(dirs) != 0 {
 		t.Fatal("expected no directives for undefined config")
@@ -191,7 +204,7 @@ func TestPremapConfigs_Undefined(t *testing.T) {
 func TestPremapSecrets_NoSecrets(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web"}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := PremapSecrets(&svc, types.Secrets{}, types.Configs{}, cfg)
+	dirs, _ := PremapSecrets(&svc, types.Secrets{}, types.Configs{}, cfg)
 
 	if len(dirs) != 0 {
 		t.Fatal("expected no directives when no secrets/configs")

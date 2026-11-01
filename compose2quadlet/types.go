@@ -20,6 +20,9 @@ const (
 	UnitVolume    = types.UnitVolume
 	UnitImage     = types.UnitImage
 	UnitBuild     = types.UnitBuild
+	UnitCQSecret  = types.UnitCQSecret
+	UnitCQImage   = types.UnitCQImage
+	UnitCQBuild   = types.UnitCQBuild
 )
 
 type QuadletUnit = types.QuadletUnit
@@ -35,6 +38,7 @@ const (
 	SectionVolume    = types.SectionVolume
 	SectionImage     = types.SectionImage
 	SectionBuild     = types.SectionBuild
+	SectionSecret    = types.SectionSecret
 )
 
 type TranspileOption = types.Option

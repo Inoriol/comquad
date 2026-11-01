@@ -23,8 +23,12 @@ This document describes the internal design, conventions, and data flow of compo
 Every compose→quadlet mapping is tracked with a minimum podman/systemd version in `doc/mapping.md`.
 The `Since` column records when the target directive was introduced.
 
-**Minimum baseline: Podman 4.8.0** (required for `.image` quadlet support).
+**Minimum baseline: Podman 4.4.0** (with pseudo-quadlet fallback for `.image` and `.build`).
 Quadlet types by introduction: `.container`/`.network`/`.volume` 4.4.0, `.image` 4.8.0, `.build` 5.2.0.
+
+For Podman versions below the native quadlet type requirements, the library generates pseudo-quadlet
+units (`.cq-image`, `.cq-build`) that are converted to standard `.service` units by the pseudo-quadlet
+generator. See [Pseudo-Quadlet Generator](#pseudo-quadlet-generator) for details.
 
 When adding a new field mapping, check the [Podman Release Notes](https://github.com/podman-container-tools/podman/blob/main/RELEASE_NOTES.md)
 to determine the minimum podman version. For systemd directives, the version is noted in the `Added in version X`
@@ -85,7 +89,7 @@ compose2quadlet/
 │   ├── build.go              # Builds() — .build quadlets (fatal error pre-5.2.0)
 │   ├── network.go            # Networks() — top-level .network quadlets
 │   ├── volume.go             # Volumes() — top-level .volume quadlets
-│   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor (env, file, external)
+│   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor; generates .cq-secret units for tmpfs staging
 │   ├── dockerfile.go         # PatchDockerfileFROM() — normalize bare image names in FROM lines
 │   ├── extensions.go         # Extract*Extensions() — x-extension extraction for quadlet-only directives
 │   ├── validation.go         # isValidDirective() — directive validation for x-extensions
@@ -94,7 +98,7 @@ compose2quadlet/
 ├── opinionated/              # Opinionated transforms
 │   ├── opinionated.go        # Apply() — orchestrates all transforms
 │   ├── prefix.go             # ApplyPrefix() — cq-<project>- prefix on all unit names
-│   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, Image=, Mount= references; preserve external names
+│   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, Image=, Mount= references; preserve external names; handle .secretref placeholders
 │   ├── containername.go      # ApplyContainerName() — default ContainerName=<project>-<service>
 │   ├── aliases.go            # ApplyNetworkAliases() — inject NetworkAlias=<service>, <project>-<service>
 │   ├── selinux.go            # ApplySELinux() — add relabel=shared/private to Mount=, :z/:Z to Volume= based on shared volume analysis
@@ -105,6 +109,12 @@ compose2quadlet/
 │   ├── ports.go              # ApplyPortOffset() — apply port offset with Info callback logging
 │   ├── autoupdate.go         # ApplyAutoUpdate() — add AutoUpdate=registry
 │   └── install.go            # ApplyInstallSection() — add [Install] section
+│
+├── pseudo/                   # Pseudo-quadlet generator
+│   ├── generator.go          # ConvertPseudoUnits() — converts .cq-* units to .service units
+│   ├── secret.go             # convertSecret() — .cq-secret → .service with LoadCredential=
+│   ├── image.go              # convertImage() — .cq-image → .service with ExecStart=podman pull
+│   └── build.go              # convertBuild() — .cq-build → .service with ExecStart=podman build
 │
 ├── serialization/            # Serialization / deserialization
 │   └── ini.go                # Marshal(), Write(), WriteUnits(), Unmarshal()
@@ -154,6 +164,7 @@ SectionNetwork   = "Network"
 SectionVolume    = "Volume"
 SectionImage     = "Image"
 SectionBuild     = "Build"
+SectionSecret    = "Secret"
 ```
 
 ## Data Flow
@@ -334,13 +345,26 @@ Podman resolves bare image names differently from Docker. When `WithDockerfileNo
 - Patched copies are written to `BuildCacheDir` as absolute paths before the `.build` quadlet is emitted
 - During dry-run, content is computed but not written to disk
 
-### Environment-Based Secret Resolution
+### Secret Handling
 
-When `WithSecretsDirectory(path)` is set, `PremapSecrets()` resolves `secrets:` entries that reference environment variables:
-- Reads the env var via `os.Getenv(def.Environment)`
-- Writes the value to `path/<secret_name>` with `0600` permissions
-- Emits `Volume=<path>:/run/secrets/<name>:ro` in `[Container]`
-- `WithDryRun()` skips disk writes but still generates correct directives
+Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs before container field mapping. The default behavior stages secrets in RAM-backed tmpfs via systemd `LoadCredential=`:
+
+**Default behavior (tmpfs staging):**
+- Environment secrets: Generates `.cq-secret` unit with `LoadCredential=<name>:/bin/sh -c 'printf "%s" "$ENV_VAR"'`
+- File secrets: Generates `.cq-secret` unit with `LoadCredential=<name>:<path>`
+- Container mounts: `Volume=/run/credentials/<prefixed-service>.service/<name>:<target>:ro`
+- Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit
+
+**Fallback (volume mount):**
+- Secrets with custom `uid`, `gid`, or `mode` fall back to direct `Volume=<file>:<target>:ro` mount
+- This preserves backward compatibility for secrets that need specific permissions
+
+**External secrets:**
+- Use native Podman `Secret=<name>` directive (requires podman >= 4.5)
+
+The `.cq-secret` units are converted to `.service` units by the pseudo-quadlet generator (`pseudo.ConvertPseudoUnits()`), which runs after transpilation. The generated service uses `Type=oneshot` and `RemainAfterExit=yes` to stage the credential in `/run/credentials/` (tmpfs, auto-cleaned on service stop).
+
+**Legacy behavior:** When `WithSecretsDirectory(path)` is set and a secret has custom permissions, the old behavior writes the env var to disk at `path/<secret_name>` and mounts it as a volume. This is only used for the custom-permissions fallback case.
 
 ### X-Extensions
 
@@ -366,6 +390,166 @@ X-extensions allow setting Quadlet directives that have no Compose equivalent. T
 - `Unit()` calls `ExtractSystemdExtensions()` for `[Unit]`
 - `Networks()` calls `ExtractNetworkExtensions()`
 - `Volumes()` calls `ExtractVolumeExtensions()`
+
+## Pseudo-Quadlet Generator
+
+The `pseudo/` package converts custom unit types (`.cq-*`) into standard `.service` units. This enables features that require systemd service semantics but aren't native Quadlet types.
+
+### Current Implementations
+
+#### `.cq-secret` — Secure Secret Handling
+
+**Input:** `.cq-secret` unit with `[Secret]` section:
+```ini
+[Secret]
+Source=environment
+Environment=DB_PASSWORD
+```
+
+**Output:** `.service` unit with `LoadCredential=`:
+```ini
+[Unit]
+Description=comquad secret: db_password
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+LoadCredential=db_password:/bin/sh -c 'printf "%s" "$DB_PASSWORD"'
+
+[Install]
+WantedBy=default.target
+```
+
+#### `.cq-image` — Image Pull Fallback (Podman 4.4.0-4.7.x)
+
+For Podman versions below 4.8.0 (when native `.image` quadlet was introduced), the library generates `.cq-image` units that are converted to `.service` units with `ExecStart=podman pull`.
+
+**Input:** `.cq-image` unit with `[Image]` section:
+```ini
+[Image]
+Image=docker.io/library/nginx:latest
+```
+
+**Output:** `.service` unit:
+```ini
+[Unit]
+Description=comquad image pull: web
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/podman pull docker.io/library/nginx:latest
+
+[Install]
+WantedBy=default.target
+```
+
+**Container references:** Container units use the actual image reference in `Image=` and add `After=`/`Requires=` dependencies:
+```ini
+[Container]
+Image=docker.io/library/nginx:latest
+
+[Unit]
+After=cq-project-web-image.service
+Requires=cq-project-web-image.service
+```
+
+This differs from native `.image` units where containers use `Image=web.image` and quadlet handles the dependency translation. The pseudo-quadlet approach allows containers to work with both native and fallback image sources without conditional logic.
+
+**Service naming:** The service name follows the native quadlet convention: `cq-project-web-image.service` (matches what native `.image` would produce).
+
+#### `.cq-build` — Image Build Fallback (Podman 4.4.0-5.1.x)
+
+For Podman versions below 5.2.0 (when native `.build` quadlet was introduced), the library generates `.cq-build` units that are converted to `.service` units with `ExecStart=podman build`.
+
+**Input:** `.cq-build` unit with `[Build]` section:
+```ini
+[Build]
+SetWorkingDirectory=./app
+ImageTag=myapp_app:latest
+```
+
+**Output:** `.service` unit:
+```ini
+[Unit]
+Description=comquad image build: app
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=./app
+ExecStart=/usr/bin/podman build -t myapp_app:latest .
+
+[Install]
+WantedBy=default.target
+```
+
+**Container references:** Container units use the actual image tag in `Image=` and add `After=`/`Requires=` dependencies:
+```ini
+[Container]
+Image=myapp_app:latest
+
+[Unit]
+After=cq-project-app-build.service
+Requires=cq-project-app-build.service
+```
+
+**Service naming:** The service name follows the native quadlet convention: `cq-project-app-build.service` (matches what native `.build` would produce).
+
+#### `.cq-secret` — Secure Secret Handling
+
+The `.cq-secret` unit type stages secrets in RAM-backed tmpfs via systemd `LoadCredential=`. Secrets are never written to persistent disk.
+
+**Input:** `.cq-secret` unit with `[Secret]` section:
+```ini
+[Secret]
+Source=environment
+Environment=DB_PASSWORD
+```
+
+**Output:** `.service` unit:
+```ini
+[Unit]
+Description=comquad secret: db_password
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+LoadCredential=db_password:/bin/sh -c 'printf "%s" "$DB_PASSWORD"'
+
+[Install]
+WantedBy=default.target
+```
+
+**Container references:** Container units mount the secret via `Volume=`:
+```ini
+[Container]
+Volume=/run/credentials/cq-project-db_password-secret.service/db_password:/run/secrets/db_password:ro
+```
+
+**Service naming:** Unlike `.cq-image` and `.cq-build`, `.cq-secret` has no native quadlet equivalent. The service name uses `-secret.service` suffix for consistency: `cq-project-db_password-secret.service`.
+
+**Secret types:**
+- Environment secrets: `LoadCredential=<name>:/bin/sh -c 'printf "%s" "$ENV_VAR"'`
+- File secrets: `LoadCredential=<name>:<path>`
+- Custom permissions (`uid`/`gid`/`mode`): Falls back to direct `Volume=` mount (not `.cq-secret`)
+
+Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit.
+
+### Disabling Pseudo-Quadlet
+
+Use `WithoutPseudoQuadlet()` to disable the fallback. When disabled:
+- `.image` units are not generated for Podman < 4.8.0
+- `.build` units cause a fatal error for Podman < 5.2.0
+
+### Usage
+
+```go
+units, _ := c2q.Transpile(project, opts...)
+units = pseudo.ConvertPseudoUnits(units)  // Converts .cq-* → .service
+```
+
+**Extensibility:** The generator is designed to support future pseudo types. Add new converters to `pseudo/` and update `ConvertPseudoUnits()`.
 
 ## Conventions
 

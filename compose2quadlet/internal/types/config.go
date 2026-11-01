@@ -33,6 +33,7 @@ type Config struct {
 	PatchedDockerfiles     map[string]string
 	ExternalNetworks       map[string]string
 	ExternalVolumes        map[string]string
+	PseudoQuadlet          bool
 }
 
 type Version struct {
@@ -64,6 +65,7 @@ func DefaultConfig() *Config {
 		ServiceName:     true,
 		ImageRetry:      3,
 		ImageRetryDelay: 5,
+		PseudoQuadlet:   true,
 	}
 }
 
@@ -155,6 +157,10 @@ func WithSystemdSpecifiers() Option {
 
 func WithInfo(fn func(string)) Option {
 	return func(c *Config) { c.Info = fn }
+}
+
+func WithoutPseudoQuadlet() Option {
+	return func(c *Config) { c.PseudoQuadlet = false }
 }
 
 func (c *Config) Warn(w Warning) {

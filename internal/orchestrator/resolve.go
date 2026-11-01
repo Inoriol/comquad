@@ -76,7 +76,7 @@ func MatchAllContainers(projectName string, state deploy.ProjectState, arg strin
 }
 
 // quadletResourceSuffixes lists all non-container quadlet file extensions handled by comquad.
-var quadletResourceSuffixes = []string{".network", ".volume", ".image", ".build"}
+var quadletResourceSuffixes = []string{".network", ".volume", ".image", ".build", ".cq-secret", ".cq-image", ".cq-build"}
 
 // MatchQuadletResource finds a network, volume, image, or build quadlet file matching the given arg.
 func MatchQuadletResource(projectName string, state deploy.ProjectState, arg string) string {
