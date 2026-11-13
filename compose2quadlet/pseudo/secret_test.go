@@ -42,19 +42,41 @@ func TestConvertSecret_Environment(t *testing.T) {
 		t.Fatal("expected [Service] section")
 	}
 
-	hasLoadCredential := false
+	hasExecStart := false
+	hasExecStop := false
+	hasEnvMarker := false
 	for _, d := range serviceSection.Directives {
-		if d.Key == "LoadCredential" && len(d.Values) > 0 {
-			hasLoadCredential = true
-			expected := "db_password:/bin/sh -c 'printf \"%s\" \"$DB_PASSWORD\"'"
+		if d.Key == "ExecStart" && len(d.Values) > 0 {
+			hasExecStart = true
+			expected := "/bin/sh -c 'podman secret create --replace db_password /run/comquad/secrets/db_password.env'"
 			if d.Values[0] != expected {
-				t.Errorf("expected LoadCredential=%s, got %s", expected, d.Values[0])
+				t.Errorf("expected ExecStart=%s, got %s", expected, d.Values[0])
+			}
+		}
+		if d.Key == "ExecStop" && len(d.Values) > 0 {
+			hasExecStop = true
+			expected := "-/usr/bin/podman secret rm db_password"
+			if d.Values[0] != expected {
+				t.Errorf("expected ExecStop=%s, got %s", expected, d.Values[0])
+			}
+		}
+		if d.Key == "Environment" && len(d.Values) > 0 {
+			hasEnvMarker = true
+			expected := "COMQUAD_SECRET_ENV=DB_PASSWORD"
+			if d.Values[0] != expected {
+				t.Errorf("expected Environment=%s, got %s", expected, d.Values[0])
 			}
 		}
 	}
 
-	if !hasLoadCredential {
-		t.Error("expected LoadCredential directive")
+	if !hasExecStart {
+		t.Error("expected ExecStart directive")
+	}
+	if !hasExecStop {
+		t.Error("expected ExecStop directive")
+	}
+	if !hasEnvMarker {
+		t.Error("expected COMQUAD_SECRET_ENV marker")
 	}
 }
 
@@ -91,19 +113,30 @@ func TestConvertSecret_File(t *testing.T) {
 		t.Fatal("expected [Service] section")
 	}
 
-	hasLoadCredential := false
+	hasExecStart := false
+	hasExecStop := false
 	for _, d := range serviceSection.Directives {
-		if d.Key == "LoadCredential" && len(d.Values) > 0 {
-			hasLoadCredential = true
-			expected := "api_key:/etc/secrets/api.key"
+		if d.Key == "ExecStart" && len(d.Values) > 0 {
+			hasExecStart = true
+			expected := "/usr/bin/podman secret create --replace api_key /etc/secrets/api.key"
 			if d.Values[0] != expected {
-				t.Errorf("expected LoadCredential=%s, got %s", expected, d.Values[0])
+				t.Errorf("expected ExecStart=%s, got %s", expected, d.Values[0])
+			}
+		}
+		if d.Key == "ExecStop" && len(d.Values) > 0 {
+			hasExecStop = true
+			expected := "-/usr/bin/podman secret rm api_key"
+			if d.Values[0] != expected {
+				t.Errorf("expected ExecStop=%s, got %s", expected, d.Values[0])
 			}
 		}
 	}
 
-	if !hasLoadCredential {
-		t.Error("expected LoadCredential directive")
+	if !hasExecStart {
+		t.Error("expected ExecStart directive")
+	}
+	if !hasExecStop {
+		t.Error("expected ExecStop directive")
 	}
 }
 

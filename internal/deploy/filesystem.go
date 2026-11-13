@@ -35,6 +35,22 @@ func (r *TargetDirResolver) GetSystemdPath() (string, error) {
 	return filepath.Join(currentUser.HomeDir, ".config", "containers", "systemd"), nil
 }
 
+// GetSystemdUnitPath returns the systemd unit directory where .service files should be placed.
+// For root: /etc/systemd/system
+// For non-root: ~/.config/systemd/user
+func (r *TargetDirResolver) GetSystemdUnitPath() (string, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	if currentUser.Uid == "0" {
+		return "/etc/systemd/system", nil
+	}
+
+	return filepath.Join(currentUser.HomeDir, ".config", "systemd", "user"), nil
+}
+
 // ValidatePodmanVersion checks that podman meets the minimum required version (4.8.0).
 // Returns nil if the version is sufficient, or an error describing the shortfall.
 func ValidatePodmanVersion() error {

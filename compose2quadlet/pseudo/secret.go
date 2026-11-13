@@ -41,14 +41,28 @@ func convertSecret(unit c2qtypes.QuadletUnit) c2qtypes.QuadletUnit {
 
 		switch sourceType {
 		case "environment":
+			secretFile := "/run/comquad/secrets/" + unit.Name + ".env"
+			execStart := fmt.Sprintf("/bin/sh -c 'podman secret create --replace %s %s'", unit.Name, secretFile)
 			serviceDirs = append(serviceDirs, c2qtypes.Directive{
-				Key:    "LoadCredential",
-				Values: []string{unit.Name + ":/bin/sh -c 'printf \"%s\" \"$" + sourceValue + "\"'"},
+				Key:    "ExecStart",
+				Values: []string{execStart},
+			})
+			serviceDirs = append(serviceDirs, c2qtypes.Directive{
+				Key:    "ExecStop",
+				Values: []string{"-/usr/bin/podman secret rm " + unit.Name},
+			})
+			serviceDirs = append(serviceDirs, c2qtypes.Directive{
+				Key:    "Environment",
+				Values: []string{"COMQUAD_SECRET_ENV=" + sourceValue},
 			})
 		case "file":
 			serviceDirs = append(serviceDirs, c2qtypes.Directive{
-				Key:    "LoadCredential",
-				Values: []string{unit.Name + ":" + sourceValue},
+				Key:    "ExecStart",
+				Values: []string{fmt.Sprintf("/usr/bin/podman secret create --replace %s %s", unit.Name, sourceValue)},
+			})
+			serviceDirs = append(serviceDirs, c2qtypes.Directive{
+				Key:    "ExecStop",
+				Values: []string{"-/usr/bin/podman secret rm " + unit.Name},
 			})
 		}
 	}

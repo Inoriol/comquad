@@ -72,3 +72,36 @@ func AssertSecretQuadletFileGone(t *testing.T, project, secretName string) {
 		t.Fatalf("expected quadlet file %s to be removed but it still exists", basename)
 	}
 }
+
+// AssertPodmanSecretExists checks that a Podman secret exists in the secret store.
+func AssertPodmanSecretExists(t *testing.T, secretName string) {
+	t.Helper()
+	ctx := exec.Command("podman", "secret", "ls", "--format", "{{.Name}}")
+	out, err := ctx.Output()
+	if err != nil {
+		t.Fatalf("podman secret ls failed: %v", err)
+	}
+	secrets := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, s := range secrets {
+		if s == secretName {
+			return
+		}
+	}
+	t.Fatalf("expected Podman secret %s to exist, but it was not found in: %v", secretName, secrets)
+}
+
+// AssertPodmanSecretGone checks that a Podman secret no longer exists in the secret store.
+func AssertPodmanSecretGone(t *testing.T, secretName string) {
+	t.Helper()
+	ctx := exec.Command("podman", "secret", "ls", "--format", "{{.Name}}")
+	out, err := ctx.Output()
+	if err != nil {
+		t.Fatalf("podman secret ls failed: %v", err)
+	}
+	secrets := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, s := range secrets {
+		if s == secretName {
+			t.Fatalf("expected Podman secret %s to be removed but it still exists", secretName)
+		}
+	}
+}

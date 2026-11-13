@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.5.1] - 2026-11-13
+
+### Added
+
+- **`.cq-secret` pseudo-quadlet implementation** — Fixed critical bugs in secret handling that prevented secrets from working correctly:
+  - **Service file location**: Pseudo-quadlet `.service` files are now written to the systemd unit directory (`/etc/systemd/system/` for rootful, `~/.config/systemd/user/` for rootless) instead of the quadlet directory (`/etc/containers/systemd/`). Systemd doesn't load `.service` files from the quadlet directory.
+  - **Podman secret integration**: Changed from systemd `LoadCredential=` (which doesn't work with containers due to credential namespace isolation) to Podman's native secret store. Secrets are now created via `podman secret create` and mounted at `/run/secrets/<name>` in containers.
+  - **Environment secret handling**: Environment variables are now written to temporary files at `/run/comquad/secrets/<name>.env` during deployment, then loaded into Podman's secret store by the secret service.
+  - **Secret service startup order**: Added logic to start secret services before container services, ensuring secrets exist before containers try to access them.
+  - **Automatic cleanup**: Secret services include `ExecStop=-/usr/bin/podman secret rm <name>` to remove secrets from Podman's store when the project is removed.
+  - **Container directive**: Changed from `Volume=` mounts to `Secret=` directive for cleaner integration with Podman's native secret mounting.
+  - **Dependency injection**: Container units now include `After=` and `Requires=` directives for secret services to ensure proper startup ordering.
+
+### Fixed
+
+- **Secret update on stack redeploy** — Secrets are now properly updated when environment variables change between deployments. Added `--replace` flag to `podman secret create` in generated `.cq-secret` services, and fixed secret service handling to always restart (not just start) to pick up value changes.
+- **Secret env file parsing** — Fixed parsing of `ExecStart=` lines in `processSecretFile()` to correctly handle the `--replace` flag when extracting secret file paths.
+
+### Changed
+
+- **Secret services always restart** — Secret services are now always restarted during deployment (instead of only starting if unchanged) to ensure updated secret values are picked up by Podman's secret store.
+- **Secret mount path**: Secrets are now mounted at `/run/secrets/<secret-name>` (e.g., `/run/secrets/cq-myapp-db_password`) instead of the previous systemd credential path.
+- **Secret storage**: Secrets are stored in Podman's native secret store instead of systemd credentials, providing better integration with container lifecycle management.
+
+### Documentation
+
+- **Secret handling consistency** — Fixed inconsistencies in `compose2quadlet/ARCHITECTURE.md` where the "Secret Handling" section incorrectly described `LoadCredential=` instead of `podman secret create`. Updated line 115, lines 349-367, and line 365 to reflect the current Podman secret-based implementation.
+- **Added references to comquad-secret.md** — Added links to `compose2quadlet/doc/comquad-secret.md` in root `ARCHITECTURE.md` (Further Reading section) and `compose2quadlet/README.md` (Pseudo-Quadlet section) so the documentation is discoverable.
+- **Updated secret examples with --replace** — Updated all `podman secret create` examples in `compose2quadlet/doc/comquad-secret.md` and `compose2quadlet/ARCHITECTURE.md` to include the `--replace` flag.
+- Added comprehensive documentation for `.cq-secret` pseudo-quadlet in `compose2quadlet/doc/comquad-secret.md`
+- Updated `README.md`, `ARCHITECTURE.md`, `compose2quadlet/README.md`, and `compose2quadlet/ARCHITECTURE.md` to reflect the new Podman secret-based implementation
+- Updated `TODO.md` to mark the Tmpfs Secrets task as completed with the new approach
+
 ## [0.5.0] - 2026-11-01
 
 ### Added
@@ -644,8 +679,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Containerfile: changed `fedora:43` to `fedora:41` (stable); replaced `loginctl enable-linger || true` with direct file creation to avoid silently masked failures.
 - Made `captureStdout` goroutine-safe with a `sync.Mutex`, allowing `t.Parallel()` in orchestrator unit tests.
 
-[Unreleased]: https://github.com/Inoriol/comquad/compare/v0.4.4...HEAD
-[0.4.4]: https://github.com/Inoriol/comquad/compare/v0.4.4...v0.5.0
+[Unreleased]: https://github.com/Inoriol/comquad/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Inoriol/comquad/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/Inoriol/comquad/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/Inoriol/comquad/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/Inoriol/comquad/compare/v0.4.1...v0.4.3
 [0.4.1]: https://github.com/Inoriol/comquad/compare/v0.4.0...v0.4.1

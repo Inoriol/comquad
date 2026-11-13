@@ -142,7 +142,7 @@ func TestApplyReferences_SecretVolume(t *testing.T) {
 	units := []c2qtypes.QuadletUnit{
 		mkUnit(c2qtypes.UnitContainer, "prefixed-web", []c2qtypes.Section{
 			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
-				mkDir("Volume", "/run/credentials/db_password.secretref:/run/secrets/db_password:ro"),
+				mkDir("Secret", "db_password.secretref"),
 			}},
 		}),
 	}
@@ -150,8 +150,27 @@ func TestApplyReferences_SecretVolume(t *testing.T) {
 	cfg.ProjectName = "myapp"
 
 	result := ApplyReferences(units, cfg)
-	sec := result[0].Sections[0]
-	assertDirectiveValue(t, sec, "Volume", "/run/credentials/cq-myapp-db_password-secret.service/db_password:/run/secrets/db_password:ro")
+	
+	var containerSec, unitSec *c2qtypes.Section
+	for i := range result[0].Sections {
+		switch result[0].Sections[i].Name {
+		case c2qtypes.SectionContainer:
+			containerSec = &result[0].Sections[i]
+		case c2qtypes.SectionUnit:
+			unitSec = &result[0].Sections[i]
+		}
+	}
+	
+	if containerSec == nil {
+		t.Fatal("Container section not found")
+	}
+	assertDirectiveValue(t, *containerSec, "Secret", "cq-myapp-db_password")
+	
+	if unitSec == nil {
+		t.Fatal("Unit section not found")
+	}
+	assertDirectiveValue(t, *unitSec, "After", "cq-myapp-db_password-secret.service")
+	assertDirectiveValue(t, *unitSec, "Requires", "cq-myapp-db_password-secret.service")
 }
 
 func TestApplyReferences_PseudoImage_ToService(t *testing.T) {
