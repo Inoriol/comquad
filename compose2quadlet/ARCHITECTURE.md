@@ -112,7 +112,7 @@ compose2quadlet/
 │
 ├── pseudo/                   # Pseudo-quadlet generator
 │   ├── generator.go          # ConvertPseudoUnits() — converts .cq-* units to .service units
-│   ├── secret.go             # convertSecret() — .cq-secret → .service with LoadCredential=
+│   ├── secret.go             # convertSecret() — .cq-secret → .service with podman secret create
 │   ├── image.go              # convertImage() — .cq-image → .service with ExecStart=podman pull
 │   └── build.go              # convertBuild() — .cq-build → .service with ExecStart=podman build
 │
@@ -347,12 +347,12 @@ Podman resolves bare image names differently from Docker. When `WithDockerfileNo
 
 ### Secret Handling
 
-Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs before container field mapping. The default behavior stages secrets in RAM-backed tmpfs via systemd `LoadCredential=`:
+Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs before container field mapping. The default behavior uses Podman's native secret store via `.cq-secret` pseudo-quadlet units:
 
-**Default behavior (tmpfs staging):**
-- Environment secrets: Generates `.cq-secret` unit with `LoadCredential=<name>:/bin/sh -c 'printf "%s" "$ENV_VAR"'`
-- File secrets: Generates `.cq-secret` unit with `LoadCredential=<name>:<path>`
-- Container mounts: `Volume=/run/credentials/<prefixed-service>.service/<name>:<target>:ro`
+**Default behavior (Podman secret store):**
+- Environment secrets: Generates `.cq-secret` unit; during deployment, the env var value is written to `/run/comquad/secrets/<name>.env` and loaded via `podman secret create`
+- File secrets: Generates `.cq-secret` unit that loads the file directly via `podman secret create <name> <path>`
+- Container mounts: `Secret=<name>` directive mounts the secret at `/run/secrets/<name>` in the container
 - Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit
 
 **Fallback (volume mount):**
@@ -362,7 +362,7 @@ Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs 
 **External secrets:**
 - Use native Podman `Secret=<name>` directive (requires podman >= 4.5)
 
-The `.cq-secret` units are converted to `.service` units by the pseudo-quadlet generator (`pseudo.ConvertPseudoUnits()`), which runs after transpilation. The generated service uses `Type=oneshot` and `RemainAfterExit=yes` to stage the credential in `/run/credentials/` (tmpfs, auto-cleaned on service stop).
+The `.cq-secret` units are converted to `.service` units by the pseudo-quadlet generator (`pseudo.ConvertPseudoUnits()`), which runs after transpilation. The generated service uses `Type=oneshot` and `RemainAfterExit=yes` to create the secret in Podman's secret store via `podman secret create`. An `ExecStop=-/usr/bin/podman secret rm <name>` directive ensures cleanup on project teardown.
 
 **Legacy behavior:** When `WithSecretsDirectory(path)` is set and a secret has custom permissions, the old behavior writes the env var to disk at `path/<secret_name>` and mounts it as a volume. This is only used for the custom-permissions fallback case.
 
@@ -406,7 +406,7 @@ Source=environment
 Environment=DB_PASSWORD
 ```
 
-**Output:** `.service` unit with `LoadCredential=`:
+**Output:** `.service` unit with `podman secret create`:
 ```ini
 [Unit]
 Description=comquad secret: db_password
@@ -414,11 +414,14 @@ Description=comquad secret: db_password
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-LoadCredential=db_password:/bin/sh -c 'printf "%s" "$DB_PASSWORD"'
+ExecStart=/bin/sh -c 'podman secret create --replace db_password /run/comquad/secrets/db_password.env'
+ExecStop=-/usr/bin/podman secret rm db_password
 
 [Install]
 WantedBy=default.target
 ```
+
+For environment secrets, comquad writes the environment variable value to `/run/comquad/secrets/<name>.env` during deployment. The secret service then loads this file into Podman's secret store.
 
 #### `.cq-image` — Image Pull Fallback (Podman 4.4.0-4.7.x)
 
@@ -498,7 +501,7 @@ Requires=cq-project-app-build.service
 
 #### `.cq-secret` — Secure Secret Handling
 
-The `.cq-secret` unit type stages secrets in RAM-backed tmpfs via systemd `LoadCredential=`. Secrets are never written to persistent disk.
+The `.cq-secret` unit type manages secrets using Podman's native secret store. Secrets are created via `podman secret create` and mounted into containers at `/run/secrets/<name>`.
 
 **Input:** `.cq-secret` unit with `[Secret]` section:
 ```ini
@@ -515,26 +518,31 @@ Description=comquad secret: db_password
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-LoadCredential=db_password:/bin/sh -c 'printf "%s" "$DB_PASSWORD"'
+ExecStart=/bin/sh -c 'podman secret create --replace db_password /run/comquad/secrets/db_password.env'
+ExecStop=-/usr/bin/podman secret rm db_password
 
 [Install]
 WantedBy=default.target
 ```
 
-**Container references:** Container units mount the secret via `Volume=`:
+**Container references:** Container units reference the secret via `Secret=`:
 ```ini
 [Container]
-Volume=/run/credentials/cq-project-db_password-secret.service/db_password:/run/secrets/db_password:ro
+Secret=cq-project-db_password
 ```
+
+Podman automatically mounts the secret at `/run/secrets/cq-project-db_password` inside the container.
 
 **Service naming:** Unlike `.cq-image` and `.cq-build`, `.cq-secret` has no native quadlet equivalent. The service name uses `-secret.service` suffix for consistency: `cq-project-db_password-secret.service`.
 
 **Secret types:**
-- Environment secrets: `LoadCredential=<name>:/bin/sh -c 'printf "%s" "$ENV_VAR"'`
-- File secrets: `LoadCredential=<name>:<path>`
+- Environment secrets: Written to `/run/comquad/secrets/<name>.env` during deployment, then loaded via `podman secret create`
+- File secrets: Loaded directly via `podman secret create <name> <path>`
 - Custom permissions (`uid`/`gid`/`mode`): Falls back to direct `Volume=` mount (not `.cq-secret`)
 
 Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit.
+
+**Cleanup:** The `ExecStop=-/usr/bin/podman secret rm <name>` directive ensures secrets are removed from Podman's store when the project is torn down. The `-` prefix ensures the stop operation succeeds even if the secret doesn't exist.
 
 ### Disabling Pseudo-Quadlet
 

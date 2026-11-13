@@ -84,11 +84,6 @@ func processSecret(serviceName string, ref types.ServiceSecretConfig, def types.
 }
 
 func processSecretTmpfs(serviceName string, ref types.ServiceSecretConfig, def types.SecretConfig, cfg *c2qtypes.Config) ([]c2qtypes.Directive, []c2qtypes.QuadletUnit) {
-	target := ref.Target
-	if target == "" {
-		target = "/run/secrets/" + ref.Source
-	}
-
 	if def.File != "" {
 		secretUnit := c2qtypes.QuadletUnit{
 			Type: c2qtypes.UnitCQSecret,
@@ -104,8 +99,8 @@ func processSecretTmpfs(serviceName string, ref types.ServiceSecretConfig, def t
 			},
 		}
 		containerDir := c2qtypes.Directive{
-			Key:    "Volume",
-			Values: []string{"/run/credentials/" + ref.Source + ".secretref:" + target + ":ro"},
+			Key:    "Secret",
+			Values: []string{ref.Source + ".secretref"},
 		}
 		return []c2qtypes.Directive{containerDir}, []c2qtypes.QuadletUnit{secretUnit}
 	}
@@ -125,8 +120,8 @@ func processSecretTmpfs(serviceName string, ref types.ServiceSecretConfig, def t
 			},
 		}
 		containerDir := c2qtypes.Directive{
-			Key:    "Volume",
-			Values: []string{"/run/credentials/" + ref.Source + ".secretref:" + target + ":ro"},
+			Key:    "Secret",
+			Values: []string{ref.Source + ".secretref"},
 		}
 		return []c2qtypes.Directive{containerDir}, []c2qtypes.QuadletUnit{secretUnit}
 	}

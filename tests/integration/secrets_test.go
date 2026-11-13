@@ -33,9 +33,10 @@ func TestSecret_EnvironmentTmpfs(t *testing.T) {
 	containerName := fmt.Sprintf("%s-web", project)
 	helpers.AssertContainerRunning(t, containerName)
 
-	// Verify secret is accessible inside container
-	helpers.AssertSecretExists(t, containerName, "/run/secrets/db_password")
-	helpers.AssertSecretContent(t, containerName, "/run/secrets/db_password", "super-secret-password")
+	// Verify secret is accessible inside container (Podman secrets use full prefixed name)
+	secretPath := fmt.Sprintf("/run/secrets/cq-%s-db_password", project)
+	helpers.AssertSecretExists(t, containerName, secretPath)
+	helpers.AssertSecretContent(t, containerName, secretPath, "super-secret-password")
 
 	// Verify quadlet file exists
 	helpers.AssertSecretQuadletFileExists(t, project, "db_password")
@@ -56,6 +57,9 @@ func TestSecret_EnvironmentTmpfs(t *testing.T) {
 		t.Fatalf("expected db_password in state.Resources.Secrets, got %v", state.Resources.Secrets)
 	}
 
+	// Verify Podman secret exists
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-db_password", project))
+
 	// Tear down
 	helpers.MustSucceed(t, dir, "down", "--name", project)
 
@@ -63,6 +67,9 @@ func TestSecret_EnvironmentTmpfs(t *testing.T) {
 	helpers.AssertSecretServiceGone(t, project, "db_password", false)
 	helpers.AssertSecretQuadletFileGone(t, project, "db_password")
 	helpers.AssertProjectGone(t, project)
+
+	// Verify Podman secret is removed
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-db_password", project))
 }
 
 func TestSecret_FileTmpfs(t *testing.T) {
@@ -93,12 +100,16 @@ func TestSecret_FileTmpfs(t *testing.T) {
 	containerName := fmt.Sprintf("%s-web", project)
 	helpers.AssertContainerRunning(t, containerName)
 
-	// Verify secret is accessible inside container
-	helpers.AssertSecretExists(t, containerName, "/run/secrets/api_key")
-	helpers.AssertSecretContent(t, containerName, "/run/secrets/api_key", secretContent)
+	// Verify secret is accessible inside container (Podman secrets use full prefixed name)
+	secretPath := fmt.Sprintf("/run/secrets/cq-%s-api_key", project)
+	helpers.AssertSecretExists(t, containerName, secretPath)
+	helpers.AssertSecretContent(t, containerName, secretPath, secretContent)
 
 	// Verify quadlet file exists
 	helpers.AssertSecretQuadletFileExists(t, project, "api_key")
+
+	// Verify Podman secret exists
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-api_key", project))
 
 	// Tear down
 	helpers.MustSucceed(t, dir, "down", "--name", project)
@@ -106,6 +117,9 @@ func TestSecret_FileTmpfs(t *testing.T) {
 	// Verify cleanup
 	helpers.AssertSecretServiceGone(t, project, "api_key", false)
 	helpers.AssertSecretQuadletFileGone(t, project, "api_key")
+
+	// Verify Podman secret is removed
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-api_key", project))
 }
 
 func TestSecret_CustomPermissionsFallback(t *testing.T) {
@@ -192,9 +206,10 @@ func TestSecret_Deduplication(t *testing.T) {
 	helpers.AssertContainerRunning(t, webContainer)
 	helpers.AssertContainerRunning(t, apiContainer)
 
-	// Verify both containers can access the secret
-	helpers.AssertSecretContent(t, webContainer, "/run/secrets/shared_secret", "shared-value-123")
-	helpers.AssertSecretContent(t, apiContainer, "/run/secrets/shared_secret", "shared-value-123")
+	// Verify both containers can access the secret (Podman secrets use full prefixed name)
+	secretPath := fmt.Sprintf("/run/secrets/cq-%s-shared_secret", project)
+	helpers.AssertSecretContent(t, webContainer, secretPath, "shared-value-123")
+	helpers.AssertSecretContent(t, apiContainer, secretPath, "shared-value-123")
 
 	// Verify state tracks only one secret
 	state := helpers.AssertProjectRegistered(t, project)
@@ -203,9 +218,15 @@ func TestSecret_Deduplication(t *testing.T) {
 			len(state.Resources.Secrets), state.Resources.Secrets)
 	}
 
+	// Verify Podman secret exists
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-shared_secret", project))
+
 	// Tear down
 	helpers.MustSucceed(t, dir, "down", "--name", project)
 	helpers.AssertSecretServiceGone(t, project, "shared_secret", false)
+
+	// Verify Podman secret is removed
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-shared_secret", project))
 }
 
 func TestSecret_MultipleSecretsPerService(t *testing.T) {
@@ -252,9 +273,11 @@ secrets:
 	containerName := fmt.Sprintf("%s-web", project)
 	helpers.AssertContainerRunning(t, containerName)
 
-	// Verify both secrets are accessible
-	helpers.AssertSecretContent(t, containerName, "/run/secrets/secret_one", "value-one")
-	helpers.AssertSecretContent(t, containerName, "/run/secrets/secret_two", "value-two")
+	// Verify both secrets are accessible (Podman secrets use full prefixed name)
+	secretOnePath := fmt.Sprintf("/run/secrets/cq-%s-secret_one", project)
+	secretTwoPath := fmt.Sprintf("/run/secrets/cq-%s-secret_two", project)
+	helpers.AssertSecretContent(t, containerName, secretOnePath, "value-one")
+	helpers.AssertSecretContent(t, containerName, secretTwoPath, "value-two")
 
 	// Verify state tracks both secrets
 	state := helpers.AssertProjectRegistered(t, project)
@@ -263,10 +286,18 @@ secrets:
 			len(state.Resources.Secrets), state.Resources.Secrets)
 	}
 
+	// Verify Podman secrets exist
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-secret_one", project))
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-secret_two", project))
+
 	// Tear down
 	helpers.MustSucceed(t, dir, "down", "--name", project)
 	helpers.AssertSecretServiceGone(t, project, "secret_one", false)
 	helpers.AssertSecretServiceGone(t, project, "secret_two", false)
+
+	// Verify Podman secrets are removed
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-secret_one", project))
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-secret_two", project))
 }
 
 func TestSecret_CustomTargetPath(t *testing.T) {

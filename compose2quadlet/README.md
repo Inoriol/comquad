@@ -82,7 +82,7 @@ func main() {
   - `unit.go` — `depends_on` → `[Unit]` dependencies and health polling hooks
   - `image.go`, `build.go` — companion `.image` and `.build` structural units
   - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
-  - `secrets.go` — pre-mapping interceptor for secrets and configs; generates `.cq-secret` units for tmpfs staging
+  - `secrets.go` — pre-mapping interceptor for secrets and configs; generates `.cq-secret` units for Podman secret store management
   - `dockerfile.go` — `PatchDockerfileFROM()` normalizes bare image names in Dockerfile FROM lines
   - `extensions.go` — x-extension extraction for quadlet-only directives
   - `validation.go` — directive validation for x-extensions
@@ -194,7 +194,7 @@ units, _ := c2q.Transpile(project,
 )
 ```
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md#pseudo-quadlet-generator) for details on the conversion process.
+See [ARCHITECTURE.md](./ARCHITECTURE.md#pseudo-quadlet-generator) for details on the conversion process, and [doc/comquad-secret.md](./doc/comquad-secret.md) for the `.cq-secret` unit specification.
 
 ## Dependencies
 

@@ -21,6 +21,7 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 		"Volume":  {".volume"},
 		"Image":   {".image", ".build", ".cq-image", ".cq-build"},
 		"Mount":   {".volume", ".image", ".cq-image"},
+		"Secret":  {".secretref"},
 	}
 	unitRefKeys := map[string]string{
 		"After":    ".container",
@@ -35,6 +36,8 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 	}
 
 	for ui := range units {
+		var secretServices []string
+
 		for si := range units[ui].Sections {
 			for di := range units[ui].Sections[si].Directives {
 				d := &units[ui].Sections[si].Directives[di]
@@ -56,12 +59,13 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 								continue
 							}
 						}
-						if d.Key == "Volume" && strings.Contains(head, ".secretref") {
-							secretName := strings.TrimSuffix(head, ".secretref")
-							secretName = strings.TrimPrefix(secretName, "/run/credentials/")
-							d.Values[vi] = "/run/credentials/" + prefix + secretName + "-secret.service/" + secretName + tail
-							continue
-						}
+					if d.Key == "Secret" && strings.HasSuffix(head, ".secretref") {
+						secretName := strings.TrimSuffix(head, ".secretref")
+						prefixedSecretName := prefix + secretName
+						d.Values[vi] = prefixedSecretName
+						secretServices = append(secretServices, prefixedSecretName+"-secret.service")
+						continue
+					}
 						for _, suffix := range suffixes {
 							if strings.HasSuffix(head, suffix) {
 								d.Values[vi] = prefix + head + tail
@@ -90,8 +94,32 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 			}
 			}
 		}
+
+		if len(secretServices) > 0 && units[ui].Type == c2qtypes.UnitContainer {
+			addSecretDependencies(units, ui, secretServices)
+		}
 	}
 	return units
+}
+
+func addSecretDependencies(units []c2qtypes.QuadletUnit, unitIdx int, secretServices []string) {
+	var unitSection *c2qtypes.Section
+	for i := range units[unitIdx].Sections {
+		if units[unitIdx].Sections[i].Name == c2qtypes.SectionUnit {
+			unitSection = &units[unitIdx].Sections[i]
+			break
+		}
+	}
+
+	if unitSection == nil {
+		units[unitIdx].Sections = append([]c2qtypes.Section{{Name: c2qtypes.SectionUnit}}, units[unitIdx].Sections...)
+		unitSection = &units[unitIdx].Sections[0]
+	}
+
+	for _, svc := range secretServices {
+		unitSection.Directives = append(unitSection.Directives, c2qtypes.Directive{Key: "After", Values: []string{svc}})
+		unitSection.Directives = append(unitSection.Directives, c2qtypes.Directive{Key: "Requires", Values: []string{svc}})
+	}
 }
 
 func splitRefHead(val string) (head, tail string) {

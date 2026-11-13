@@ -21,6 +21,15 @@ func (o *Orchestrator) resolveTargetDir() (string, error) {
 	return targetDir, nil
 }
 
+func (o *Orchestrator) resolveSystemdUnitDir() (string, error) {
+	resolver := deploy.NewTargetDirResolver()
+	unitDir, err := resolver.GetSystemdUnitPath()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve systemd unit path: %w", err)
+	}
+	return unitDir, nil
+}
+
 func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
 	entries, err := os.ReadDir(targetDir)
 	if err != nil {
@@ -128,6 +137,27 @@ func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Resu
 
 	changed := stringSet(res.Changed)
 
+	// Start secret services first
+	for _, f := range projectFiles {
+		if !strings.HasSuffix(f, ".cq-secret") {
+			continue
+		}
+		unitName := CQSecretFileToUnitName(f)
+		if !output.IsJSONMode() {
+			logger.Action("Starting secret unit: " + unitName)
+		}
+
+		if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
+			return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
+		}
+
+		// Always restart secret services to pick up any value changes
+		if err := dbusMgr.RestartUnit(unitName); err != nil {
+			return fmt.Errorf("failed to restart unit %s: %w", unitName, err)
+		}
+	}
+
+	// Start container units
 	for _, f := range projectFiles {
 		if !strings.HasSuffix(f, ".container") {
 			continue
@@ -168,6 +198,30 @@ func (o *Orchestrator) reportReconcile(res reconcile.Result) {
 }
 
 func (o *Orchestrator) copyPseudoQuadlets(projectFiles []string) error {
+	systemdUnitDir, err := o.resolveSystemdUnitDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve systemd unit directory: %w", err)
+	}
+
+	if err := os.MkdirAll(systemdUnitDir, 0755); err != nil {
+		return fmt.Errorf("failed to create systemd unit directory: %w", err)
+	}
+
+	hasSecrets := false
+	for _, f := range projectFiles {
+		if strings.HasSuffix(f, ".cq-secret") {
+			hasSecrets = true
+			break
+		}
+	}
+
+	if hasSecrets {
+		secretDir := "/run/comquad/secrets"
+		if err := os.MkdirAll(secretDir, 0700); err != nil {
+			return fmt.Errorf("failed to create secret directory: %w", err)
+		}
+	}
+
 	for _, f := range projectFiles {
 		base := filepath.Base(f)
 		var serviceName string
@@ -181,11 +235,19 @@ func (o *Orchestrator) copyPseudoQuadlets(projectFiles []string) error {
 		default:
 			continue
 		}
-		servicePath := filepath.Join(filepath.Dir(f), serviceName)
+		servicePath := filepath.Join(systemdUnitDir, serviceName)
 		content, err := os.ReadFile(f)
 		if err != nil {
 			return fmt.Errorf("failed to read pseudo-quadlet %s: %w", f, err)
 		}
+
+		if strings.HasSuffix(base, ".cq-secret") {
+			content, err = o.processSecretFile(content, base)
+			if err != nil {
+				return fmt.Errorf("failed to process secret file %s: %w", base, err)
+			}
+		}
+
 		if err := os.WriteFile(servicePath, content, 0644); err != nil {
 			return fmt.Errorf("failed to write service file %s: %w", servicePath, err)
 		}
@@ -193,7 +255,55 @@ func (o *Orchestrator) copyPseudoQuadlets(projectFiles []string) error {
 	return nil
 }
 
+func (o *Orchestrator) processSecretFile(content []byte, filename string) ([]byte, error) {
+	lines := strings.Split(string(content), "\n")
+	var result []string
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "ExecStart=") && strings.Contains(line, "/run/comquad/secrets/") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				secretPath := strings.TrimPrefix(parts[1], "/bin/sh -c 'podman secret create ")
+				secretPath = strings.TrimPrefix(secretPath, "--replace ")
+				secretPath = strings.Split(secretPath, " ")[1]
+				secretPath = strings.TrimSuffix(secretPath, "'")
+				
+				envVarName := extractEnvVarNameFromServiceUnit(string(content))
+				if envVarName != "" {
+					envValue := os.Getenv(envVarName)
+					if envValue != "" {
+						if err := os.WriteFile(secretPath, []byte(envValue), 0600); err != nil {
+							return nil, fmt.Errorf("failed to write secret file: %w", err)
+						}
+					}
+				}
+			}
+		}
+		result = append(result, line)
+	}
+
+	return []byte(strings.Join(result, "\n")), nil
+}
+
+func extractEnvVarNameFromServiceUnit(content string) string {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "COMQUAD_SECRET_ENV=") {
+			parts := strings.SplitN(line, "COMQUAD_SECRET_ENV=", 2)
+			if len(parts) == 2 {
+				return strings.TrimSpace(parts[1])
+			}
+		}
+	}
+	return ""
+}
+
 func (o *Orchestrator) removePseudoQuadletServices(projectFiles []string) error {
+	systemdUnitDir, err := o.resolveSystemdUnitDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve systemd unit directory: %w", err)
+	}
+
 	for _, f := range projectFiles {
 		base := filepath.Base(f)
 		var serviceName string
@@ -207,7 +317,7 @@ func (o *Orchestrator) removePseudoQuadletServices(projectFiles []string) error 
 		default:
 			continue
 		}
-		servicePath := filepath.Join(filepath.Dir(f), serviceName)
+		servicePath := filepath.Join(systemdUnitDir, serviceName)
 		if err := os.Remove(servicePath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("failed to remove service file %s: %w", servicePath, err)
 		}

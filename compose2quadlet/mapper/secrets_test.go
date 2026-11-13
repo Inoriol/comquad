@@ -49,7 +49,7 @@ func TestPremapSecrets_File(t *testing.T) {
 	cfg := c2qtypes.DefaultConfig()
 	dirs, units := PremapSecrets(&svc, secrets, nil, cfg)
 
-	assertDirective(t, dirs, "Volume", "/run/credentials/db_password.secretref:/run/secrets/db_password:ro")
+	assertDirective(t, dirs, "Secret", "db_password.secretref")
 	if len(units) != 1 {
 		t.Fatalf("expected 1 secret unit, got %d", len(units))
 	}
@@ -72,7 +72,7 @@ func TestPremapSecrets_CustomTarget(t *testing.T) {
 	cfg := c2qtypes.DefaultConfig()
 	dirs, units := PremapSecrets(&svc, secrets, nil, cfg)
 
-	assertDirective(t, dirs, "Volume", "/run/credentials/db_password.secretref:/custom/path/secret:ro")
+	assertDirective(t, dirs, "Secret", "db_password.secretref")
 	if len(units) != 1 {
 		t.Fatalf("expected 1 secret unit, got %d", len(units))
 	}
@@ -89,7 +89,7 @@ func TestPremapSecrets_Environment(t *testing.T) {
 	cfg := c2qtypes.DefaultConfig()
 	dirs, units := PremapSecrets(&svc, secrets, nil, cfg)
 
-	assertDirective(t, dirs, "Volume", "/run/credentials/db_password.secretref:/run/secrets/db_password:ro")
+	assertDirective(t, dirs, "Secret", "db_password.secretref")
 	if len(units) != 1 {
 		t.Fatalf("expected 1 secret unit, got %d", len(units))
 	}

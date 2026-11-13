@@ -142,11 +142,9 @@ Container units reference their companion image or build units. This lets Quadle
 
 The pseudo-quadlet generator converts custom unit types (`.cq-*`) into standard `.service` units. Currently supports:
 
-- **`.cq-secret`**: Stages secrets in RAM-backed tmpfs (`/run/credentials/`) via systemd `LoadCredential=`. Never written to persistent disk.
+- **`.cq-secret`**: Manages secrets using Podman's native secret store. Environment secrets are written to temporary files at `/run/comquad/secrets/` during deployment and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Includes `ExecStop=-/usr/bin/podman secret rm <name>` for automatic cleanup.
 - **`.cq-image`**: Fallback for Podman < 4.8.0 — generates `.service` with `ExecStart=podman pull`.
 - **`.cq-build`**: Fallback for Podman < 5.2.0 — generates `.service` with `ExecStart=podman build`.
-- Environment secrets: `LoadCredential=<name>:/bin/sh -c 'printf "%s" "$ENV_VAR"'`
-- File secrets: `LoadCredential=<name>:<path>`
 - Custom permissions (`uid`/`gid`/`mode`): Falls back to direct `Volume=` mount
 
 Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit.
@@ -286,3 +284,4 @@ The systemd manager remains the source of truth for whether a unit is running. P
 - [DEVELOPMENT.md](./DEVELOPMENT.md) for package details, command internals, and testing
 - [compose2quadlet/ARCHITECTURE.md](./compose2quadlet/ARCHITECTURE.md) for the conversion library
 - [compose2quadlet/doc/mapping.md](./compose2quadlet/doc/mapping.md) for Compose field mappings
+- [compose2quadlet/doc/comquad-secret.md](./compose2quadlet/doc/comquad-secret.md) for `.cq-secret` pseudo-quadlet details
