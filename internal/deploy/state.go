@@ -18,12 +18,20 @@ type ResourceInfo struct {
 	Secrets    []string `json:"secrets"`
 }
 
+// AutoNSRange tracks the UID range allocated for a project's AutoNS namespace
+type AutoNSRange struct {
+	BaseUID int    `json:"base_uid"`
+	Size    int    `json:"size"`
+	Anchor  string `json:"anchor"`
+}
+
 // ProjectState represents the state of a single managed project
 type ProjectState struct {
 	ProjectName string        `json:"project_name"`
 	SourcePath  string        `json:"source_path"`
-	Files       []string      `json:"files"`         // List of generated quadlet files
-	Resources   *ResourceInfo `json:"resources,omitempty"` // Podman resources discovered via labels
+	Files       []string      `json:"files"`
+	Resources   *ResourceInfo `json:"resources,omitempty"`
+	AutoNSRange *AutoNSRange  `json:"autons_range,omitempty"`
 }
 
 // StateManager manages the persistence of project states in a JSON file

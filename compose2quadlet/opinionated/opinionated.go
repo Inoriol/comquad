@@ -12,6 +12,7 @@ func Apply(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qtypes.Quadle
 	units = WarnDangerousBindMounts(units, cfg)
 	units = ApplySpecifiers(units, cfg)
 	units = ApplyLabels(units, cfg)
+	units = ApplyAutoNS(units, cfg)
 	units = ApplyPortOffset(units, cfg)
 	units = ApplyAutoUpdate(units, cfg)
 	units = ApplyInstallSection(units, cfg)

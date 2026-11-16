@@ -9,6 +9,12 @@ import (
     "testing"
 )
 
+type AutoNSRange struct {
+	BaseUID int    `json:"base_uid"`
+	Size    int    `json:"size"`
+	Anchor  string `json:"anchor"`
+}
+
 type ProjectState struct {
 	ProjectName string   `json:"project_name"`
 	SourcePath  string   `json:"source_path"`
@@ -21,6 +27,7 @@ type ProjectState struct {
 		Builds     []string `json:"builds"`
 		Secrets    []string `json:"secrets"`
 	} `json:"resources"`
+	AutoNSRange *AutoNSRange `json:"autons_range,omitempty"`
 }
 
 // ReadStateFile parses projects.json and returns all project entries.

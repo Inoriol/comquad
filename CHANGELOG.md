@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`comquad pull` command** — New command to pull images defined in compose.yaml without starting containers. Supports service filtering (`pull [service...]`) and `--dry-run` preview. Uses the same transpilation and reconciliation pipeline as `up`, but only starts `.image` units.
+- **Docker Compose compatibility layer** — New `comquad compose` command provides docker-compose compatible CLI syntax while using comquad's systemd-native workflow internally.
+  - `compose up` — Create and start containers (`-d` for detach, `--build`, `--no-build`, `--force-recreate`, `--no-recreate`, `--remove-orphans`, `--pull`)
+  - `compose down` — Stop and remove containers, networks (`--volumes`, `--remove-orphans`)
+  - `compose ps` — List containers (`-a` for all)
+  - `compose logs` — View output from containers (`-f`, `--tail`, `--since`, `-t`)
+  - `compose start/stop/restart` — Lifecycle management for services
+  - `compose exec` — Execute commands in running containers (`-u`, `-T`)
+  - `compose build` — Build or rebuild services (`-f`, `--pull`)
+  - `compose pull` — Pull service images
+  - Global flags: `--file`, `--project-name`, `--dry-run`
+- **Orchestrator options structs** — Refactored `Up()`, `Build()`, and `Down()` methods to use options structs (`UpOptions`, `DownOptions`, `PullOptions`) for cleaner APIs and forward compatibility.
+- **Compose file path support** — New `WithComposeFile(path)` method on Orchestrator allows specifying a compose file path (file or directory) instead of always searching the current working directory.
+- **`PullData` JSON schema** — New JSON output schema for `comquad pull` command with project name, pulled images list, and success status.
+- **AutoNS mode for rootful deployments** — Optional user namespace isolation between stacks using Podman's AutoNS feature. Each stack gets a dedicated 65535-wide UID/GID range from `/etc/subuid`, ensuring containers within a stack share one user namespace while containers across stacks are fully isolated.
+  - Enabled via `COMQUAD_AUTONS=1` environment variable (rootful only)
+  - Anchor container (root of `depends_on` DAG or alphabetically first) gets `--userns=auto:uidmapping=0:<base>:65535`
+  - Non-anchor containers join anchor's namespace via `--userns=container:<anchor-name>`
+  - All volumes get `idmap` option for proper UID mapping
+  - Allocated UID range persisted in `projects.json` for stability across deployments
+  - `comquad check` validates `/etc/subuid` has `containers` entry when AutoNS is enabled
+  - New `compose2quadlet/mapper/anchor.go` for anchor selection algorithm
+  - New `compose2quadlet/opinionated/autons.go` for AutoNS transform
+  - New `internal/deploy/subuid.go` for `/etc/subuid` parsing and UID allocation
+  - New `WithAutoNS(base, anchor)` option in compose2quadlet library
+  - Anchor-first start order in `startContainers()` to ensure namespace exists before other containers join
+
+### Changed
+
+- **Refactored orchestrator method signatures** — `Up()`, `Build()`, and `Down()` now accept options structs instead of individual parameters. Existing tests updated to use new signatures.
+- **Compose command flag handling** — Removed shorthand `-f` from `compose --file` to avoid conflict with `logs -f` (follow). Removed shorthand `-v` from `compose down --volumes` to avoid conflict with root `-v` (verbose).
+
+### Documentation
+
+- Updated `README.md` with new `pull` command and Compose Compatibility section.
+- Updated `ARCHITECTURE.md` with Pull Command, Compose Compatibility Layer, Orchestrator Options Structs, and Compose File Path sections.
+- Updated `TODO.md` to mark completed items in the Compose Compatibility Layer implementation plan.
+
 ## [0.5.1] - 2026-11-13
 
 ### Added

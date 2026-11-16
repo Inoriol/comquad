@@ -154,22 +154,53 @@ func AssertMountHasOption(t *testing.T, containerName, destination, option strin
 
 // AssertMountMissingOption fails if a mount at destination has the given option.
 func AssertMountMissingOption(t *testing.T, containerName, destination, option string) {
- t.Helper()
- mounts := GetContainerMounts(t, containerName)
- for _, m := range mounts {
-  if m.Destination != destination {
-   continue
-  }
-  if strings.Contains(m.Mode, option) {
-   t.Fatalf("mount at %q unexpectedly has option %q (mode=%q)", destination, option, m.Mode)
-  }
-  for _, o := range m.Options {
-   if o == option {
-    t.Fatalf("mount at %q unexpectedly has option %q", destination, option)
-   }
-  }
-  return
- }
- // Mount not found at all — that's fine for this assertion
+	t.Helper()
+	mounts := GetContainerMounts(t, containerName)
+	for _, m := range mounts {
+		if m.Destination != destination {
+			continue
+		}
+		if strings.Contains(m.Mode, option) {
+			t.Fatalf("mount at %q unexpectedly has option %q (mode=%q)", destination, option, m.Mode)
+		}
+		for _, o := range m.Options {
+			if o == option {
+				t.Fatalf("mount at %q unexpectedly has option %q", destination, option)
+			}
+		}
+		return
+	}
+	// Mount not found at all — that's fine for this assertion
+}
+
+// ImageExists returns true if a podman image with the given name exists.
+func ImageExists(t *testing.T, name string) bool {
+	t.Helper()
+	err := exec.Command("podman", "image", "inspect", name).Run()
+	return err == nil
+}
+
+// ContainerRunning returns true if a container with the given name is running.
+func ContainerRunning(t *testing.T, name string) bool {
+	t.Helper()
+	containers := ListContainers(t, name)
+	for _, c := range containers {
+		if strings.EqualFold(c.State, "running") {
+			return true
+		}
+	}
+	return false
+}
+
+// WaitForContainer waits until a container is running or timeout is reached.
+func WaitForContainer(t *testing.T, name string) {
+	t.Helper()
+	for i := 0; i < 30; i++ {
+		if ContainerRunning(t, name) {
+			return
+		}
+		exec.Command("sleep", "1").Run()
+	}
+	t.Fatalf("timeout waiting for container %q to be running", name)
 }
 

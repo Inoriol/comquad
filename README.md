@@ -75,6 +75,7 @@ Run commands from the directory containing the project `compose.yaml`.
 |---|---|---|
 | `comquad up` | Generate or update Quadlets and start the project | `-f` follow logs, `--dry-run` preview, `--pull always\|missing\|never`, `--no-diff` skip diff and confirmation |
 | `comquad build` | Build images defined in compose.yaml without starting containers | `-f` follow build logs, `--dry-run` preview, `--pull always\|missing\|never`, `--no-diff` skip diff and confirmation |
+| `comquad pull [service ...]` | Pull images defined in compose.yaml without starting containers | `--dry-run` preview |
 | `comquad down` | Stop and remove the project | `-d` also remove named volumes, `-y` skip confirmation, `--dry-run` preview |
 | `comquad ps` | Show container status | `-a` include exited containers |
 | `comquad start [service ...]` | Start all services or selected services | `--dry-run` preview |
@@ -82,6 +83,7 @@ Run commands from the directory containing the project `compose.yaml`.
 | `comquad restart [service ...]` | Restart all services or selected services | `--dry-run` preview |
 | `comquad logs [service]` | Show service logs | `-f` follow, `--tail N`, `--since TIME`, `-t` show timestamps |
 | `comquad exec SERVICE COMMAND` | Run a command in a running container | `-u USER`, `-t` control TTY |
+| `comquad compose COMMAND` | Docker Compose compatible commands | See [Compose Compatibility](#compose-compatibility) |
 | `comquad view [RESOURCE]` | Show the project or a generated Quadlet file | `comquad view web` |
 | `comquad edit [SERVICE]` | Edit generated Quadlet files in `$EDITOR` | `--no-reload` do not reload systemd |
 | `comquad list [PROJECT]` | List deployed projects, or view a specific project | Also available as `comquad ls` |
@@ -95,6 +97,43 @@ comquad up --help
 comquad logs --help
 comquad exec --help
 ```
+
+## Compose Compatibility
+
+comquad provides a Docker Compose compatible command layer via `comquad compose`. This allows users familiar with docker-compose to use the same syntax while getting comquad's unique features like diffs, confirmations, and systemd-native workflow.
+
+```bash
+comquad compose up -d          # Deploy in background
+comquad compose logs -f        # Follow logs
+comquad compose down --volumes # Remove with volumes
+comquad compose exec web bash  # Execute in container
+```
+
+### Supported Commands
+
+| Command | Description |
+|---------|-------------|
+| `compose up` | Create and start containers |
+| `compose down` | Stop and remove containers, networks |
+| `compose ps` | List containers |
+| `compose logs` | View output from containers |
+| `compose start` | Start services |
+| `compose stop` | Stop services |
+| `compose restart` | Restart services |
+| `compose exec` | Execute a command in a running container |
+| `compose build` | Build or rebuild services |
+| `compose pull` | Pull service images |
+
+### Key Differences from Docker Compose
+
+| Aspect | docker-compose | comquad compose |
+|--------|----------------|-----------------|
+| Default `up` | Start & attach | Start & return (like `-d`) |
+| `up` to attach | Use no flag | Use `-f` |
+| `down -v` | Remove volumes | Use `--volumes` |
+| Changes | Apply immediately | Show diff & confirm |
+| Skip confirm | N/A | Use `--no-diff` |
+| Service manager | Direct container ops | systemd (via quadlet) |
 
 ## Compose Files
 
@@ -150,6 +189,45 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete Compose-to-Quadlet map
 | `COMQUAD_SELINUX_DANGEROUS_PATHS` | `/etc,/var,/home,/usr,/sys,/proc,/boot,/root` | Comma-separated list of host paths that trigger a warning when bind-mounted with SELinux relabeling. |
 | `COMQUAD_SKIP_REGISTRY_NORMALIZATION` | Unset | Set to any value to skip image name normalization (respects `registries.conf`). |
 | `COMQUAD_SYSTEMD_SPECIFIERS` | Unset | Set to any value to use systemd specifiers (e.g., `%h`) for paths under `$HOME`. |
+| `COMQUAD_AUTONS` | Unset | Set to `1` to enable AutoNS mode for user namespace isolation (rootful only). |
+
+## AutoNS Mode (Rootful)
+
+comquad supports optional user namespace isolation between stacks using Podman's AutoNS feature. When enabled, each stack gets a dedicated 65535-wide UID/GID range, ensuring containers within a stack share one user namespace while containers across stacks are fully isolated.
+
+### Enabling AutoNS
+
+```bash
+export COMQUAD_AUTONS=1
+sudo comquad up
+```
+
+AutoNS is **rootful-only** and requires Podman 4.4.0+ for `idmap` volume support.
+
+### System Configuration
+
+Add a `containers` entry to `/etc/subuid` and `/etc/subgid`:
+
+```
+containers:10000000:6553600
+```
+
+This provides space for ~100 stacks with 65535 UIDs each.
+
+### How It Works
+
+1. **Anchor selection**: One container per stack is designated as the "anchor" (root of `depends_on` DAG, or alphabetically first service)
+2. **UID allocation**: comquad allocates a 65535-wide UID range from `/etc/subuid` for the stack
+3. **Namespace sharing**: The anchor gets `--userns=auto:uidmapping=0:<base>:65535`, other containers join via `--userns=container:<anchor>`
+4. **Volume idmap**: All volumes get the `idmap` option for proper UID mapping
+
+### Isolation Guarantees
+
+- Containers **within** a stack share one user namespace → shared volumes work naturally
+- Containers **across** stacks are in different UID ranges → fully isolated from each other
+- Host filesystem access is mapped through the UID range, providing an additional security layer
+
+See [TODO.md](./TODO.md) for implementation details and design decisions.
 
 ## Files and State
 

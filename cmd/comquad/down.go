@@ -43,7 +43,10 @@ var downCmd = &cobra.Command{
 			}
 		}
 
-		return o.Down(downRemoveVolumes, dryRun)
+		return o.Down(orchestrator.DownOptions{
+			RemoveVolumes: downRemoveVolumes,
+			DryRun:        dryRun,
+		})
 	},
 }
 

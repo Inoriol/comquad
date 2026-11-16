@@ -196,6 +196,25 @@ units, _ := c2q.Transpile(project,
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md#pseudo-quadlet-generator) for details on the conversion process, and [doc/comquad-secret.md](./doc/comquad-secret.md) for the `.cq-secret` unit specification.
 
+## AutoNS (User Namespace Isolation)
+
+The library supports AutoNS mode for rootful deployments that provides user namespace isolation between stacks. When enabled, one container per stack becomes the "anchor" that owns the namespace, and other containers join it.
+
+**Enable AutoNS:**
+```go
+units, _ := c2q.Transpile(project,
+    c2q.WithAutoNS(65535, "db"),  // base UID, anchor service name
+)
+```
+
+**What it does:**
+- Anchor container gets `PodmanArgs=--userns=auto:uidmapping=0:<base>:65535`
+- Non-anchor containers get `PodmanArgs=--userns=container:<anchor-name>`
+- Non-anchor containers get `After=` and `Requires=` for the anchor service
+- All volumes get the `idmap` option
+
+**Anchor selection** is handled by `mapper.SelectAnchor(services)` which picks the root of the `depends_on` DAG or alphabetically first service.
+
 ## Dependencies
 
 - `github.com/compose-spec/compose-go/v2` — canonical compose parsing

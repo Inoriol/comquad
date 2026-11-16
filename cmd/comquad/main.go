@@ -44,6 +44,7 @@ func init() {
 func main() {
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(buildCmd)
+	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(downCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(regenerateCmd)
@@ -56,6 +57,7 @@ func main() {
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(restartCmd)
 	rootCmd.AddCommand(execCmd)
+	rootCmd.AddCommand(composeCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		if output.IsJSONMode() {

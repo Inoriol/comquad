@@ -47,7 +47,7 @@ func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
 	return projectFiles, nil
 }
 
-func (o *Orchestrator) registerState(projectFiles []string) error {
+func (o *Orchestrator) registerState(projectFiles []string, autoNSRange *deploy.AutoNSRange) error {
 	stateMgr, err := o.newState()
 	if err != nil {
 		return fmt.Errorf("failed to initialize state manager: %w", err)
@@ -94,6 +94,7 @@ func (o *Orchestrator) registerState(projectFiles []string) error {
 		SourcePath:  o.cwd,
 		Files:       projectFiles,
 		Resources:   resources,
+		AutoNSRange: autoNSRange,
 	})
 }
 
@@ -128,7 +129,7 @@ func (o *Orchestrator) prepareUnits(projectFiles []string, res reconcile.Result)
 	return nil
 }
 
-func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Result) error {
+func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Result, anchorService string) error {
 	dbusMgr, err := o.newSystemd()
 	if err != nil {
 		return fmt.Errorf("failed to connect to systemd: %w", err)
@@ -157,9 +158,41 @@ func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Resu
 		}
 	}
 
-	// Start container units
+	// Start anchor container first if AutoNS is enabled
+	if anchorService != "" {
+		prefix := "cq-" + o.projectName + "-"
+		anchorFileName := prefix + anchorService + ".container"
+		for _, f := range projectFiles {
+			if filepath.Base(f) == anchorFileName {
+				unitName := ContainerFileToUnitName(f)
+				if !output.IsJSONMode() {
+					logger.Action("Starting anchor unit: " + unitName)
+				}
+
+				if err := dbusMgr.WaitForUnit(unitName, startUnitWaitTime); err != nil {
+					return fmt.Errorf("unit %s did not appear after daemon-reload: %w", unitName, err)
+				}
+
+				if changed[f] {
+					if err := dbusMgr.RestartUnit(unitName); err != nil {
+						return fmt.Errorf("failed to restart anchor unit %s: %w", unitName, err)
+					}
+				} else {
+					if err := dbusMgr.StartUnit(unitName); err != nil {
+						return fmt.Errorf("failed to start anchor unit %s: %w", unitName, err)
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// Start container units (skip anchor if already started)
 	for _, f := range projectFiles {
 		if !strings.HasSuffix(f, ".container") {
+			continue
+		}
+		if anchorService != "" && filepath.Base(f) == "cq-"+o.projectName+"-"+anchorService+".container" {
 			continue
 		}
 		unitName := ContainerFileToUnitName(f)

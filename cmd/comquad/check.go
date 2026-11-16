@@ -73,6 +73,28 @@ var checkCmd = &cobra.Command{
 			}
 		}
 
+		if os.Getenv("COMQUAD_AUTONS") == "1" {
+			logger.Print("\nAutoNS checks:")
+			if deploy.IsRootless() {
+				warnings = append(warnings, "AutoNS: COMQUAD_AUTONS=1 set but running in rootless mode (will be ignored)")
+			} else {
+				entries, err := deploy.ParseSubuid()
+				if err != nil {
+					warnings = append(warnings, "AutoNS: failed to parse /etc/subuid: "+err.Error())
+				} else {
+					entry := deploy.FindContainersEntry(entries)
+					if entry == nil {
+						warnings = append(warnings, "AutoNS: /etc/subuid missing 'containers' entry (required for AutoNS)")
+					} else {
+						logger.Printf("  /etc/subuid: containers entry found (start=%d, size=%d)\n", entry.Start, entry.Size)
+						if entry.Size < deploy.AutoNSRangeSize*10 {
+							warnings = append(warnings, fmt.Sprintf("AutoNS: containers entry size %d may be too small for many stacks (recommended: %d+)", entry.Size, deploy.AutoNSRangeSize*10))
+						}
+					}
+				}
+			}
+		}
+
 		if len(warnings) > 0 {
 			logger.Print("\nWarnings:")
 			for _, w := range warnings {

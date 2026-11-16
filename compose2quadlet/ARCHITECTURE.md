@@ -93,7 +93,8 @@ compose2quadlet/
 │   ├── dockerfile.go         # PatchDockerfileFROM() — normalize bare image names in FROM lines
 │   ├── extensions.go         # Extract*Extensions() — x-extension extraction for quadlet-only directives
 │   ├── validation.go         # isValidDirective() — directive validation for x-extensions
-│   └── helpers.go            # sortedKeys() — deterministic map key ordering
+│   ├── helpers.go            # sortedKeys() — deterministic map key ordering
+│   └── anchor.go             # SelectAnchor() — pick root of depends_on DAG or alphabetically first service
 │
 ├── opinionated/              # Opinionated transforms
 │   ├── opinionated.go        # Apply() — orchestrates all transforms
@@ -108,6 +109,7 @@ compose2quadlet/
 │   ├── network.go            # ApplyDefaultNetwork() — inject default network for services without explicit networks
 │   ├── ports.go              # ApplyPortOffset() — apply port offset with Info callback logging
 │   ├── autoupdate.go         # ApplyAutoUpdate() — add AutoUpdate=registry
+│   ├── autons.go             # ApplyAutoNS() — add userns directives, systemd deps, volume idmap for rootful namespace isolation
 │   └── install.go            # ApplyInstallSection() — add [Install] section
 │
 ├── pseudo/                   # Pseudo-quadlet generator
@@ -308,6 +310,7 @@ All transforms are **enabled by default** and can be individually disabled via `
 | Info callback | `WithInfo(fn)` | Receives info-level messages and non-fatal mapping warnings for consumer logging |
 | Version parsing | `ParseVersion(s)` | Parses `"5.2.0"` or `"v4.8"` into `Version` for `WithPodmanVersion()` |
 | Batch write | `serialization.WriteUnits(dir, units)` | Writes all units to a directory with `<name>.<type>` filenames |
+| AutoNS | `WithAutoNS(base, anchor)` | Adds `PodmanArgs=--userns=auto:uidmapping=0:<base>:65535` to anchor, `--userns=container:<anchor>` to others, `After=`/`Requires=` deps, and `idmap` to volumes |
 
 ## Quadlet-Specific Behaviors
 

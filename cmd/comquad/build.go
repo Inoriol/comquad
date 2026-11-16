@@ -30,7 +30,12 @@ var buildCmd = &cobra.Command{
 			pullStr = "always"
 		}
 
-		return o.Build(pullStr, buildFollow, dryRun, buildNoDiff)
+		return o.Build(orchestrator.UpOptions{
+			PullStrategy: pullStr,
+			Follow:       buildFollow,
+			DryRun:       dryRun,
+			NoDiff:       buildNoDiff,
+		})
 	},
 }
 

@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,11 +13,14 @@ import (
 	"unicode"
 
 	c2q "github.com/Inoriol/comquad/compose2quadlet"
+	"github.com/Inoriol/comquad/compose2quadlet/mapper"
 	"github.com/Inoriol/comquad/compose2quadlet/pseudo"
 	"github.com/Inoriol/comquad/internal/deploy"
 	"github.com/Inoriol/comquad/internal/logger"
 	"github.com/Inoriol/comquad/internal/output"
 	"github.com/Inoriol/comquad/internal/reconcile"
+	"github.com/compose-spec/compose-go/v2/cli"
+	composetypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 const (
@@ -25,13 +29,19 @@ const (
 )
 
 type Orchestrator struct {
-	projectName string
-	cwd         string
+	projectName  string
+	cwd          string
+	composePath  string
 
 	newState       func() (deploy.StateStore, error)
 	newSystemd     func() (deploy.SystemdClient, error)
 	listContainers func(projectName string, all bool) ([]ContainerInfo, error)
 	newJournalCmd  func(name string, args ...string) *exec.Cmd
+}
+
+func (o *Orchestrator) WithComposeFile(path string) *Orchestrator {
+	o.composePath = path
+	return o
 }
 
 func NewOrchestrator(projectName string) (*Orchestrator, error) {
@@ -70,16 +80,16 @@ func (o *Orchestrator) ProjectName() string {
 	return o.projectName
 }
 
-func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff bool) error {
+func (o *Orchestrator) Up(upOpts UpOptions) error {
 	if !output.IsJSONMode() {
 		logger.Action("Reading compose file...")
 	}
-	composeFile := findComposeFile(o.cwd)
+	composeFile := o.resolveComposeFile()
 	if composeFile == "" {
 		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml, podman-compose.yaml, podman-compose.yml)")
 	}
 
-	if !dryRun && !deploy.StateFileExists() {
+	if !upOpts.DryRun && !deploy.StateFileExists() {
 		if !output.IsJSONMode() {
 			logger.Action("First deployment detected — checking prerequisites...")
 		}
@@ -90,7 +100,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	podmanVersion, versionErr := deploy.DetectPodmanVersion()
 	if versionErr != nil {
-		if !dryRun && !output.IsJSONMode() {
+		if !upOpts.DryRun && !output.IsJSONMode() {
 			logger.Warn("could not detect podman version, assuming latest: " + versionErr.Error())
 		}
 	}
@@ -127,6 +137,51 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		return fmt.Errorf("failed to resolve build cache directory: %w", err)
 	}
 
+	autoNSEnabled := os.Getenv("COMQUAD_AUTONS") == "1"
+	var autoNSRange *deploy.AutoNSRange
+	if autoNSEnabled {
+		if isRootless {
+			return fmt.Errorf("COMQUAD_AUTONS=1 is only supported in rootful mode")
+		}
+		if versionErr == nil && !podmanVersion.AtLeast(4, 4) {
+			return fmt.Errorf("AutoNS requires podman >= 4.4.0 for idmap volume support")
+		}
+		if err := deploy.ValidateContainersEntry(); err != nil {
+			return err
+		}
+
+		subuidEntries, err := deploy.ParseSubuid()
+		if err != nil {
+			return fmt.Errorf("failed to parse /etc/subuid: %w", err)
+		}
+
+		stateMgr, stateErr := o.newState()
+		var usedBases []int
+		if stateErr == nil {
+			usedBases = deploy.CollectUsedBases(stateMgr.ListProjects())
+		}
+		stackBase := deploy.AllocateStackRange(subuidEntries, usedBases)
+
+		composeProject, err := loadComposeProject(composeFile)
+		if err != nil {
+			return fmt.Errorf("failed to load compose project for AutoNS anchor selection: %w", err)
+		}
+		anchor := mapper.SelectAnchor(composeProject.Services)
+		if anchor == "" {
+			return fmt.Errorf("AutoNS: no services found in compose file for anchor selection")
+		}
+
+		autoNSRange = &deploy.AutoNSRange{
+			BaseUID: stackBase,
+			Size:    deploy.AutoNSRangeSize,
+			Anchor:  anchor,
+		}
+
+		if !output.IsJSONMode() {
+			logger.Action(fmt.Sprintf("AutoNS enabled: anchor=%s, uid_base=%d", anchor, stackBase))
+		}
+	}
+
 	opts := []c2q.TranspileOption{
 		c2q.WithProjectName(o.projectName),
 		c2q.WithLabels(map[string]string{
@@ -138,6 +193,10 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		c2q.WithBuildCacheDir(buildCacheDir),
 		c2q.WithDockerfileNormalization(),
 		c2q.WithoutServiceName(),
+	}
+
+	if autoNSEnabled {
+		opts = append(opts, c2q.WithAutoNS(autoNSRange.BaseUID, autoNSRange.Anchor))
 	}
 
 	if versionErr == nil {
@@ -156,7 +215,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	if !selinuxEnabled {
 		opts = append(opts, c2q.WithoutSELinux())
 	}
-	if dryRun {
+	if upOpts.DryRun {
 		opts = append(opts, c2q.WithDryRun())
 	}
 	if os.Getenv("COMQUAD_SKIP_REGISTRY_NORMALIZATION") != "" {
@@ -176,7 +235,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	units = pseudo.ConvertPseudoUnits(units)
 
-	strat, err := ParsePullStrategy(pullStrategy)
+	strat, err := ParsePullStrategy(upOpts.PullStrategy)
 	if err != nil {
 		return err
 	}
@@ -198,11 +257,11 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		return fmt.Errorf("computing changes: %w", err)
 	}
 
-	if dryRun {
-		return o.printDryRun(units, targetDir, pullStrategy, plan)
+	if upOpts.DryRun {
+		return o.printDryRun(units, targetDir, upOpts.PullStrategy, plan)
 	}
 
-	if !noDiff && o.projectDeployed() && plan.HasChanges() {
+	if !upOpts.NoDiff && o.projectDeployed() && plan.HasChanges() {
 		if output.IsJSONMode() {
 			// In JSON mode, skip diff and confirmation
 		} else {
@@ -240,7 +299,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 
 	priorState, hadPriorState := o.getProjectState()
 
-	if err := o.registerState(projectFiles); err != nil {
+	if err := o.registerState(projectFiles, autoNSRange); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
@@ -256,17 +315,19 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	if !output.IsJSONMode() {
 		logger.Action("Handling images...")
 	}
-	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
+	if err := o.handleImages(projectFiles, units, upOpts.PullStrategy); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
 
-	if !output.IsJSONMode() {
-		logger.Action("Handling builds...")
-	}
-	if err := o.handleBuilds(projectFiles); err != nil {
-		o.rollbackDeploy(plan, priorState, hadPriorState)
-		return err
+	if !upOpts.SkipBuild {
+		if !output.IsJSONMode() {
+			logger.Action("Handling builds...")
+		}
+		if err := o.handleBuilds(projectFiles); err != nil {
+			o.rollbackDeploy(plan, priorState, hadPriorState)
+			return err
+		}
 	}
 
 	deployTime := time.Now().Format("2006-01-02 15:04:05")
@@ -291,7 +352,7 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		Success:      true,
 	}
 
-	if follow {
+	if upOpts.Follow {
 		if !output.IsJSONMode() {
 			logger.Print("Following logs for project: " + o.projectName)
 		}
@@ -305,7 +366,11 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 		if !output.IsJSONMode() {
 			logger.Action("Starting services...")
 		}
-		if err := o.startContainers(projectFiles, result); err != nil {
+		anchorSvc := ""
+		if autoNSRange != nil {
+			anchorSvc = autoNSRange.Anchor
+		}
+		if err := o.startContainers(projectFiles, result, anchorSvc); err != nil {
 			o.rollbackDeploy(plan, priorState, hadPriorState)
 			return fmt.Errorf("failed to start services: %w", err)
 		}
@@ -321,7 +386,11 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	if !output.IsJSONMode() {
 		logger.Action("Starting services...")
 	}
-	if err := o.startContainers(projectFiles, result); err != nil {
+	anchorSvc := ""
+	if autoNSRange != nil {
+		anchorSvc = autoNSRange.Anchor
+	}
+	if err := o.startContainers(projectFiles, result, anchorSvc); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return fmt.Errorf("failed to start services: %w", err)
 	}
@@ -334,14 +403,14 @@ func (o *Orchestrator) Up(pullStrategy string, follow bool, dryRun bool, noDiff 
 	return nil
 }
 
-func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDiff bool) error {
+func (o *Orchestrator) Build(upOpts UpOptions) error {
 	logger.Action("Reading compose file...")
-	composeFile := findComposeFile(o.cwd)
+	composeFile := o.resolveComposeFile()
 	if composeFile == "" {
 		return fmt.Errorf("no compose file found in current directory (looked for compose.yaml, compose.yml, docker-compose.yaml, docker-compose.yml, podman-compose.yaml, podman-compose.yml)")
 	}
 
-	if !dryRun && !deploy.StateFileExists() {
+	if !upOpts.DryRun && !deploy.StateFileExists() {
 		logger.Action("First deployment detected — checking prerequisites...")
 		if err := deploy.ValidatePodmanVersion(); err != nil {
 			return fmt.Errorf("prerequisite check failed: %w", err)
@@ -350,7 +419,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 
 	podmanVersion, versionErr := deploy.DetectPodmanVersion()
 	if versionErr != nil {
-		if !dryRun {
+		if !upOpts.DryRun {
 			logger.Warn("could not detect podman version, assuming latest: " + versionErr.Error())
 		}
 	}
@@ -387,6 +456,49 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 		return fmt.Errorf("failed to resolve build cache directory: %w", err)
 	}
 
+	autoNSEnabled := os.Getenv("COMQUAD_AUTONS") == "1"
+	var autoNSRange *deploy.AutoNSRange
+	if autoNSEnabled {
+		if isRootless {
+			return fmt.Errorf("COMQUAD_AUTONS=1 is only supported in rootful mode")
+		}
+		if versionErr == nil && !podmanVersion.AtLeast(4, 4) {
+			return fmt.Errorf("AutoNS requires podman >= 4.4.0 for idmap volume support")
+		}
+		if err := deploy.ValidateContainersEntry(); err != nil {
+			return err
+		}
+
+		subuidEntries, err := deploy.ParseSubuid()
+		if err != nil {
+			return fmt.Errorf("failed to parse /etc/subuid: %w", err)
+		}
+
+		stateMgr, stateErr := o.newState()
+		var usedBases []int
+		if stateErr == nil {
+			usedBases = deploy.CollectUsedBases(stateMgr.ListProjects())
+		}
+		stackBase := deploy.AllocateStackRange(subuidEntries, usedBases)
+
+		composeProject, err := loadComposeProject(composeFile)
+		if err != nil {
+			return fmt.Errorf("failed to load compose project for AutoNS anchor selection: %w", err)
+		}
+		anchor := mapper.SelectAnchor(composeProject.Services)
+		if anchor == "" {
+			return fmt.Errorf("AutoNS: no services found in compose file for anchor selection")
+		}
+
+		autoNSRange = &deploy.AutoNSRange{
+			BaseUID: stackBase,
+			Size:    deploy.AutoNSRangeSize,
+			Anchor:  anchor,
+		}
+
+		logger.Action(fmt.Sprintf("AutoNS enabled: anchor=%s, uid_base=%d", anchor, stackBase))
+	}
+
 	opts := []c2q.TranspileOption{
 		c2q.WithProjectName(o.projectName),
 		c2q.WithLabels(map[string]string{
@@ -397,6 +509,10 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 		c2q.WithBuildCacheDir(buildCacheDir),
 		c2q.WithDockerfileNormalization(),
 		c2q.WithoutServiceName(),
+	}
+
+	if autoNSEnabled {
+		opts = append(opts, c2q.WithAutoNS(autoNSRange.BaseUID, autoNSRange.Anchor))
 	}
 
 	if versionErr == nil {
@@ -411,7 +527,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 	if !selinuxEnabled {
 		opts = append(opts, c2q.WithoutSELinux())
 	}
-	if dryRun {
+	if upOpts.DryRun {
 		opts = append(opts, c2q.WithDryRun())
 	}
 	if os.Getenv("COMQUAD_SKIP_REGISTRY_NORMALIZATION") != "" {
@@ -429,7 +545,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 
 	units = pseudo.ConvertPseudoUnits(units)
 
-	strat, err := ParsePullStrategy(pullStrategy)
+	strat, err := ParsePullStrategy(upOpts.PullStrategy)
 	if err != nil {
 		return err
 	}
@@ -449,11 +565,11 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 		return fmt.Errorf("computing changes: %w", err)
 	}
 
-	if dryRun {
-		return o.printDryRun(units, targetDir, pullStrategy, plan)
+	if upOpts.DryRun {
+		return o.printDryRun(units, targetDir, upOpts.PullStrategy, plan)
 	}
 
-	if !noDiff && o.projectDeployed() && plan.HasChanges() {
+	if !upOpts.NoDiff && o.projectDeployed() && plan.HasChanges() {
 		fmt.Print(colorizeDiff(plan.Diff()))
 		if isTerminal(os.Stdin) {
 			proceed, err := confirmUpdate()
@@ -485,7 +601,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 
 	priorState, hadPriorState := o.getProjectState()
 
-	if err := o.registerState(projectFiles); err != nil {
+	if err := o.registerState(projectFiles, autoNSRange); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
@@ -497,7 +613,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 	}
 
 	logger.Action("Handling images...")
-	if err := o.handleImages(projectFiles, units, pullStrategy); err != nil {
+	if err := o.handleImages(projectFiles, units, upOpts.PullStrategy); err != nil {
 		o.rollbackDeploy(plan, priorState, hadPriorState)
 		return err
 	}
@@ -510,7 +626,7 @@ func (o *Orchestrator) Build(pullStrategy string, follow bool, dryRun bool, noDi
 
 	deployTime := time.Now().Format("2006-01-02 15:04:05")
 
-	if follow {
+	if upOpts.Follow {
 		logger.Print("Following logs for project: " + o.projectName)
 		return o.FollowLogs(deployTime, "", false)
 	}
@@ -708,6 +824,19 @@ func validateProjectName(name string) error {
 	return nil
 }
 
+func (o *Orchestrator) resolveComposeFile() string {
+	if o.composePath != "" {
+		info, err := os.Stat(o.composePath)
+		if err == nil {
+			if info.IsDir() {
+				return findComposeFile(o.composePath)
+			}
+			return o.composePath
+		}
+	}
+	return findComposeFile(o.cwd)
+}
+
 func findComposeFile(dir string) string {
 	candidates := []string{
 		"compose.yaml",
@@ -761,4 +890,24 @@ func resolveBuildCacheDir(projectName string) (string, error) {
 		cacheDir = filepath.Join(home, ".cache")
 	}
 	return filepath.Join(cacheDir, "comquad", "builds", projectName), nil
+}
+
+func loadComposeProject(composePath string) (*composetypes.Project, error) {
+	absPath, err := filepath.Abs(composePath)
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(absPath)
+
+	projectOpts, err := cli.NewProjectOptions(
+		[]string{absPath},
+		cli.WithOsEnv,
+		cli.WithDotEnv,
+		cli.WithWorkingDirectory(dir),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return projectOpts.LoadProject(context.Background())
 }

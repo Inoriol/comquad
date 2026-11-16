@@ -120,6 +120,25 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 }
 
 func TranspileFile(composePath string, opts ...TranspileOption) ([]QuadletUnit, error) {
+	project, err := LoadProject(composePath)
+	if err != nil {
+		return nil, err
+	}
+
+	absPath, err := filepath.Abs(composePath)
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(absPath)
+
+	opts = append(opts,
+		WithWorkingDirectory(dir),
+	)
+
+	return Transpile(project, opts...)
+}
+
+func LoadProject(composePath string) (*types.Project, error) {
 	absPath, err := filepath.Abs(composePath)
 	if err != nil {
 		return nil, err
@@ -136,16 +155,7 @@ func TranspileFile(composePath string, opts ...TranspileOption) ([]QuadletUnit, 
 		return nil, err
 	}
 
-	project, err := projectOpts.LoadProject(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	opts = append(opts,
-		WithWorkingDirectory(dir),
-	)
-
-	return Transpile(project, opts...)
+	return projectOpts.LoadProject(context.Background())
 }
 
 func analyzeSharedVolumes(services types.Services) map[string]bool {

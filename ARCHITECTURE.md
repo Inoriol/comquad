@@ -170,6 +170,37 @@ Generated files are placed in the systemd Quadlet directory for the current exec
 - Rootless: `~/.config/containers/systemd`
 - Root: `/etc/containers/systemd`
 
+## AutoNS Mode (Rootful)
+
+When `COMQUAD_AUTONS=1` is set in rootful mode, comquad enables user namespace isolation between stacks. Each stack gets a dedicated 65535-wide UID/GID range from `/etc/subuid`.
+
+### Anchor Selection
+
+One container per stack is designated as the "anchor" that owns the user namespace:
+- If `depends_on` exists: root of the dependency DAG (service with no dependencies)
+- If no dependencies: alphabetically first service name
+
+### Namespace Sharing
+
+- **Anchor container**: Gets `PodmanArgs=--userns=auto:uidmapping=0:<base>:65535`
+- **Non-anchor containers**: Get `PodmanArgs=--userns=container:<anchor-container-name>`
+- **systemd dependencies**: Non-anchor containers get `After=` and `Requires=` for the anchor service
+
+### Volume Handling
+
+All volume mounts get the `idmap` option for proper UID mapping within the user namespace.
+
+### State Persistence
+
+The allocated UID range is stored in `projects.json` under `autons_range` and reused across deployments for stability.
+
+### Implementation Files
+
+- `compose2quadlet/mapper/anchor.go` — Anchor selection algorithm
+- `compose2quadlet/opinionated/autons.go` — AutoNS transform (userns directives, systemd deps, volume idmap)
+- `internal/deploy/subuid.go` — `/etc/subuid` parsing and UID range allocation
+- `internal/orchestrator/pipeline.go` — Anchor-first start order in `startContainers()`
+
 ## Runtime Commands
 
 Commands such as `start`, `stop`, and `restart` operate on already-generated units through systemd D-Bus. They do not regenerate files or run reconciliation.
@@ -183,6 +214,92 @@ Commands that inspect or interact with services use the project state to resolve
 - `edit` opens generated units in `$EDITOR`, then reloads systemd when files change.
 
 `down` stops the project's units, removes generated files and managed networks, unregisters the project, and removes auxiliary state. Named volumes are retained unless `--delete-volumes` is supplied.
+
+## Pull Command
+
+`comquad pull` pulls images defined in compose.yaml without starting containers. It follows the same transpilation and reconciliation pipeline as `up`, but only starts `.image` units.
+
+```go
+func (o *Orchestrator) Pull(opts PullOptions) error
+```
+
+The `PullOptions` struct:
+- `PullStrategy` - Image pull policy (always/missing/never)
+- `DryRun` - Preview without pulling
+- `Services` - Optional list of services to pull images for
+
+## Compose Compatibility Layer
+
+The `comquad compose` command provides Docker Compose compatible syntax. It translates docker-compose flags and commands to comquad's orchestrator calls.
+
+### Command Structure
+
+```
+cmd/comquad/
+├── compose.go           # Parent "compose" command
+├── compose_flags.go     # Flag translation helpers
+├── compose_up.go        # compose up subcommand
+├── compose_down.go      # compose down subcommand
+├── compose_ps.go        # compose ps subcommand
+├── compose_logs.go      # compose logs subcommand
+├── compose_start.go     # compose start subcommand
+├── compose_stop.go      # compose stop subcommand
+├── compose_restart.go   # compose restart subcommand
+├── compose_exec.go      # compose exec subcommand
+├── compose_build.go     # compose build subcommand
+└── compose_pull.go      # compose pull subcommand
+```
+
+### Flag Translation
+
+| docker-compose | comquad compose | Notes |
+|----------------|-----------------|-------|
+| `up` (no flag) | `Up{Follow: true}` | Attach to logs |
+| `up -d` | `Up{Follow: false}` | Detach |
+| `up --build` | `Up{ForceRebuild: true}` | Force rebuild |
+| `up --no-build` | `Up{SkipBuild: true}` | Skip build |
+| `up --force-recreate` | `Up{ForceRecreate: true}` | Always recreate |
+| `up --remove-orphans` | `Up{RemoveOrphans: true}` | Remove unmanaged |
+| `down -v` | `Down{RemoveVolumes: true}` | Remove volumes |
+| `exec -T` | `Exec{TTY: false}` | Disable TTY |
+
+## Orchestrator Options Structs
+
+The orchestrator methods use options structs for cleaner APIs and forward compatibility:
+
+```go
+type UpOptions struct {
+    PullStrategy   string
+    Follow         bool
+    DryRun         bool
+    NoDiff         bool
+    ForceRebuild   bool
+    SkipBuild      bool
+    ForceRecreate  bool
+    SkipRecreate   bool
+    RemoveOrphans  bool
+    Services       []string
+}
+
+type DownOptions struct {
+    RemoveVolumes bool
+    DryRun        bool
+    RemoveOrphans bool
+}
+
+type PullOptions struct {
+    PullStrategy string
+    DryRun       bool
+    Services     []string
+}
+```
+
+## Compose File Path
+
+The orchestrator supports specifying a compose file path via `WithComposeFile(path)`:
+- If path is a file → use directly
+- If path is a directory → search for compose files in it
+- If not set → search in current working directory
 
 ## JSON Output
 
@@ -206,6 +323,7 @@ Commands check `output.IsJSONMode()` and emit JSON instead of human-readable tab
 | `restart` | `LifecycleData` | Restart action result |
 | `down` | `DownData` | Removal summary |
 | `up` | `UpData` | Deployment summary |
+| `pull` | `PullData` | Pull summary |
 | `logs` | `LogsData` | Structured log entries (batch mode) |
 
 When adding JSON support to a new command:
