@@ -133,7 +133,6 @@ Depending on the Compose file, comquad can generate:
 | Network | `.network` |
 | Named volume | `.volume` |
 | Secret (default) | `.cq-secret` → `.service` (pseudo-quadlet) |
-| Secret (custom perms) | `Volume=` mount (fallback) |
 | External secret | `Secret=` directive |
 
 Container units reference their companion image or build units. This lets Quadlet and systemd express dependencies between pulling or building an image and starting its container.
@@ -142,10 +141,9 @@ Container units reference their companion image or build units. This lets Quadle
 
 The pseudo-quadlet generator converts custom unit types (`.cq-*`) into standard `.service` units. Currently supports:
 
-- **`.cq-secret`**: Manages secrets using Podman's native secret store. Environment secrets are written to temporary files at `/run/comquad/secrets/` during deployment and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Includes `ExecStop=-/usr/bin/podman secret rm <name>` for automatic cleanup.
+- **`.cq-secret`**: Manages secrets using Podman's native secret store. Environment secrets are written to temporary files at `/run/comquad/secrets/` during deployment and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Custom permissions (`uid`/`gid`/`mode`) and custom target paths are passed to the `Secret=` directive (Podman 4.5.0+). Secrets can be exposed as environment variables using `x-type: env` extension. Includes `ExecStop=-/usr/bin/podman secret rm <name>` for automatic cleanup.
 - **`.cq-image`**: Fallback for Podman < 4.8.0 — generates `.service` with `ExecStart=podman pull`.
 - **`.cq-build`**: Fallback for Podman < 5.2.0 — generates `.service` with `ExecStart=podman build`.
-- Custom permissions (`uid`/`gid`/`mode`): Falls back to direct `Volume=` mount
 
 Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit.
 

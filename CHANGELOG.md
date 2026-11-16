@@ -35,17 +35,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `internal/deploy/subuid.go` for `/etc/subuid` parsing and UID allocation
   - New `WithAutoNS(base, anchor)` option in compose2quadlet library
   - Anchor-first start order in `startContainers()` to ensure namespace exists before other containers join
+- **Secret options support (Podman 4.5.0+)** — Secrets now support custom `target`, `uid`, `gid`, and `mode` options passed directly to Podman's native `Secret=` directive instead of falling back to volume mounts.
+  - Custom target paths: `target: /custom/path` mounts secret at specified location
+  - Custom permissions: `uid`, `gid`, `mode` set ownership and permissions on secret files
+  - Environment variable exposure: `x-type: env` exposes secret as environment variable instead of file mount
+  - Custom env var name: `x-target: VAR_NAME` sets the environment variable name when using `x-type: env`
+  - External secrets support the same options and extensions
+  - Version fallback: Podman < 4.5.0 falls back to `Volume=` bind mounts
+  - Updated `compose2quadlet/mapper/secrets.go` to build `Secret=` directives with options
+  - Updated `compose2quadlet/opinionated/references.go` to preserve Secret= options during reference rewriting
+  - Added `extractSecretExtensions()` helper for parsing `x-type` and `x-target` extensions
+  - Added `buildSecretValue()` helper for constructing Secret= directive with comma-separated options
+  - New integration tests for custom permissions and environment variable exposure
 
 ### Changed
 
 - **Refactored orchestrator method signatures** — `Up()`, `Build()`, and `Down()` now accept options structs instead of individual parameters. Existing tests updated to use new signatures.
 - **Compose command flag handling** — Removed shorthand `-f` from `compose --file` to avoid conflict with `logs -f` (follow). Removed shorthand `-v` from `compose down --volumes` to avoid conflict with root `-v` (verbose).
+- **Secret handling for custom permissions** — Secrets with custom `uid`, `gid`, or `mode` now use Podman's native `Secret=` directive with options (Podman 4.5.0+) instead of falling back to `Volume=` bind mounts. This provides better integration with Podman's secret store and lifecycle management.
 
 ### Documentation
 
 - Updated `README.md` with new `pull` command and Compose Compatibility section.
 - Updated `ARCHITECTURE.md` with Pull Command, Compose Compatibility Layer, Orchestrator Options Structs, and Compose File Path sections.
 - Updated `TODO.md` to mark completed items in the Compose Compatibility Layer implementation plan.
+- Updated `compose2quadlet/doc/comquad-secret.md` with comprehensive documentation for secret options, environment variable exposure, and version compatibility.
+- Updated `compose2quadlet/doc/mapping.md` to reflect new Secret= directive with options for Podman 4.5.0+.
+- Updated `compose2quadlet/README.md` and `compose2quadlet/ARCHITECTURE.md` with new secret handling behavior and x-extension support.
 
 ## [0.5.1] - 2026-11-13
 

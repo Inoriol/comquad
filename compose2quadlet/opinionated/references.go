@@ -59,13 +59,20 @@ func ApplyReferences(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 								continue
 							}
 						}
-					if d.Key == "Secret" && strings.HasSuffix(head, ".secretref") {
-						secretName := strings.TrimSuffix(head, ".secretref")
-						prefixedSecretName := prefix + secretName
-						d.Values[vi] = prefixedSecretName
+				if d.Key == "Secret" {
+					secretName, secretOpts := splitSecretRef(d.Values[vi])
+					if strings.HasSuffix(secretName, ".secretref") {
+						baseName := strings.TrimSuffix(secretName, ".secretref")
+						prefixedSecretName := prefix + baseName
+						if secretOpts != "" {
+							d.Values[vi] = prefixedSecretName + "," + secretOpts
+						} else {
+							d.Values[vi] = prefixedSecretName
+						}
 						secretServices = append(secretServices, prefixedSecretName+"-secret.service")
 						continue
 					}
+				}
 						for _, suffix := range suffixes {
 							if strings.HasSuffix(head, suffix) {
 								d.Values[vi] = prefix + head + tail
@@ -128,4 +135,12 @@ func splitRefHead(val string) (head, tail string) {
 		return val, ""
 	}
 	return val[:colon], val[colon:]
+}
+
+func splitSecretRef(val string) (name, opts string) {
+	comma := strings.IndexByte(val, ',')
+	if comma < 0 {
+		return val, ""
+	}
+	return val[:comma], val[comma+1:]
 }

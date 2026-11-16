@@ -173,6 +173,67 @@ func TestApplyReferences_SecretVolume(t *testing.T) {
 	assertDirectiveValue(t, *unitSec, "Requires", "cq-myapp-db_password-secret.service")
 }
 
+func TestApplyReferences_SecretWithOptions(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "prefixed-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Secret", "db_password.secretref,target=/custom/path,uid=1000,gid=1000,mode=0400"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	result := ApplyReferences(units, cfg)
+	
+	var containerSec, unitSec *c2qtypes.Section
+	for i := range result[0].Sections {
+		switch result[0].Sections[i].Name {
+		case c2qtypes.SectionContainer:
+			containerSec = &result[0].Sections[i]
+		case c2qtypes.SectionUnit:
+			unitSec = &result[0].Sections[i]
+		}
+	}
+	
+	if containerSec == nil {
+		t.Fatal("Container section not found")
+	}
+	assertDirectiveValue(t, *containerSec, "Secret", "cq-myapp-db_password,target=/custom/path,uid=1000,gid=1000,mode=0400")
+	
+	if unitSec == nil {
+		t.Fatal("Unit section not found")
+	}
+	assertDirectiveValue(t, *unitSec, "After", "cq-myapp-db_password-secret.service")
+	assertDirectiveValue(t, *unitSec, "Requires", "cq-myapp-db_password-secret.service")
+}
+
+func TestApplyReferences_SecretWithTypeEnv(t *testing.T) {
+	units := []c2qtypes.QuadletUnit{
+		mkUnit(c2qtypes.UnitContainer, "prefixed-web", []c2qtypes.Section{
+			{Name: c2qtypes.SectionContainer, Directives: []c2qtypes.Directive{
+				mkDir("Secret", "db_password.secretref,type=env,target=DB_PASSWORD"),
+			}},
+		}),
+	}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.ProjectName = "myapp"
+
+	result := ApplyReferences(units, cfg)
+	
+	var containerSec *c2qtypes.Section
+	for i := range result[0].Sections {
+		if result[0].Sections[i].Name == c2qtypes.SectionContainer {
+			containerSec = &result[0].Sections[i]
+			break
+		}
+	}
+	if containerSec == nil {
+		t.Fatal("Container section not found")
+	}
+	assertDirectiveValue(t, *containerSec, "Secret", "cq-myapp-db_password,type=env,target=DB_PASSWORD")
+}
+
 func TestApplyReferences_PseudoImage_ToService(t *testing.T) {
 	units := []c2qtypes.QuadletUnit{
 		mkUnit(c2qtypes.UnitContainer, "prefixed-web", []c2qtypes.Section{

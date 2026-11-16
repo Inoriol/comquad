@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -51,9 +52,22 @@ func PremapSecrets(svc *types.ServiceConfig, secrets types.Secrets, configs type
 }
 
 func processSecret(serviceName string, ref types.ServiceSecretConfig, def types.SecretConfig, cfg *c2qtypes.Config) ([]c2qtypes.Directive, []c2qtypes.QuadletUnit) {
-	target := ref.Target
-	if target == "" {
-		target = "/run/secrets/" + ref.Source
+	hasCustomPerms := ref.UID != "" || ref.GID != "" || ref.Mode != nil
+
+	xType, xTarget := extractSecretExtensions(ref, serviceName, cfg)
+
+	if hasCustomPerms && xType == "env" {
+		cfg.Warn(c2qtypes.Warning{
+			Level:   c2qtypes.WarningSkipped,
+			Service: serviceName,
+			Field:   "secrets." + ref.Source,
+			Message: "x-type: env is incompatible with uid/gid/mode options",
+		})
+		xType = ""
+		xTarget = ""
+		ref.UID = ""
+		ref.GID = ""
+		ref.Mode = nil
 	}
 
 	if bool(def.External) {
@@ -71,19 +85,81 @@ func processSecret(serviceName string, ref types.ServiceSecretConfig, def types.
 		if name == "" {
 			name = ref.Source
 		}
-		return []c2qtypes.Directive{{Key: "Secret", Values: []string{name}}}, nil
+		return []c2qtypes.Directive{{Key: "Secret", Values: []string{buildSecretValue(name, ref, xType, xTarget)}}}, nil
 	}
 
-	hasCustomPerms := ref.UID != "" || ref.GID != "" || ref.Mode != nil
-
-	if hasCustomPerms {
-		return processSecretVolume(serviceName, ref, def, cfg), nil
+	if !cfg.PodmanVersion.AtLeast(4, 5) {
+		return processSecretVolumeFallback(serviceName, ref, def, cfg)
 	}
 
-	return processSecretTmpfs(serviceName, ref, def, cfg)
+	return processSecretPodman(serviceName, ref, def, cfg, xType, xTarget)
 }
 
-func processSecretTmpfs(serviceName string, ref types.ServiceSecretConfig, def types.SecretConfig, cfg *c2qtypes.Config) ([]c2qtypes.Directive, []c2qtypes.QuadletUnit) {
+func extractSecretExtensions(ref types.ServiceSecretConfig, serviceName string, cfg *c2qtypes.Config) (xType, xTarget string) {
+	if ref.Extensions == nil {
+		return "", ""
+	}
+
+	if t, ok := ref.Extensions["x-type"]; ok {
+		if ts, ok := t.(string); ok {
+			if ts != "env" && ts != "mount" {
+				cfg.Warn(c2qtypes.Warning{
+					Level:   c2qtypes.WarningSkipped,
+					Service: serviceName,
+					Field:   "secrets." + ref.Source,
+					Message: fmt.Sprintf("x-type must be 'env' or 'mount', got %q", ts),
+				})
+			} else {
+				xType = ts
+			}
+		}
+	}
+
+	if t, ok := ref.Extensions["x-target"]; ok {
+		if ts, ok := t.(string); ok {
+			xTarget = ts
+		}
+	}
+
+	return xType, xTarget
+}
+
+func buildSecretValue(name string, ref types.ServiceSecretConfig, xType, xTarget string) string {
+	var opts []string
+
+	if xType == "env" {
+		opts = append(opts, "type=env")
+		if xTarget != "" {
+			opts = append(opts, "target="+xTarget)
+		}
+	} else {
+		if ref.Target != "" {
+			target := ref.Target
+			if !filepath.IsAbs(target) {
+				target = "/run/secrets/" + target
+			}
+			opts = append(opts, "target="+target)
+		} else if xTarget != "" {
+			opts = append(opts, "target="+xTarget)
+		}
+		if ref.UID != "" {
+			opts = append(opts, "uid="+ref.UID)
+		}
+		if ref.GID != "" {
+			opts = append(opts, "gid="+ref.GID)
+		}
+		if ref.Mode != nil {
+			opts = append(opts, fmt.Sprintf("mode=%04o", os.FileMode(*ref.Mode)))
+		}
+	}
+
+	if len(opts) == 0 {
+		return name
+	}
+	return name + "," + strings.Join(opts, ",")
+}
+
+func processSecretPodman(serviceName string, ref types.ServiceSecretConfig, def types.SecretConfig, cfg *c2qtypes.Config, xType, xTarget string) ([]c2qtypes.Directive, []c2qtypes.QuadletUnit) {
 	if def.File != "" {
 		secretUnit := c2qtypes.QuadletUnit{
 			Type: c2qtypes.UnitCQSecret,
@@ -100,7 +176,7 @@ func processSecretTmpfs(serviceName string, ref types.ServiceSecretConfig, def t
 		}
 		containerDir := c2qtypes.Directive{
 			Key:    "Secret",
-			Values: []string{ref.Source + ".secretref"},
+			Values: []string{buildSecretValue(ref.Source+".secretref", ref, xType, xTarget)},
 		}
 		return []c2qtypes.Directive{containerDir}, []c2qtypes.QuadletUnit{secretUnit}
 	}
@@ -121,7 +197,7 @@ func processSecretTmpfs(serviceName string, ref types.ServiceSecretConfig, def t
 		}
 		containerDir := c2qtypes.Directive{
 			Key:    "Secret",
-			Values: []string{ref.Source + ".secretref"},
+			Values: []string{buildSecretValue(ref.Source+".secretref", ref, xType, xTarget)},
 		}
 		return []c2qtypes.Directive{containerDir}, []c2qtypes.QuadletUnit{secretUnit}
 	}
@@ -129,14 +205,14 @@ func processSecretTmpfs(serviceName string, ref types.ServiceSecretConfig, def t
 	return nil, nil
 }
 
-func processSecretVolume(serviceName string, ref types.ServiceSecretConfig, def types.SecretConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
+func processSecretVolumeFallback(serviceName string, ref types.ServiceSecretConfig, def types.SecretConfig, cfg *c2qtypes.Config) ([]c2qtypes.Directive, []c2qtypes.QuadletUnit) {
 	target := ref.Target
 	if target == "" {
 		target = "/run/secrets/" + ref.Source
 	}
 
 	if def.File != "" {
-		return []c2qtypes.Directive{{Key: "Volume", Values: []string{def.File + ":" + target + ":ro"}}}
+		return []c2qtypes.Directive{{Key: "Volume", Values: []string{def.File + ":" + target + ":ro"}}}, nil
 	}
 
 	if def.Environment != "" {
@@ -145,9 +221,9 @@ func processSecretVolume(serviceName string, ref types.ServiceSecretConfig, def 
 				Level:   c2qtypes.WarningDegraded,
 				Service: serviceName,
 				Field:   "secrets." + ref.Source,
-				Message: "environment secrets with custom permissions require WithSecretsDirectory()",
+				Message: "environment secrets with podman < 4.5.0 require WithSecretsDirectory()",
 			})
-			return nil
+			return nil, nil
 		}
 		val := os.Getenv(def.Environment)
 		if val == "" {
@@ -157,7 +233,7 @@ func processSecretVolume(serviceName string, ref types.ServiceSecretConfig, def 
 				Field:   "secrets." + ref.Source,
 				Message: fmt.Sprintf("environment variable %q is not set or empty", def.Environment),
 			})
-			return nil
+			return nil, nil
 		}
 		sourcePath := filepath.Join(cfg.SecretsDir, ref.Source)
 		if !cfg.DryRun {
@@ -168,7 +244,7 @@ func processSecretVolume(serviceName string, ref types.ServiceSecretConfig, def 
 					Field:   "secrets." + ref.Source,
 					Message: fmt.Sprintf("failed to create secrets directory: %v", err),
 				})
-				return nil
+				return nil, nil
 			}
 			if err := os.WriteFile(sourcePath, []byte(val), 0600); err != nil {
 				cfg.Warn(c2qtypes.Warning{
@@ -177,13 +253,13 @@ func processSecretVolume(serviceName string, ref types.ServiceSecretConfig, def 
 					Field:   "secrets." + ref.Source,
 					Message: fmt.Sprintf("failed to write secret file: %v", err),
 				})
-				return nil
+				return nil, nil
 			}
 		}
-		return []c2qtypes.Directive{{Key: "Volume", Values: []string{sourcePath + ":" + target + ":ro"}}}
+		return []c2qtypes.Directive{{Key: "Volume", Values: []string{sourcePath + ":" + target + ":ro"}}}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func processConfig(serviceName string, ref types.ServiceConfigObjConfig, def types.ConfigObjConfig) []c2qtypes.Directive {

@@ -147,7 +147,7 @@ Some behavior is handled automatically:
 - Rootless privileged ports are shifted by `ROOTLESS_PORT_OFFSET`.
 - Image and build units are generated for systemd to manage.
 - SELinux labels added to volumes: `:Z` (private) for single-service volumes, `:z` (shared) for volumes used by multiple services.
-- Secrets are managed via Podman's native secret store. Environment secrets are written to temporary files at deployment time and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Secrets with custom `uid`/`gid`/`mode` fall back to volume mounts.
+- Secrets are managed via Podman's native secret store. Environment secrets are written to temporary files at deployment time and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Secrets support custom `target`, `uid`, `gid`, and `mode` options (Podman 4.5.0+). Secrets can be exposed as environment variables using `x-type: env` extension.
 
 Native Quadlet directives that have no Compose equivalent can be set through x-extensions. Supported extensions: `x-container`, `x-image`, `x-build`, `x-network`, `x-volume`, and `x-systemd` (for `[Service]` and `[Unit]` sections). X-extensions override compose-generated directives when there's a conflict.
 
