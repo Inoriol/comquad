@@ -22,7 +22,7 @@ Key differences from docker-compose:
 }
 
 func init() {
-	composeCmd.PersistentFlags().StringVar(&composeFile, "file", "", "Compose file path (file or directory)")
+	composeCmd.PersistentFlags().StringVarP(&composeFile, "file", "f", "", "Compose file path (file or directory)")
 	composeCmd.PersistentFlags().StringVarP(&composeProjectName, "project-name", "p", "", "Project name")
 	composeCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview without applying changes")
 

@@ -245,7 +245,8 @@ cmd/comquad/
 ├── compose_restart.go   # compose restart subcommand
 ├── compose_exec.go      # compose exec subcommand
 ├── compose_build.go     # compose build subcommand
-└── compose_pull.go      # compose pull subcommand
+├── compose_pull.go      # compose pull subcommand
+└── provider.go          # Provider mode detection (docker-compose/podman-compose symlinks)
 ```
 
 ### Flag Translation
@@ -260,6 +261,32 @@ cmd/comquad/
 | `up --remove-orphans` | `Up{RemoveOrphans: true}` | Remove unmanaged |
 | `down -v` | `Down{RemoveVolumes: true}` | Remove volumes |
 | `exec -T` | `Exec{TTY: false}` | Disable TTY |
+
+### Provider Mode
+
+comquad supports being invoked as a compose provider via symlinks. When the binary is invoked as `docker-compose` or `podman-compose`, it automatically enters provider mode and accepts docker-compose syntax directly without requiring the `compose` subcommand.
+
+**Implementation:**
+
+The provider mode is implemented in `cmd/comquad/provider.go` and `cmd/comquad/main.go`:
+
+1. `isProviderMode()` checks `os.Args[0]` to detect if invoked as `docker-compose` or `podman-compose`
+2. If in provider mode and arguments are present, `main()` inserts `"compose"` as the first argument
+3. Cobra then routes the command to the compose command handler automatically
+
+**Example:**
+```
+User invokes: docker-compose up -d
+os.Args[0] = "docker-compose"
+os.Args[1:] = ["up", "-d"]
+
+Provider mode detection inserts "compose":
+os.Args = ["docker-compose", "compose", "up", "-d"]
+
+Cobra routes to: composeCmd → composeUpCmd
+```
+
+This allows comquad to work as a drop-in replacement for docker-compose or as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`.
 
 ## Orchestrator Options Structs
 

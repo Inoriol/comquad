@@ -350,11 +350,11 @@ type PullOptions struct {
 
 Create `cmd/comquad/compose_flags.go` with translation functions.
 
-#### Phase 4: Provider Mode (Future/TODO)
+#### Phase 4: Provider Mode ✅
 
-- Detect invocation as `docker-compose` or `podman-compose`
-- Skip `compose` subcommand requirement
-- Reuse translation layer
+- Detect invocation as `docker-compose` or `podman-compose` ✅
+- Skip `compose` subcommand requirement ✅
+- Reuse translation layer ✅
 
 #### File Structure ✅
 
@@ -372,6 +372,7 @@ cmd/comquad/
 ├── compose_exec.go      # compose exec subcommand
 ├── compose_build.go     # compose build subcommand
 ├── compose_pull.go      # compose pull subcommand
+├── provider.go          # Provider mode detection
 └── pull.go              # comquad pull command
 
 internal/orchestrator/

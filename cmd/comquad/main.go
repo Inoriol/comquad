@@ -42,6 +42,12 @@ func init() {
 }
 
 func main() {
+	if isProviderMode() && len(os.Args) > 1 {
+		newArgs := []string{os.Args[0], "compose"}
+		newArgs = append(newArgs, os.Args[1:]...)
+		os.Args = newArgs
+	}
+
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(pullCmd)

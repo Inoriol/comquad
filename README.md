@@ -135,6 +135,27 @@ comquad compose exec web bash  # Execute in container
 | Skip confirm | N/A | Use `--no-diff` |
 | Service manager | Direct container ops | systemd (via quadlet) |
 
+### Provider Mode
+
+comquad can be used as a drop-in replacement for `docker-compose` or `podman-compose` via symlinks. When invoked as either of these names, comquad automatically accepts docker-compose syntax without requiring the `compose` subcommand:
+
+```bash
+# Create symlinks
+ln -s /usr/local/bin/comquad ~/.local/bin/docker-compose
+ln -s /usr/local/bin/comquad ~/.local/bin/podman-compose
+
+# Use as docker-compose
+docker-compose up -d
+docker-compose logs -f
+docker-compose down --volumes
+
+# Or use as podman compose provider
+export PODMAN_COMPOSE_PROVIDER=comquad
+podman compose up -d
+```
+
+This allows comquad to work seamlessly with existing docker-compose workflows and scripts while providing comquad's systemd-native benefits.
+
 ## Compose Files
 
 comquad accepts standard Compose files with `services`, `networks`, and `volumes`. Compose services, networks, volumes, secrets, images, and build blocks are translated into the corresponding Quadlet units where supported.

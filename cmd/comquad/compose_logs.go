@@ -27,7 +27,7 @@ var composeLogsCmd = &cobra.Command{
 }
 
 func init() {
-	composeLogsCmd.Flags().BoolVarP(&composeLogsFollow, "follow", "f", false, "Follow log output")
+	composeLogsCmd.Flags().BoolVar(&composeLogsFollow, "follow", false, "Follow log output")
 	composeLogsCmd.Flags().StringVar(&composeLogsTail, "tail", "", "Number of lines to show from the end of logs")
 	composeLogsCmd.Flags().StringVar(&composeLogsSince, "since", "", "Show logs since a specific time")
 	composeLogsCmd.Flags().BoolVarP(&composeLogsTimestamps, "timestamps", "t", false, "Show timestamps")

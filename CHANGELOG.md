@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `compose exec` — Execute commands in running containers (`-u`, `-T`)
   - `compose build` — Build or rebuild services (`-f`, `--pull`)
   - `compose pull` — Pull service images
-  - Global flags: `--file`, `--project-name`, `--dry-run`
+  - Global flags: `--file` (`-f`), `--project-name` (`-p`), `--dry-run`
+  - **Provider mode** — comquad can be invoked as `docker-compose` or `podman-compose` via symlinks, automatically accepting docker-compose syntax without requiring the `compose` subcommand. Also works as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`.
 - **Orchestrator options structs** — Refactored `Up()`, `Build()`, and `Down()` methods to use options structs (`UpOptions`, `DownOptions`, `PullOptions`) for cleaner APIs and forward compatibility.
 - **Compose file path support** — New `WithComposeFile(path)` method on Orchestrator allows specifying a compose file path (file or directory) instead of always searching the current working directory.
 - **`PullData` JSON schema** — New JSON output schema for `comquad pull` command with project name, pulled images list, and success status.
