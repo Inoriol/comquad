@@ -7,6 +7,7 @@ import (
     "fmt"
     "os"
     "os/exec"
+    "path/filepath"
     "strings"
     "testing"
     "time"
@@ -126,6 +127,109 @@ func envSlice(m map[string]string) []string {
         result = append(result, k+"="+v)
     }
     return result
+}
+
+// ProviderBinary invokes the comquad binary as a compose provider (docker-compose/podman-compose).
+// It creates a symlink with the given name pointing to the comquad binary and runs the command
+// through that symlink. The symlink is created in a temp directory and cleaned up after the test.
+// providerName should be "docker-compose" or "podman-compose".
+func ProviderBinary(t *testing.T, workDir string, providerName string, args ...string) CQResult {
+	t.Helper()
+
+	bin := os.Getenv("CQ_BINARY")
+	if bin == "" {
+		bin = "comquad"
+	}
+
+	tmpDir := t.TempDir()
+	symlinkPath := filepath.Join(tmpDir, providerName)
+	if err := os.Symlink(bin, symlinkPath); err != nil {
+		t.Fatalf("failed to create symlink %s -> %s: %v", symlinkPath, bin, err)
+	}
+
+	cmd := exec.Command(symlinkPath, args...)
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	result := CQResult{
+		Stdout:   strings.TrimSpace(stdout.String()),
+		Stderr:   strings.TrimSpace(stderr.String()),
+		ExitCode: 0,
+	}
+
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			result.ExitCode = exitErr.ExitCode()
+		}
+	}
+
+	t.Logf("[%s %s] exit=%d\nstdout: %s\nstderr: %s",
+		providerName, strings.Join(args, " "), result.ExitCode, result.Stdout, result.Stderr)
+
+	return result
+}
+
+// ProviderBinaryMustSucceed calls ProviderBinary and fails the test if exit code != 0.
+func ProviderBinaryMustSucceed(t *testing.T, workDir string, providerName string, args ...string) CQResult {
+	t.Helper()
+	result := ProviderBinary(t, workDir, providerName, args...)
+	if result.ExitCode != 0 {
+		t.Fatalf("%s %s failed (exit %d):\nstdout: %s\nstderr: %s",
+			providerName, strings.Join(args, " "), result.ExitCode, result.Stdout, result.Stderr)
+	}
+	return result
+}
+
+// ProviderBinaryWithEnv invokes the provider binary with additional environment variables.
+func ProviderBinaryWithEnv(t *testing.T, workDir string, providerName string, env map[string]string, args ...string) CQResult {
+	t.Helper()
+
+	bin := os.Getenv("CQ_BINARY")
+	if bin == "" {
+		bin = "comquad"
+	}
+
+	tmpDir := t.TempDir()
+	symlinkPath := filepath.Join(tmpDir, providerName)
+	if err := os.Symlink(bin, symlinkPath); err != nil {
+		t.Fatalf("failed to create symlink %s -> %s: %v", symlinkPath, bin, err)
+	}
+
+	cmd := exec.Command(symlinkPath, args...)
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
+	cmd.Env = append(os.Environ(), envSlice(env)...)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	result := CQResult{
+		Stdout:   strings.TrimSpace(stdout.String()),
+		Stderr:   strings.TrimSpace(stderr.String()),
+		ExitCode: 0,
+	}
+
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			result.ExitCode = exitErr.ExitCode()
+		}
+	}
+
+	t.Logf("[%s %s] exit=%d\nstdout: %s\nstderr: %s",
+		providerName, strings.Join(args, " "), result.ExitCode, result.Stdout, result.Stderr)
+
+	return result
 }
 
 // ProjectName generates a unique project name for a test to avoid
