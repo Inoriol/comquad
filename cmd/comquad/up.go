@@ -30,7 +30,12 @@ var upCmd = &cobra.Command{
 			pullStr = "missing"
 		}
 
-		return o.Up(pullStr, upFollow, dryRun, upNoDiff)
+		return o.Up(orchestrator.UpOptions{
+			PullStrategy: pullStr,
+			Follow:       upFollow,
+			DryRun:       dryRun,
+			NoDiff:       upNoDiff,
+		})
 	},
 }
 

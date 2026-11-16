@@ -27,7 +27,7 @@ func TestUp_NoComposeFileReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("missing", false, false, true)
+	err := o.Up(UpOptions{PullStrategy: "missing", NoDiff: true})
 	if err == nil || !strings.Contains(err.Error(), "no compose file found") {
 		t.Errorf("expected 'no compose file found' error, got %v", err)
 	}
@@ -40,7 +40,7 @@ func TestUp_InvalidYamlReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("missing", false, false, true)
+	err := o.Up(UpOptions{PullStrategy: "missing", NoDiff: true})
 	if err == nil {
 		t.Error("expected error for invalid YAML")
 	} else if !strings.Contains(err.Error(), "transpile") &&
@@ -57,7 +57,7 @@ func TestUp_StateRegistrationError(t *testing.T) {
 	o := newTestOrchestratorWithStateErr("myapp", dir, errors.New("cannot write state"))
 	o.cwd = dir
 
-	err := o.Up("missing", false, false, true)
+	err := o.Up(UpOptions{PullStrategy: "missing", NoDiff: true})
 	if err == nil || !strings.Contains(err.Error(), "cannot write state") {
 		t.Errorf("expected 'cannot write state' error, got %v", err)
 	}
@@ -71,7 +71,7 @@ func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("badstrategy", false, false, true)
+	err := o.Up(UpOptions{PullStrategy: "badstrategy", NoDiff: true})
 	if err == nil || !strings.Contains(err.Error(), "invalid pull strategy") {
 		t.Errorf("expected 'unknown pull strategy' error, got %v", err)
 	}
@@ -87,7 +87,7 @@ func TestRegisterState_PersistsToStateStore(t *testing.T) {
 		filepath.Join(dir, "cq-myapp-web.container"),
 	}
 
-	if err := o.registerState(files); err != nil {
+	if err := o.registerState(files, nil); err != nil {
 		t.Fatalf("registerState failed: %v", err)
 	}
 
@@ -113,7 +113,7 @@ func TestRegisterState_StateError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.registerState([]string{})
+	err := o.registerState([]string{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "disk full") {
 		t.Errorf("expected disk full error, got %v", err)
 	}

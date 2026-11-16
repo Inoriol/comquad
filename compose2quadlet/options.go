@@ -37,6 +37,7 @@ func WithoutImageNormalization() types.Option          { return types.WithoutIma
 func WithSystemdSpecifiers() types.Option              { return types.WithSystemdSpecifiers() }
 func WithInfo(fn func(string)) types.Option             { return types.WithInfo(fn) }
 func WithoutPseudoQuadlet() types.Option                { return types.WithoutPseudoQuadlet() }
+func WithAutoNS(baseUID int, anchor string) types.Option { return types.WithAutoNS(baseUID, anchor) }
 
 func PatchDockerfileFile(path string) (string, error) {
 	data, err := os.ReadFile(path)

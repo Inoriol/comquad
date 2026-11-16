@@ -26,60 +26,7 @@ For long-term goals, refer to the [roadmap](./ROADMAP.md).
 
 - **RISC-V architecture** — Add riscv64 to goreleaser build targets for binaries and deb/rpm packages only (skip for brew)
 
-### Tmpfs Secrets (`.cq-secret`) — ✅ Implemented
-
-- **Goal:** Implement secure secret handling via `.cq-secret` definitions that are regular `.service` files with a custom extension, compiled into companion systemd `.service` units using Podman's native secret store.
-
-- **Mechanism:**
-  - Parse `.cq-secret` definitions from compose files
-  - Generate `.cq-secret` files (regular `.service` files with custom extension) that manage secrets via `podman secret create`
-  - For environment secrets: write value to `/run/comquad/secrets/<name>.env` during deployment, then load into Podman secret store
-  - For file secrets: load directly into Podman secret store via `podman secret create <name> <path>`
-  - Secrets are mounted at `/run/secrets/<name>` in containers via Podman's native secret mounting
-  - `ExecStop=-/usr/bin/podman secret rm <name>` ensures cleanup on project teardown
-
-- **Upstream potential:** Acts as production PoC for proposing native `.secret` Quadlet type to `containers/podman`
-
-- **Complexity:** High (~500-800 lines, Podman secret integration, security review required)
-
-- **Status:** ✅ Implemented. Default behavior uses Podman secret store. Secrets with custom `uid`/`gid`/`mode` fall back to volume mounts.
-
-### Pseudo-Quadlet Fallback (Lower Baseline to 4.4.0) — ✅ Implemented
-
-- **Goal:** Lower minimum Podman baseline from 4.8.0 → **4.4.0** by generating `.cq-image` and `.cq-build` files (regular `.service` files with custom extensions) when native quadlet types are unavailable, which are then copied to `.service` files by the quadlet generator.
-
-- **Scope:**
-  - `.cq-image` (native since 4.8.0) → fallback to `.cq-image` (`.service` file) with `ExecStart=podman image pull ...` for Podman 4.4.0-4.7.x
-  - `.cq-build` (native since 5.2.0) → fallback to `.cq-build` (`.service` file) with `ExecStart=podman build ...` for Podman 4.4.0-5.1.x
-
-- **Implementation location:** `compose2quadlet` library (mapper-level decision)
-
-- **Behavior:**
-  - Automatic based on `WithPodmanVersion()` configuration
-  - Option to disable fallback (e.g., `WithoutPseudoQuadlet()`)
-  - Emit warning when fallback is active
-  - Quadlet generator copies `.cq-*` files to `.service` files in the systemd directory
-
-- **Fallback service characteristics:**
-  - `Type=oneshot` with `RemainAfterExit=yes`
-  - Container units reference via `After=<name>.service` instead of `Image=<name>.cq-image`
-  - For `.cq-build` fallback: `WorkingDirectory=` set to build context
-  - For `.cq-image` fallback: `--pull=always/missing/never` logic in `ExecStart` command
-
-- **Status:** ✅ Implemented. Pseudo-quadlet generator converts `.cq-image` and `.cq-build` to `.service` units with appropriate `ExecStart=` commands.
-
-- **Out of scope:**
-  - Podman < 4.4.0 support (no quadlet at all)
-  - Runtime version detection (already handled)
-
-- **Documentation updates:**
-  - ✅ Update `compose2quadlet/doc/mapping.md` baseline from 4.8.0 → 4.4.0
-  - ✅ Add section documenting pseudo-quadlet fallback behavior
-  - ✅ Fill in "?" version columns in mapping.md
-
 ### Quadlet Directives in Compose Files
-
-- **X-extension** — ✅ Implemented. Supports `x-container`, `x-image`, `x-build`, `x-network`, `x-volume`, and `x-systemd` (for `[Service]` and `[Unit]` sections). X-extensions override compose-generated directives. Validates directive names and warns on unknown directives.
 
 - **Timers** — Service-level timer support via `x-timer`. Design decisions:
   - **Target**: `Target: "build"|"service"` (defaults to `"build"` if service has `build:`, else `"service"`)
@@ -110,110 +57,9 @@ For long-term goals, refer to the [roadmap](./ROADMAP.md).
 
 Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Portainer's stack management.
 
-### Design Decisions
+### Remaining Features
 
-- **Backend**: Pure `cockpit.spawn()` calling `comquad --json`. No daemon.
-- **State**: Stateless UI — always reads fresh from CLI.
-- **Auth**: Handled by Cockpit.
-- **Rootless/root**: Follow cockpit-podman pattern (detect user context).
-- **Error handling**: All errors as JSON error envelopes.
-- **Real-time**: Manual refresh first, auto-refresh later.
-- **Web console**: Skip — link to cockpit-podman for container details/terminal.
-- **Folder picker**: Custom directory browser widget (not file picker).
-- **Location**: `cockpit-comquad/` subdirectory in this repo.
-
-### MVP Features
-
-- List all projects (stacks) with status, service counts, source paths
-- Project detail view with services, resources, quadlet files
-- View container configuration (generated quadlet files)
-- Logs viewer with filtering by service/priority
-- Deploy new stack via folder browser
-- Start/stop/restart/remove stacks
-- Link to cockpit-podman for container details/terminal/stats
-
-### Phase 1: JSON API Additions (Prerequisites)
-
-#### 1.1 Add `--json` to `view` command
-- [x] Add `ViewData`, `ServiceJSON`, `ResourceJSON` schemas to `internal/output/schemas.go`
-- [x] Refactor `viewProject()` in `internal/orchestrator/view.go` to build structured data
-- [x] Add `output.IsJSONMode()` branch to `viewProject()`
-- [x] Add `output.IsJSONMode()` branch to `viewUnit()` for single file viewing
-- [x] Test with `comquad view --json`
-
-#### 1.2 Add `--json` to `start/stop/restart` commands
-- [x] Add `LifecycleData` schema to `internal/output/schemas.go`
-- [x] Add JSON branches to `Start()`, `Stop()`, `Restart()` in `internal/orchestrator/lifecycle.go`
-- [x] Test with `comquad start --json`, `comquad stop --json`, `comquad restart --json`
-
-#### 1.3 Add `--json` to `down` command
-- [x] Add `DownData` schema to `internal/output/schemas.go`
-- [x] Add JSON branch to `Down()` in `internal/orchestrator/down.go`
-- [x] Test with `comquad down --json`
-
-#### 1.4 Add `--json` to `up` command
-- [x] Add `UpData` schema to `internal/output/schemas.go`
-- [x] Add JSON branch to `Up()` in `internal/orchestrator/orchestrator.go`
-- [x] Suppress logger output in JSON mode for pipeline functions
-- [x] Test with `comquad up --json --no-diff`
-
-#### 1.5 Add `--json` to `logs` command
-- [x] Add `LogsData`, `LogEntryJSON` schemas to `internal/output/schemas.go`
-- [x] Add JSON branch to `Logs()` in `internal/orchestrator/log.go` (batch mode only)
-- [x] Test with `comquad logs --json`
-
-#### 1.6 Error handling in JSON mode
-- [x] Wrap command execution in `cmd/comquad/main.go` to catch errors
-- [x] Output JSON error envelope when `output.IsJSONMode()` and command fails
-- [x] Test error cases with `--json` flag
-
-### Phase 2: cockpit-comquad Plugin
-
-#### 2.1 Project scaffold
-- [x] Create `cockpit-comquad/` directory
-- [x] Create `package.json` with React, PatternFly, TypeScript dependencies
-- [x] Create `tsconfig.json` for TypeScript configuration
-- [x] Create `build.js` (copy from cockpit-podman, adapt for comquad)
-- [x] Create `Makefile` with build targets (build, install, devel-install, watch)
-- [x] Create `.eslintrc.json` and `.stylelintrc.json`
-- [x] Create `src/manifest.json` with plugin registration
-- [x] Create `src/index.html` entry point
-
-#### 2.2 TypeScript types
-- [x] Create `src/types.ts` mirroring Go JSON schemas
-- [x] Define interfaces: `Project`, `Container`, `ViewData`, `Service`, `Resource`, `LogEntry`, etc.
-- [x] Define API response types: `ListResponse`, `PSResponse`, `LifecycleResponse`, etc.
-
-#### 2.3 Client wrapper
-- [x] Create `src/client.ts` with functions wrapping `cockpit.spawn()`
-- [x] Implement `listProjects()`, `projectPs()`, `viewProject()`
-- [x] Implement `startProject()`, `stopProject()`, `restartProject()`, `removeProject()`
-- [x] Implement `deployProject()`, `projectLogs()`
-- [x] Handle JSON parsing and error extraction
-
-#### 2.4 Projects list dashboard
-- [x] Create `src/ProjectsList.tsx` component
-- [x] PatternFly `Table` or `Gallery` showing projects
-- [x] Display: name, status badge, services count, source path
-- [x] Add manual refresh button
-- [x] Click project → navigate to detail view
-
-#### 2.5 Project detail view
-- [x] Create `src/ProjectDetail.tsx` component
-- [x] Header section: project name, status, source path, action buttons
-- [x] Services table: name, status, image, networks, volumes
-- [x] Resources section: networks, volumes, images lists
-- [x] Containers tab: container list with state, image, ports
-- [x] Action buttons with confirmation modals: start, stop, restart, down
-
-#### 2.6 Stack deploy dialog
-- [x] Create `src/StackDeploy.tsx` component
-- [x] Directory browser: breadcrumb navigation, folder list, compose.yaml detection
-- [x] Path input with navigation
-- [x] Deploy button → calls `client.deployProject()`
-- [x] Show deployment success/error
-
-#### 2.7 Logs viewer
+#### Logs viewer
 - [ ] Create `src/LogsView.tsx` component
 - [ ] Real-time log streaming via `cockpit.spawn()` with streaming output
 - [ ] Display log entries in monospace font with syntax highlighting
@@ -226,30 +72,7 @@ Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Port
 - [ ] Handle log rotation and reconnection
 - [ ] Add unit tests for log streaming and filtering
 
-#### 2.8 Styling
-- [x] Import PatternFly styles in index.tsx
-- [x] Status badge colors (healthy=green, stopped=gray, degraded=orange, failed=red)
-
-#### 2.9 Testing
-- [x] Set up test infrastructure (vitest + React Testing Library for unit tests)
-- [x] Unit tests: 60 tests across 7 test files (client, components)
-- [x] Browser integration tests (Selenium + Chromium in container)
-- [x] Follow cockpit-podman test patterns (adapted for comquad)
-
-#### 2.10 JSON API: `up --dry-run --json`
-- [x] Add `DryRunData`, `DryRunImage`, `DryRunBuild`, `DryRunFile` schemas to `internal/output/schemas.go`
-- [x] Add JSON branch to `printDryRun()` in `internal/orchestrator/images.go`
-- [x] Return structured data: project, target_dir, pull_strategy, images, builds, files (with diff), has_changes
-- [x] Test with `comquad up --dry-run --json`
-
-#### 2.11 Cockpit plugin enhancements
-- [x] Add dry-run preview to StackDeploy.tsx (Preview Changes button before deploy)
-- [x] Add diff preview to Update confirmation modal in ProjectDetail.tsx
-- [x] Add resource unit viewer modal (click resource name to view quadlet content)
-- [x] Add clickable port links with per-port http/https toggle (lock/unlock icon)
-- [x] Fix Makefile manifest.json path (src/manifest.json)
-
-#### 2.12 YAML/Compose editor
+#### YAML/Compose editor
 - [ ] Add in-browser compose.yaml editor with syntax highlighting (Monaco or CodeMirror)
 - [ ] Compose spec validation before deployment (use compose-go parser via new JSON API)
 - [ ] Diff view showing changes before applying (reuse existing dry-run preview)
@@ -260,7 +83,7 @@ Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Port
 - [ ] Add `comquad validate --json` command to validate compose files without deploying
 - [ ] Unit tests for editor component and validation flow
 
-#### 2.13 Resource metrics
+#### Resource metrics
 - [ ] **Prerequisite: New JSON API** - Add `comquad stats --json` using Podman stats
   - [ ] Add `StatsData`, `ServiceStats` schemas to `internal/output/schemas.go`
   - [ ] Add JSON branch to orchestrator stats method
@@ -275,34 +98,13 @@ Web UI plugin for Cockpit to manage comquad projects as stacks, inspired by Port
 - [ ] Alert indicators for high resource usage (>80% threshold)
 - [ ] Unit tests for metrics component and data formatting
 
-#### 2.14 Shell/Exec integration
+#### Shell/Exec integration
 - [ ] Add "Open Terminal" button to service rows in ProjectDetail.tsx
 - [ ] Deep-link to cockpit-podman container detail page with terminal
 - [ ] Construct cockpit-podman URL: `/podman/#/containers/<container-id>/console`
 - [ ] Handle cases where cockpit-podman is not installed (show message)
 - [ ] Add "Exec Command" quick action for one-off commands (optional enhancement)
 - [ ] Unit tests for URL generation and link handling
-
-### Execution Order
-
-1. ✅ Phase 1.1: `view --json` (validates schema design)
-2. ✅ Phase 1.2: `start/stop/restart --json` (validates lifecycle pattern)
-3. ✅ Phase 1.3: `down --json` (simple)
-4. ✅ Phase 1.6: Error handling in JSON mode (critical for plugin UX)
-5. ✅ Phase 2.1-2.3: Plugin scaffold + types + client (foundation)
-6. ✅ Phase 2.4: Projects list (first visible feature, validates end-to-end)
-7. ✅ Phase 2.5: Project detail (core feature)
-8. ✅ Phase 1.4: `up --json` (needed for deploy)
-9. ✅ Phase 2.6: Stack deploy (depends on `up --json`)
-10. ✅ Phase 1.5: `logs --json` (needed for logs viewer)
-11. ✅ Phase 2.10: `up --dry-run --json` (needed for preview features)
-12. ✅ Phase 2.11: Cockpit plugin enhancements (preview, resource viewer, clickable ports)
-13. ✅ Phase 2.9: Testing (unit tests + browser integration tests)
-14. ✅ Internationalization (i18n) - all strings wrapped, po/ infrastructure, build integration
-15. ⏳ Phase 2.7: Logs viewer (real-time streaming, search, filtering)
-16. ⏳ Phase 2.12: YAML/Compose editor (in-browser editing with validation)
-17. ⏳ Phase 2.13: Resource metrics (needs `stats --json` API first)
-18. ⏳ Phase 2.14: Shell/Exec integration (link to cockpit-podman terminal)
 
 ### References
 
@@ -449,6 +251,138 @@ environment:
 ---
 
 ## 🔄 Podman Compose Compatibility Layer & Provider
+
+### Implementation Plan
+
+#### Phase 1: Orchestrator Changes ✅
+
+**1.1 Compose file path support** ✅
+- Add `composePath string` field to `Orchestrator`
+- Add `WithComposeFile(path string)` method
+- If path is file → use directly; if directory → search (current behavior)
+
+**1.2 Refactor to options structs** ✅
+```go
+type UpOptions struct {
+    PullStrategy    string
+    Follow          bool
+    DryRun          bool
+    NoDiff          bool
+    ForceRebuild    bool
+    SkipBuild       bool
+    ForceRecreate   bool
+    SkipRecreate    bool
+    RemoveOrphans   bool
+    Services        []string  // For service filtering
+}
+
+type DownOptions struct {
+    RemoveVolumes   bool
+    DryRun          bool
+    RemoveOrphans   bool
+}
+
+type PullOptions struct {
+    PullStrategy    string  // default: "always"
+    DryRun          bool
+    Services        []string
+}
+```
+
+**1.3 Implement orphan detection** ⏳ (Deferred)
+- Query podman for containers with project label
+- Compare with services in current compose file
+- Stop containers not in compose file
+- Integrate into `Up()` and `Down()`
+
+**1.4 Implement service filtering** ⏳ (Deferred)
+- Filter units at start time based on `Services` list
+- Include dependencies if needed
+
+**1.5 Add `Pull()` method** ✅
+- Transpile, reconcile, write files
+- Start `.image` units only (filtered by services if specified)
+- Skip builds and containers
+
+**1.6 Update existing methods** ✅
+- `Up(opts UpOptions) error`
+- `Build(opts UpOptions) error` (reuse UpOptions minus some fields)
+- `Down(opts DownOptions) error`
+
+#### Phase 2: New Commands ✅
+
+**2.1 `comquad pull` command** ✅
+- Pull images defined in compose.yaml
+- Support service filtering: `pull [service...]`
+- Default pull strategy: `always`
+
+**2.2 `comquad compose` parent command** ✅
+- Registers all compose subcommands
+- Handles global flags (`--file`, `-p`, `--dry-run`)
+
+**2.3 Compose subcommands (P0)** ✅
+
+| Command | Translation |
+|---------|-------------|
+| `compose up` | `Up{Follow: true}` |
+| `compose up -d` | `Up{Follow: false}` |
+| `compose up --build` | `Up{ForceRebuild: true}` |
+| `compose up --no-build` | `Up{SkipBuild: true}` |
+| `compose up --force-recreate` | `Up{ForceRecreate: true}` |
+| `compose up --no-recreate` | `Up{SkipRecreate: true}` |
+| `compose up --remove-orphans` | `Up{RemoveOrphans: true}` |
+| `compose down` | `Down{}` |
+| `compose down --volumes` | `Down{RemoveVolumes: true}` |
+| `compose down --remove-orphans` | `Down{RemoveOrphans: true}` |
+| `compose ps` | `Ps()` passthrough |
+| `compose logs` | `Logs()` passthrough |
+
+**2.4 Compose subcommands (P1)** ✅
+
+| Command | Translation |
+|---------|-------------|
+| `compose start/stop/restart` | Passthrough |
+| `compose exec` | Invert `-T` → `tty=false` |
+| `compose build` | Passthrough |
+| `compose pull` | Passthrough to `pull` command |
+
+#### Phase 3: Flag Translation Layer ✅
+
+Create `cmd/comquad/compose_flags.go` with translation functions.
+
+#### Phase 4: Provider Mode ✅
+
+- Detect invocation as `docker-compose` or `podman-compose` ✅
+- Skip `compose` subcommand requirement ✅
+- Reuse translation layer ✅
+
+#### File Structure ✅
+
+```
+cmd/comquad/
+├── compose.go           # Parent "compose" command
+├── compose_flags.go     # Flag translation functions
+├── compose_up.go        # compose up subcommand
+├── compose_down.go      # compose down subcommand
+├── compose_ps.go        # compose ps subcommand
+├── compose_logs.go      # compose logs subcommand
+├── compose_start.go     # compose start subcommand
+├── compose_stop.go      # compose stop subcommand
+├── compose_restart.go   # compose restart subcommand
+├── compose_exec.go      # compose exec subcommand
+├── compose_build.go     # compose build subcommand
+├── compose_pull.go      # compose pull subcommand
+├── provider.go          # Provider mode detection
+└── pull.go              # comquad pull command
+
+internal/orchestrator/
+├── orchestrator.go      # Update Up(), Build() signatures
+├── down.go              # Update Down() signature
+├── pull.go              # New Pull() method
+└── options.go           # New UpOptions, DownOptions, PullOptions structs
+```
+
+---
 
 ### Concept
 
@@ -706,222 +640,3 @@ podman compose up
 - podman compose source: https://github.com/containers/podman/blob/main/cmd/podman/compose.go
 - docker compose docs: https://docs.docker.com/compose/reference/
 - podman-compose: https://github.com/containers/podman-compose
-
----
-
-## 🔒 AutoNS Mode for comquad (Rootful)
-
-### Concept
-
-Optional mode for rootful deployments that provides user namespace isolation between stacks using Podman's AutoNS feature. Each stack gets a dedicated 65535-wide UID/GID range, ensuring containers within a stack share one user namespace while containers across stacks are fully isolated.
-
-### Activation
-
-- Enabled via environment variable: `COMQUAD_AUTONS=1`
-- Only available in rootful mode (no-op or error in rootless)
-- Requires minimum Podman 4.4.0 (guarantees `idmap` volume support)
-
-### Design Decisions
-
-- **Opt-in**: Disabled by default, enabled via environment variable
-- **Rootful-only**: User namespaces with AutoNS are only relevant for root deployments
-- **Per-stack isolation**: Each comquad project gets its own UID range
-- **Anchor-based**: One container per stack owns the namespace, others join it
-- **Stable ranges**: Allocated ranges persisted in project state, reused across deployments
-- **No overlap detection**: If `/etc/subuid` changes after initial deployment, behavior is undefined
-- **Security-conscious idmap**: Volume mounts use `uids`/`gids` restrictions to prevent setuid leaks
-
-### System Configuration
-
-#### Recommended `/etc/subuid` Entry
-
-For rootful AutoNS deployments, add this entry to `/etc/subuid` and `/etc/subgid`:
-
-```
-containers:2147483647:2147483648
-```
-
-This provides:
-- **Start**: 2³¹ - 1 (upper half of 32-bit UID space, avoiding normal UIDs)
-- **Size**: 2³¹ (space for ~2 million containers)
-- **Range**: Covers UIDs 2147483647 to 4294967294
-
-The `containers` user is a special entry used by Podman for rootful AutoNS. The upper-half range avoids conflicts with system users (typically 0-999) and regular human users (typically 1000-60000).
-
-#### Validation
-
-`comquad check` should verify:
-- `/etc/subuid` contains a `containers` entry
-- The entry has adequate size (at least 65535 * expected_stacks)
-- Warn if the entry is missing or too small
-
-### User Namespace Strategy
-
-#### Range Allocation
-
-At first deployment, comquad reads `/etc/subuid` and finds the highest allocated end:
-
-```
-highest_end = max(start + size) for all entries
-registry_start = ceil(highest_end / 65535) * 65535
-stack_base = registry_start + (stack_index * 65535)
-```
-
-- Each stack gets a dedicated 65535-wide UID/GID range (not 65536 to avoid the `nobody` edge case where UID -2 casts to 65534)
-- Allocated range stored in project state under `$XDG_DATA_HOME/comquad/`
-- Range reused on subsequent deployments (stable across restarts)
-
-#### Anchor Container
-
-The anchor container gets a pinned AutoNS range:
-
-```ini
-[Container]
-PodmanArgs=--userns=auto:uidmapping=0,<stack_base>,65535
-```
-
-All other containers in the stack join the anchor's namespace:
-
-```ini
-[Container]
-PodmanArgs=--userns=container:<anchor-service>
-```
-
-#### Anchor Selection
-
-- **Case 1 — `depends_on` chain exists**: Walk the DAG, select the root node (service with no dependencies) as anchor
-- **Case 2 — No dependencies**: Select deterministically (alphabetically first service name) as anchor
-
-#### systemd Dependencies
-
-For all non-anchor containers, comquad injects synthetic systemd dependencies:
-
-```ini
-[Unit]
-After=<anchor>.service
-Requires=<anchor>.service
-```
-
-This guarantees the anchor's user namespace exists before any other container attempts to join it.
-
-### Volume Handling
-
-- All volume mounts get the `idmap` mount option with UID/GID restrictions
-- No `:U` fallback — `idmap` is strictly required (guaranteed by Podman 4.4.0 minimum)
-- Since the UID range is pinned and stable across restarts, volume data ownership remains consistent
-
-Example volume mount with restricted idmap:
-
-```ini
-[Container]
-Volume=/host/path:/container/path:idmap,uids=0-65534,gids=0-65534
-```
-
-The `uids` and `gids` restrictions prevent security issues where containers could create setuid executables on mapped volumes that would execute as host root.
-
-### Isolation Guarantees
-
-- Containers **within** a stack share one user namespace → shared volumes work naturally
-- Containers **across** stacks are in different UID ranges → fully isolated from each other
-- Host filesystem access is mapped through the UID range, providing an additional security layer
-
-### Implementation Plan
-
-#### Phase 1: compose2quadlet Library
-
-##### 1.1 Add AutoNS option
-- [ ] Add `WithAutoNS(enabled bool)` option in `compose2quadlet/options.go`
-- [ ] Add `AutoNS` field to `Config` in `compose2quadlet/internal/types/config.go`
-- [ ] Add `AutoNSConfig` struct to hold stack base UID, anchor service name
-
-##### 1.2 Anchor selection logic
-- [ ] Create `compose2quadlet/mapper/anchor.go` with anchor selection algorithm
-- [ ] Walk `depends_on` DAG to find root node (service with no dependencies)
-- [ ] Fallback to alphabetically first service if no dependencies
-- [ ] Return anchor service name for use in transform
-
-##### 1.3 AutoNS transform
-- [ ] Create `compose2quadlet/opinionated/autons.go`
-- [ ] Add `ApplyAutoNS(units []QuadletUnit, cfg *Config) []QuadletUnit` function
-- [ ] For anchor container: add `PodmanArgs=--userns=auto:uidmapping=0,<base>,65535`
-- [ ] For non-anchor containers: add `PodmanArgs=--userns=container:<anchor>`
-- [ ] Inject `After=<anchor>.service` and `Requires=<anchor>.service` in `[Unit]` section for non-anchor containers
-
-##### 1.4 Volume idmap option
-- [ ] Modify `compose2quadlet/opinionated/selinux.go` or create new transform
-- [ ] Add `idmap,uids=0-65534,gids=0-65534` option to all `Volume=` directives when AutoNS is enabled
-- [ ] Handle both `Volume=` and `Mount=` directives
-
-##### 1.5 Integration
-- [ ] Call `ApplyAutoNS()` in `opinionated.Apply()` pipeline
-- [ ] Add option to disable with `WithoutAutoNS()` (for symmetry)
-
-#### Phase 2: Orchestrator Integration
-
-##### 2.1 Environment variable handling
-- [ ] Read `COMQUAD_AUTONS` environment variable in `cmd/comquad/root.go`
-- [ ] Pass to orchestrator via context or option
-
-##### 2.2 Rootful mode check
-- [ ] Verify execution context is rootful before enabling AutoNS
-- [ ] Emit warning or error if `COMQUAD_AUTONS=1` in rootless mode
-
-##### 2.3 UID range allocation
-- [ ] Create `internal/deploy/subuid.go` for `/etc/subuid` parsing
-- [ ] Parse `/etc/subuid` to find highest allocated end
-- [ ] Calculate registry start (aligned to 65535 boundary)
-- [ ] Allocate stack-specific range based on project name or index
-
-##### 2.4 State persistence
-- [ ] Extend `projects.json` schema to include `autons_range` field per project
-- [ ] Store allocated UID range on first deployment
-- [ ] Retrieve and reuse range on subsequent deployments
-- [ ] Handle range cleanup on `comquad down`
-
-##### 2.5 Transpile option wiring
-- [ ] Pass `WithAutoNS(true)` and `WithAutoNSConfig(base, anchor)` to `Transpile()`
-- [ ] Ensure anchor selection happens after compose parsing but before transpilation
-
-##### 2.6 Validation in `comquad check`
-- [ ] Add check for `/etc/subuid` containing `containers` entry
-- [ ] Validate entry has adequate size for expected number of stacks
-- [ ] Warn if entry is missing or too small
-
-#### Phase 3: Testing
-
-##### 3.1 Unit tests
-- [ ] Test anchor selection with various `depends_on` configurations
-- [ ] Test UID range allocation and alignment
-- [ ] Test volume idmap option injection with uids/gids restrictions
-- [ ] Test systemd dependency injection
-
-##### 3.2 Integration tests
-- [ ] Test full deployment with AutoNS enabled
-- [ ] Verify anchor container has correct `--userns=auto` directive
-- [ ] Verify non-anchor containers join anchor's namespace
-- [ ] Verify volumes have `idmap,uids=0-65534,gids=0-65534` option
-- [ ] Test isolation between two stacks with different UID ranges
-
-### Known Limitations
-
-- If `/etc/subuid` is empty or missing, behavior is undefined — considered user misconfiguration on a systemd target system
-- No overlap detection with future `/etc/subuid` changes after initial deployment
-- Rootful-only feature (no-op in rootless mode)
-- Requires Podman 4.4.0+ for `idmap` volume support
-- The `nobody` user (UID -2 / 65534) edge case is avoided by using 65535 instead of 65536 as range size
-
-### Future Enhancements
-
-- **Overlap detection**: Warn if allocated range overlaps with new `/etc/subuid` entries
-- **Range resizing**: Support for stacks that need more or fewer than 65535 UIDs
-- **Rootless support**: Investigate if AutoNS can work in rootless mode with user-defined ranges
-- **Custom idmap restrictions**: Allow users to override the default `uids=0-65534,gids=0-65534` via x-extension
-
-### References
-
-- Podman AutoNS: `podman run --userns=auto`
-- Podman idmap volumes: `podman volume create --opt o=idmap`
-- `/etc/subuid` and `/etc/subgid` documentation: `man subuid`
-- User namespaces in containers: https://docs.podman.io/en/latest/markdown/podman-run.1.html#userns-mode
-- User-Based Privilege Separation article: https://tangentsoft.com/podman/wiki?name=User-Based%20Privilege%20Separation
-

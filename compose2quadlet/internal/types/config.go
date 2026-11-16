@@ -34,6 +34,12 @@ type Config struct {
 	ExternalNetworks       map[string]string
 	ExternalVolumes        map[string]string
 	PseudoQuadlet          bool
+	AutoNS                 *AutoNSConfig
+}
+
+type AutoNSConfig struct {
+	StackBaseUID  int
+	AnchorService string
 }
 
 type Version struct {
@@ -161,6 +167,15 @@ func WithInfo(fn func(string)) Option {
 
 func WithoutPseudoQuadlet() Option {
 	return func(c *Config) { c.PseudoQuadlet = false }
+}
+
+func WithAutoNS(baseUID int, anchor string) Option {
+	return func(c *Config) {
+		c.AutoNS = &AutoNSConfig{
+			StackBaseUID:  baseUID,
+			AnchorService: anchor,
+		}
+	}
 }
 
 func (c *Config) Warn(w Warning) {

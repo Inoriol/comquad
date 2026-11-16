@@ -133,7 +133,6 @@ Depending on the Compose file, comquad can generate:
 | Network | `.network` |
 | Named volume | `.volume` |
 | Secret (default) | `.cq-secret` → `.service` (pseudo-quadlet) |
-| Secret (custom perms) | `Volume=` mount (fallback) |
 | External secret | `Secret=` directive |
 
 Container units reference their companion image or build units. This lets Quadlet and systemd express dependencies between pulling or building an image and starting its container.
@@ -142,10 +141,9 @@ Container units reference their companion image or build units. This lets Quadle
 
 The pseudo-quadlet generator converts custom unit types (`.cq-*`) into standard `.service` units. Currently supports:
 
-- **`.cq-secret`**: Manages secrets using Podman's native secret store. Environment secrets are written to temporary files at `/run/comquad/secrets/` during deployment and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Includes `ExecStop=-/usr/bin/podman secret rm <name>` for automatic cleanup.
+- **`.cq-secret`**: Manages secrets using Podman's native secret store. Environment secrets are written to temporary files at `/run/comquad/secrets/` during deployment and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Custom permissions (`uid`/`gid`/`mode`) and custom target paths are passed to the `Secret=` directive (Podman 4.5.0+). Secrets can be exposed as environment variables using `x-type: env` extension. Includes `ExecStop=-/usr/bin/podman secret rm <name>` for automatic cleanup.
 - **`.cq-image`**: Fallback for Podman < 4.8.0 — generates `.service` with `ExecStart=podman pull`.
 - **`.cq-build`**: Fallback for Podman < 5.2.0 — generates `.service` with `ExecStart=podman build`.
-- Custom permissions (`uid`/`gid`/`mode`): Falls back to direct `Volume=` mount
 
 Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit.
 
@@ -170,6 +168,37 @@ Generated files are placed in the systemd Quadlet directory for the current exec
 - Rootless: `~/.config/containers/systemd`
 - Root: `/etc/containers/systemd`
 
+## AutoNS Mode (Rootful)
+
+When `COMQUAD_AUTONS=1` is set in rootful mode, comquad enables user namespace isolation between stacks. Each stack gets a dedicated 65535-wide UID/GID range from `/etc/subuid`.
+
+### Anchor Selection
+
+One container per stack is designated as the "anchor" that owns the user namespace:
+- If `depends_on` exists: root of the dependency DAG (service with no dependencies)
+- If no dependencies: alphabetically first service name
+
+### Namespace Sharing
+
+- **Anchor container**: Gets `PodmanArgs=--userns=auto:uidmapping=0:<base>:65535`
+- **Non-anchor containers**: Get `PodmanArgs=--userns=container:<anchor-container-name>`
+- **systemd dependencies**: Non-anchor containers get `After=` and `Requires=` for the anchor service
+
+### Volume Handling
+
+All volume mounts get the `idmap` option for proper UID mapping within the user namespace.
+
+### State Persistence
+
+The allocated UID range is stored in `projects.json` under `autons_range` and reused across deployments for stability.
+
+### Implementation Files
+
+- `compose2quadlet/mapper/anchor.go` — Anchor selection algorithm
+- `compose2quadlet/opinionated/autons.go` — AutoNS transform (userns directives, systemd deps, volume idmap)
+- `internal/deploy/subuid.go` — `/etc/subuid` parsing and UID range allocation
+- `internal/orchestrator/pipeline.go` — Anchor-first start order in `startContainers()`
+
 ## Runtime Commands
 
 Commands such as `start`, `stop`, and `restart` operate on already-generated units through systemd D-Bus. They do not regenerate files or run reconciliation.
@@ -183,6 +212,119 @@ Commands that inspect or interact with services use the project state to resolve
 - `edit` opens generated units in `$EDITOR`, then reloads systemd when files change.
 
 `down` stops the project's units, removes generated files and managed networks, unregisters the project, and removes auxiliary state. Named volumes are retained unless `--delete-volumes` is supplied.
+
+## Pull Command
+
+`comquad pull` pulls images defined in compose.yaml without starting containers. It follows the same transpilation and reconciliation pipeline as `up`, but only starts `.image` units.
+
+```go
+func (o *Orchestrator) Pull(opts PullOptions) error
+```
+
+The `PullOptions` struct:
+- `PullStrategy` - Image pull policy (always/missing/never)
+- `DryRun` - Preview without pulling
+- `Services` - Optional list of services to pull images for
+
+## Compose Compatibility Layer
+
+The `comquad compose` command provides Docker Compose compatible syntax. It translates docker-compose flags and commands to comquad's orchestrator calls.
+
+### Command Structure
+
+```
+cmd/comquad/
+├── compose.go           # Parent "compose" command
+├── compose_flags.go     # Flag translation helpers
+├── compose_up.go        # compose up subcommand
+├── compose_down.go      # compose down subcommand
+├── compose_ps.go        # compose ps subcommand
+├── compose_logs.go      # compose logs subcommand
+├── compose_start.go     # compose start subcommand
+├── compose_stop.go      # compose stop subcommand
+├── compose_restart.go   # compose restart subcommand
+├── compose_exec.go      # compose exec subcommand
+├── compose_build.go     # compose build subcommand
+├── compose_pull.go      # compose pull subcommand
+└── provider.go          # Provider mode detection (docker-compose/podman-compose symlinks)
+```
+
+### Flag Translation
+
+| docker-compose | comquad compose | Notes |
+|----------------|-----------------|-------|
+| `up` (no flag) | `Up{Follow: true}` | Attach to logs |
+| `up -d` | `Up{Follow: false}` | Detach |
+| `up --build` | `Up{ForceRebuild: true}` | Force rebuild |
+| `up --no-build` | `Up{SkipBuild: true}` | Skip build |
+| `up --force-recreate` | `Up{ForceRecreate: true}` | Always recreate |
+| `up --remove-orphans` | `Up{RemoveOrphans: true}` | Remove unmanaged |
+| `down -v` | `Down{RemoveVolumes: true}` | Remove volumes |
+| `exec -T` | `Exec{TTY: false}` | Disable TTY |
+
+### Provider Mode
+
+comquad supports being invoked as a compose provider via symlinks. When the binary is invoked as `docker-compose` or `podman-compose`, it automatically enters provider mode and accepts docker-compose syntax directly without requiring the `compose` subcommand.
+
+**Implementation:**
+
+The provider mode is implemented in `cmd/comquad/provider.go` and `cmd/comquad/main.go`:
+
+1. `isProviderMode()` checks `os.Args[0]` to detect if invoked as `docker-compose` or `podman-compose`
+2. If in provider mode and arguments are present, `main()` inserts `"compose"` as the first argument
+3. Cobra then routes the command to the compose command handler automatically
+
+**Example:**
+```
+User invokes: docker-compose up -d
+os.Args[0] = "docker-compose"
+os.Args[1:] = ["up", "-d"]
+
+Provider mode detection inserts "compose":
+os.Args = ["docker-compose", "compose", "up", "-d"]
+
+Cobra routes to: composeCmd → composeUpCmd
+```
+
+This allows comquad to work as a drop-in replacement for docker-compose or as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`.
+
+## Orchestrator Options Structs
+
+The orchestrator methods use options structs for cleaner APIs and forward compatibility:
+
+```go
+type UpOptions struct {
+    PullStrategy   string
+    Follow         bool
+    DryRun         bool
+    NoDiff         bool
+    ForceRebuild   bool
+    SkipBuild      bool
+    ForceRecreate  bool
+    SkipRecreate   bool
+    RemoveOrphans  bool
+    Services       []string
+}
+
+type DownOptions struct {
+    RemoveVolumes bool
+    DryRun        bool
+    RemoveOrphans bool
+}
+
+type PullOptions struct {
+    PullStrategy string
+    DryRun       bool
+    Services     []string
+}
+```
+
+## Compose File Path
+
+The orchestrator supports specifying a compose file path via `WithComposeFile(path)`:
+- If path is a file → use directly
+- If path is a directory → search for compose files in it
+- If not set → search in current working directory
 
 ## JSON Output
 
@@ -206,6 +348,7 @@ Commands check `output.IsJSONMode()` and emit JSON instead of human-readable tab
 | `restart` | `LifecycleData` | Restart action result |
 | `down` | `DownData` | Removal summary |
 | `up` | `UpData` | Deployment summary |
+| `pull` | `PullData` | Pull summary |
 | `logs` | `LogsData` | Structured log entries (batch mode) |
 
 When adding JSON support to a new command:

@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-16
+
+### Added
+
+- **`comquad pull` command** — New command to pull images defined in compose.yaml without starting containers. Supports service filtering (`pull [service...]`) and `--dry-run` preview. Uses the same transpilation and reconciliation pipeline as `up`, but only starts `.image` units.
+- **Docker Compose compatibility layer** — New `comquad compose` command provides docker-compose compatible CLI syntax while using comquad's systemd-native workflow internally.
+  - `compose up` — Create and start containers (`-d` for detach, `--build`, `--no-build`, `--force-recreate`, `--no-recreate`, `--remove-orphans`, `--pull`)
+  - `compose down` — Stop and remove containers, networks (`--volumes`, `--remove-orphans`)
+  - `compose ps` — List containers (`-a` for all)
+  - `compose logs` — View output from containers (`-f`, `--tail`, `--since`, `-t`)
+  - `compose start/stop/restart` — Lifecycle management for services
+  - `compose exec` — Execute commands in running containers (`-u`, `-T`)
+  - `compose build` — Build or rebuild services (`-f`, `--pull`)
+  - `compose pull` — Pull service images
+  - Global flags: `--file` (`-f`), `--project-name` (`-p`), `--dry-run`
+  - **Provider mode** — comquad can be invoked as `docker-compose` or `podman-compose` via symlinks, automatically accepting docker-compose syntax without requiring the `compose` subcommand. Also works as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`.
+- **Orchestrator options structs** — Refactored `Up()`, `Build()`, and `Down()` methods to use options structs (`UpOptions`, `DownOptions`, `PullOptions`) for cleaner APIs and forward compatibility.
+- **Compose file path support** — New `WithComposeFile(path)` method on Orchestrator allows specifying a compose file path (file or directory) instead of always searching the current working directory.
+- **`PullData` JSON schema** — New JSON output schema for `comquad pull` command with project name, pulled images list, and success status.
+- **AutoNS mode for rootful deployments** — Optional user namespace isolation between stacks using Podman's AutoNS feature. Each stack gets a dedicated 65535-wide UID/GID range from `/etc/subuid`, ensuring containers within a stack share one user namespace while containers across stacks are fully isolated.
+  - Enabled via `COMQUAD_AUTONS=1` environment variable (rootful only)
+  - Anchor container (root of `depends_on` DAG or alphabetically first) gets `--userns=auto:uidmapping=0:<base>:65535`
+  - Non-anchor containers join anchor's namespace via `--userns=container:<anchor-name>`
+  - All volumes get `idmap` option for proper UID mapping
+  - Allocated UID range persisted in `projects.json` for stability across deployments
+  - `comquad check` validates `/etc/subuid` has `containers` entry when AutoNS is enabled
+  - New `compose2quadlet/mapper/anchor.go` for anchor selection algorithm
+  - New `compose2quadlet/opinionated/autons.go` for AutoNS transform
+  - New `internal/deploy/subuid.go` for `/etc/subuid` parsing and UID allocation
+  - New `WithAutoNS(base, anchor)` option in compose2quadlet library
+  - Anchor-first start order in `startContainers()` to ensure namespace exists before other containers join
+- **Secret options support (Podman 4.5.0+)** — Secrets now support custom `target`, `uid`, `gid`, and `mode` options passed directly to Podman's native `Secret=` directive instead of falling back to volume mounts.
+  - Custom target paths: `target: /custom/path` mounts secret at specified location
+  - Custom permissions: `uid`, `gid`, `mode` set ownership and permissions on secret files
+  - Environment variable exposure: `x-type: env` exposes secret as environment variable instead of file mount
+  - Custom env var name: `x-target: VAR_NAME` sets the environment variable name when using `x-type: env`
+  - External secrets support the same options and extensions
+  - Version fallback: Podman < 4.5.0 falls back to `Volume=` bind mounts
+  - Updated `compose2quadlet/mapper/secrets.go` to build `Secret=` directives with options
+  - Updated `compose2quadlet/opinionated/references.go` to preserve Secret= options during reference rewriting
+  - Added `extractSecretExtensions()` helper for parsing `x-type` and `x-target` extensions
+  - Added `buildSecretValue()` helper for constructing Secret= directive with comma-separated options
+  - New integration tests for custom permissions and environment variable exposure
+
+### Changed
+
+- **Refactored orchestrator method signatures** — `Up()`, `Build()`, and `Down()` now accept options structs instead of individual parameters. Existing tests updated to use new signatures.
+- **Compose command flag handling** — Removed shorthand `-f` from `compose --file` to avoid conflict with `logs -f` (follow). Removed shorthand `-v` from `compose down --volumes` to avoid conflict with root `-v` (verbose).
+- **Secret handling for custom permissions** — Secrets with custom `uid`, `gid`, or `mode` now use Podman's native `Secret=` directive with options (Podman 4.5.0+) instead of falling back to `Volume=` bind mounts. This provides better integration with Podman's secret store and lifecycle management.
+
+### Documentation
+
+- Updated `README.md` with new `pull` command and Compose Compatibility section.
+- Updated `ARCHITECTURE.md` with Pull Command, Compose Compatibility Layer, Orchestrator Options Structs, and Compose File Path sections.
+- Updated `TODO.md` to mark completed items in the Compose Compatibility Layer implementation plan.
+- Updated `compose2quadlet/doc/comquad-secret.md` with comprehensive documentation for secret options, environment variable exposure, and version compatibility.
+- Updated `compose2quadlet/doc/mapping.md` to reflect new Secret= directive with options for Podman 4.5.0+.
+- Updated `compose2quadlet/README.md` and `compose2quadlet/ARCHITECTURE.md` with new secret handling behavior and x-extension support.
+
 ## [0.5.1] - 2026-11-13
 
 ### Added
@@ -679,7 +738,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Containerfile: changed `fedora:43` to `fedora:41` (stable); replaced `loginctl enable-linger || true` with direct file creation to avoid silently masked failures.
 - Made `captureStdout` goroutine-safe with a `sync.Mutex`, allowing `t.Parallel()` in orchestrator unit tests.
 
-[Unreleased]: https://github.com/Inoriol/comquad/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Inoriol/comquad/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/Inoriol/comquad/compare/v0.5.0...v0.5.1
 [0.5.1]: https://github.com/Inoriol/comquad/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Inoriol/comquad/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/Inoriol/comquad/compare/v0.4.3...v0.4.4

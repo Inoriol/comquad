@@ -122,7 +122,7 @@ func TestSecret_FileTmpfs(t *testing.T) {
 	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-api_key", project))
 }
 
-func TestSecret_CustomPermissionsFallback(t *testing.T) {
+func TestSecret_CustomPermissions(t *testing.T) {
 	helpers.SkipIfSystemdUnavailable(t)
 	project := helpers.ProjectName(t)
 	dir, _ := helpers.WriteCompose(t, helpers.SecretCustomPermsCompose(project))
@@ -143,6 +143,9 @@ func TestSecret_CustomPermissionsFallback(t *testing.T) {
 	// Deploy
 	helpers.MustSucceed(t, dir, "up", "--name", project)
 
+	// Verify secret service is active (custom permissions now use native Secret= directive)
+	helpers.AssertSecretServiceActive(t, project, "custom_secret", false)
+
 	// Verify container is running
 	containerName := fmt.Sprintf("%s-web", project)
 	helpers.AssertContainerRunning(t, containerName)
@@ -151,24 +154,21 @@ func TestSecret_CustomPermissionsFallback(t *testing.T) {
 	helpers.AssertSecretExists(t, containerName, "/run/secrets/custom_secret")
 	helpers.AssertSecretContent(t, containerName, "/run/secrets/custom_secret", secretContent)
 
-	// Verify NO .cq-secret file exists (fallback to volume mount)
-	basename := "cq-" + project + "-custom_secret.cq-secret"
-	if helpers.QuadletFileExists(t, basename) {
-		t.Fatalf("expected no .cq-secret file for custom permissions fallback, but %s exists", basename)
-	}
+	// Verify .cq-secret file exists (no longer falls back to volume mount for Podman 4.5.0+)
+	helpers.AssertSecretQuadletFileExists(t, project, "custom_secret")
 
-	// Verify the mount is a direct bind mount (not from /run/credentials)
+	// Verify Podman secret exists
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-custom_secret", project))
+
+	// Verify the secret is mounted via Podman secret (not direct bind mount)
 	mounts := helpers.GetContainerMounts(t, containerName)
 	found := false
 	for _, m := range mounts {
 		if m.Destination == "/run/secrets/custom_secret" {
 			found = true
-			// Should be a bind mount from the actual file, not from /run/credentials
-			if strings.Contains(m.Source, "/run/credentials") {
-				t.Fatalf("expected direct bind mount, but got /run/credentials path: %s", m.Source)
-			}
-			if !strings.Contains(m.Mode, "ro") {
-				t.Fatalf("expected read-only mount, but got mode: %s", m.Mode)
+			// Should be from Podman secret store, not a direct bind mount
+			if !strings.Contains(m.Source, "secrets") {
+				t.Fatalf("expected Podman secret mount, but got: %s", m.Source)
 			}
 			break
 		}
@@ -179,7 +179,60 @@ func TestSecret_CustomPermissionsFallback(t *testing.T) {
 
 	// Tear down
 	helpers.MustSucceed(t, dir, "down", "--name", project)
+	helpers.AssertSecretServiceGone(t, project, "custom_secret", false)
+	helpers.AssertSecretQuadletFileGone(t, project, "custom_secret")
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-custom_secret", project))
 	helpers.AssertProjectGone(t, project)
+}
+
+func TestSecret_EnvironmentVariableExposure(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
+
+	compose := `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    secrets:
+      - source: db_password
+        x-type: env
+        x-target: DB_PASSWORD
+secrets:
+  db_password:
+    environment: DB_PASSWORD_ENV
+`
+	dir, _ := helpers.WriteCompose(t, compose)
+
+	t.Cleanup(func() {
+		helpers.Comquad(t, dir, "down", "--name", project)
+	})
+
+	t.Setenv("DB_PASSWORD_ENV", "secret-env-value")
+
+	// Deploy
+	helpers.MustSucceed(t, dir, "up", "--name", project)
+
+	// Verify secret service is active
+	helpers.AssertSecretServiceActive(t, project, "db_password", false)
+
+	// Verify container is running
+	containerName := fmt.Sprintf("%s-web", project)
+	helpers.AssertContainerRunning(t, containerName)
+
+	// Verify secret is accessible as environment variable
+	envValue := helpers.ExecInContainer(t, containerName, "printenv DB_PASSWORD")
+	if envValue != "secret-env-value" {
+		t.Fatalf("expected DB_PASSWORD env var to be 'secret-env-value', got %q", envValue)
+	}
+
+	// Verify Podman secret exists
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-db_password", project))
+
+	// Tear down
+	helpers.MustSucceed(t, dir, "down", "--name", project)
+	helpers.AssertSecretServiceGone(t, project, "db_password", false)
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-db_password", project))
 }
 
 func TestSecret_Deduplication(t *testing.T) {

@@ -13,14 +13,14 @@ import (
 )
 
 // Down stops all units, removes quadlet files, removes networks, and unregisters the project.
-// If removeVolumes is true, also removes Podman volumes.
-func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
+// If downOpts.RemoveVolumes is true, also removes Podman volumes.
+func (o *Orchestrator) Down(downOpts DownOptions) error {
 	stateMgr, state, err := o.ensureProjectDeployed()
 	if err != nil {
 		return err
 	}
 
-	if dryRun {
+	if downOpts.DryRun {
 		if output.IsJSONMode() {
 			return output.PrintJSON(&output.DownData{
 				Project:         o.projectName,
@@ -36,7 +36,7 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 		}
 		logger.Print("  Remove quadlet files and unregister project")
 		logger.Print("  Remove podman networks")
-		if removeVolumes {
+		if downOpts.RemoveVolumes {
 			logger.Print("  Remove podman volumes")
 		}
 		return nil
@@ -162,7 +162,7 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 		logger.Error("failed to remove networks: " + err.Error())
 	}
 
-	if removeVolumes {
+	if downOpts.RemoveVolumes {
 		if err := deploy.RemoveVolumes(o.projectName); err != nil {
 			logger.Error("failed to remove volumes: " + err.Error())
 		}
@@ -191,7 +191,7 @@ func (o *Orchestrator) Down(removeVolumes bool, dryRun bool) error {
 			RemovedNetworks: removedNetworks,
 			Success:         true,
 		}
-		if removeVolumes {
+		if downOpts.RemoveVolumes {
 			data.RemovedVolumes = removedVolumes
 		}
 		return output.PrintJSON(data)

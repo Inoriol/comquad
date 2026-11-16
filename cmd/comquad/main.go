@@ -42,8 +42,15 @@ func init() {
 }
 
 func main() {
+	if isProviderMode() && len(os.Args) > 1 {
+		newArgs := []string{os.Args[0], "compose"}
+		newArgs = append(newArgs, os.Args[1:]...)
+		os.Args = newArgs
+	}
+
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(buildCmd)
+	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(downCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(regenerateCmd)
@@ -56,6 +63,7 @@ func main() {
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(restartCmd)
 	rootCmd.AddCommand(execCmd)
+	rootCmd.AddCommand(composeCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		if output.IsJSONMode() {

@@ -8,7 +8,7 @@ comquad-secret — comquad pseudo-quadlet secret unit
 
 ## DESCRIPTION
 
-The `.cq-secret` unit type is a comquad-specific pseudo-quadlet that manages secrets using Podman's native secret store. Secret values are created as Podman secrets and mounted into containers at `/run/secrets/<secret-name>`.
+The `.cq-secret` unit type is a comquad-specific pseudo-quadlet that manages secrets using Podman's native secret store. Secret values are created as Podman secrets and mounted into containers at `/run/secrets/<secret-name>` or exposed as environment variables.
 
 `.cq-secret` units are not native Quadlet types. During deployment, comquad converts each `.cq-secret` file into a companion `.service` unit that systemd loads directly. The `.cq-secret` file remains the source of truth managed by comquad; the `.service` file is what systemd actually starts.
 
@@ -22,13 +22,58 @@ Two source types are supported:
 
 - **File secrets** — The secret value is read from a file on the host filesystem. The generated service uses `podman secret create <name> <path>` to load the file contents into Podman's secret store.
 
+### Secret Options
+
+Secrets support the following options passed to the `Secret=` directive:
+
+- **target=** — Custom mount path inside the container. Relative paths are resolved relative to `/run/secrets/`. For environment variable exposure, this is the variable name.
+- **uid=** — UID of the secret file (mount type only).
+- **gid=** — GID of the secret file (mount type only).
+- **mode=** — File mode of the secret file (mount type only).
+
+### Environment Variable Exposure
+
+Secrets can be exposed as environment variables instead of files using the `x-type: env` extension:
+
+```yaml
+services:
+  web:
+    secrets:
+      - source: db_password
+        x-type: env
+        x-target: DB_PASSWORD  # optional, defaults to secret name
+```
+
+This generates `Secret=<name>,type=env,target=DB_PASSWORD` which exposes the secret as an environment variable inside the container.
+
+**Note:** `x-type: env` is incompatible with `uid`, `gid`, and `mode` options. If both are specified, a warning is emitted and the options are ignored.
+
 ### External Secrets
 
 Secrets defined with `external: true` in the Compose file do not produce `.cq-secret` units. Instead, they generate a native Podman `Secret=<name>` directive on the container. External secrets require Podman 4.5.0 or newer.
 
-### Custom Permissions Fallback
+External secrets support the same options (target, uid, gid, mode) and x-extensions (x-type, x-target) as managed secrets.
 
-Secrets with custom `uid`, `gid`, or `mode` in the Compose service reference bypass the `.cq-secret` mechanism entirely. They fall back to a direct `Volume=` bind mount from the source file to the container target path. For environment secrets with custom permissions, the `WithSecretsDirectory()` option must be configured; the environment variable value is written to `<SecretsDir>/<secret_name>` (mode 0600) and mounted as a volume.
+### Version Compatibility
+
+- **Podman >= 4.5.0**: Uses native `Secret=` directive with all options (target, uid, gid, mode, type).
+- **Podman < 4.5.0**: Falls back to `Volume=` bind mounts for secrets. Environment secrets require `WithSecretsDirectory()` to be configured.
+
+### Custom Permissions
+
+Secrets with custom `uid`, `gid`, or `mode` are passed directly to the `Secret=` directive:
+
+```yaml
+services:
+  web:
+    secrets:
+      - source: db_password
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+```
+
+Generates: `Secret=cq-myapp-db_password,uid=1000,gid=1000,mode=0400`
 
 ### Deduplication
 
@@ -190,7 +235,7 @@ Generates:
 - Two `.cq-secret` units (`db_password` and `api_key`)
 - Two `Secret=` directives on the `web` container:
   - `Secret=cq-myapp-db_password`
-  - `Secret=cq-myapp-api_key`
+  - `Secret=cq-myapp-api_key,target=/app/config/api.key`
 - Secrets are mounted at `/run/secrets/cq-myapp-db_password` and `/run/secrets/cq-myapp-api_key` in the container
 
 ### External Secrets
@@ -212,7 +257,7 @@ Generates:
 - No `.cq-secret` unit
 - `Secret=my-db-secret` directive on the `web` container
 
-### Custom Permissions Fallback
+### Custom Permissions
 
 ```yaml
 services:
@@ -230,8 +275,29 @@ secrets:
 ```
 
 Generates:
-- No `.cq-secret` unit
-- Direct bind mount: `Volume=./db_password.txt:/run/secrets/db_password:ro`
+- One `.cq-secret` unit (`db_password`)
+- `Secret=cq-myapp-db_password,uid=1000,gid=1000,mode=0400` directive on the `web` container
+
+### Environment Variable Exposure
+
+```yaml
+services:
+  web:
+    image: nginx
+    secrets:
+      - source: db_password
+        x-type: env
+        x-target: DB_PASSWORD
+
+secrets:
+  db_password:
+    environment: DB_PASSWORD
+```
+
+Generates:
+- One `.cq-secret` unit (`db_password`)
+- `Secret=cq-myapp-db_password,type=env,target=DB_PASSWORD` directive on the `web` container
+- The secret is exposed as the `DB_PASSWORD` environment variable inside the container
 
 ### Shared Secrets (Deduplication)
 

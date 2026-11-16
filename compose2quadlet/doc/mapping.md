@@ -206,8 +206,12 @@ The **Since** column tracks the minimum version required for each mapping:
 | `group_add` | 1 | `GroupAdd=` | `[Container]` | 5.1.0 | `podman run --group-add <group>` |
 | `secrets` (short syntax) | — | *(handled pre-mapping)* | — | — | `podman run --secret <secret>` |
 | `secrets` (long, external) | 1 | `Secret=` | `[Container]` | 4.5.0 | `podman run --secret <secret>` |
-| `secrets` (long, file) | 1 | `Volume=<path>:/run/secrets/<name>:ro` | `[Container]` | 4.4.0 | `podman run -v <path>:/run/secrets/<name>:ro` |
-| `secrets` (long, environment) | 1 | `Volume=<path>:/run/secrets/<name>:ro` | `[Container]` | 4.4.0 | `podman run -v <path>:/run/secrets/<name>:ro` |
+| `secrets` (long, file) | 1 | `Secret=<name>[,target=,uid=,gid=,mode=]` | `[Container]` | 4.5.0 | `podman run --secret <spec>` |
+| `secrets` (long, file, fallback) | 1 | `Volume=<path>:/run/secrets/<name>:ro` | `[Container]` | 4.4.0 | `podman run -v <path>:/run/secrets/<name>:ro` |
+| `secrets` (long, environment) | 1 | `Secret=<name>[,target=,uid=,gid=,mode=]` | `[Container]` | 4.5.0 | `podman run --secret <spec>` |
+| `secrets` (long, environment, fallback) | 1 | `Volume=<path>:/run/secrets/<name>:ro` | `[Container]` | 4.4.0 | `podman run -v <path>:/run/secrets/<name>:ro` |
+| `secrets.x-type: env` | 1 | `Secret=<name>,type=env[,target=<VAR>]` | `[Container]` | 4.5.0 | `podman run --secret <name>,type=env,target=<VAR>` |
+| `secrets.x-target` | 1 | *(merged into Secret= target)* | `[Container]` | 4.5.0 | `podman run --secret <name>,target=<path>` |
 | `configs` (short syntax) | 1 | `Mount=type=bind,source=<path>,target=/<name>` | `[Container]` | 4.5.0 | `podman run --mount type=bind,source=<path>,target=/<name>` |
 | `configs` (long syntax) | 1 | `Mount=type=bind,...` | `[Container]` | 4.5.0 | `podman run --mount type=bind,...` |
 | `credential_spec` | 4 | — | — | — | — |

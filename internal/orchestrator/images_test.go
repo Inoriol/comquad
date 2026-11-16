@@ -288,7 +288,7 @@ func TestStartContainers_StartsContainerUnits(t *testing.T) {
 	projectFiles := []string{"/fake/cq-myapp-web.container"}
 	res := reconcileResultWithCreated([]string{"/fake/cq-myapp-web.container"})
 
-	err := o.startContainers(projectFiles, res)
+	err := o.startContainers(projectFiles, res, "")
 	if err != nil {
 		t.Fatalf("startContainers failed: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestStartContainers_RestartsChangedUnits(t *testing.T) {
 	projectFiles := []string{"/fake/cq-myapp-web.container"}
 	res := reconcileResultWithChanged([]string{"/fake/cq-myapp-web.container"})
 
-	err := o.startContainers(projectFiles, res)
+	err := o.startContainers(projectFiles, res, "")
 	if err != nil {
 		t.Fatalf("startContainers failed: %v", err)
 	}

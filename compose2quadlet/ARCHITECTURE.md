@@ -89,16 +89,17 @@ compose2quadlet/
 │   ├── build.go              # Builds() — .build quadlets (fatal error pre-5.2.0)
 │   ├── network.go            # Networks() — top-level .network quadlets
 │   ├── volume.go             # Volumes() — top-level .volume quadlets
-│   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor; generates .cq-secret units for tmpfs staging
+│   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor; generates .cq-secret units and Secret= directives with options (target, uid, gid, mode, type)
 │   ├── dockerfile.go         # PatchDockerfileFROM() — normalize bare image names in FROM lines
 │   ├── extensions.go         # Extract*Extensions() — x-extension extraction for quadlet-only directives
 │   ├── validation.go         # isValidDirective() — directive validation for x-extensions
-│   └── helpers.go            # sortedKeys() — deterministic map key ordering
+│   ├── helpers.go            # sortedKeys() — deterministic map key ordering
+│   └── anchor.go             # SelectAnchor() — pick root of depends_on DAG or alphabetically first service
 │
 ├── opinionated/              # Opinionated transforms
 │   ├── opinionated.go        # Apply() — orchestrates all transforms
 │   ├── prefix.go             # ApplyPrefix() — cq-<project>- prefix on all unit names
-│   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, Image=, Mount= references; preserve external names; handle .secretref placeholders
+│   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, Image=, Mount=, Secret= references; preserve external names; handle .secretref placeholders with options
 │   ├── containername.go      # ApplyContainerName() — default ContainerName=<project>-<service>
 │   ├── aliases.go            # ApplyNetworkAliases() — inject NetworkAlias=<service>, <project>-<service>
 │   ├── selinux.go            # ApplySELinux() — add relabel=shared/private to Mount=, :z/:Z to Volume= based on shared volume analysis
@@ -108,6 +109,7 @@ compose2quadlet/
 │   ├── network.go            # ApplyDefaultNetwork() — inject default network for services without explicit networks
 │   ├── ports.go              # ApplyPortOffset() — apply port offset with Info callback logging
 │   ├── autoupdate.go         # ApplyAutoUpdate() — add AutoUpdate=registry
+│   ├── autons.go             # ApplyAutoNS() — add userns directives, systemd deps, volume idmap for rootful namespace isolation
 │   └── install.go            # ApplyInstallSection() — add [Install] section
 │
 ├── pseudo/                   # Pseudo-quadlet generator
@@ -184,9 +186,9 @@ Transpile(project, opts...)
     ├── 1. Apply transpileConfig (defaults + user overrides from opts)
     │
     ├── 2. Secrets pre-mapping intercept
-    │       secrets → Volume= / Secret= in [Container]
+    │       secrets → Secret= with options (target, uid, gid, mode, type) in [Container]
     │       configs → Mount=type=bind in [Container]
-    │       Environment-based secrets resolved when WithSecretsDirectory() is set
+    │       Environment-based secrets resolved when WithSecretsDirectory() is set (for Podman < 4.5.0 fallback)
     │       (strips secrets/configs from model before field mapping)
     │
     ├── 3. Field mapping phase (mapper/)
@@ -308,6 +310,7 @@ All transforms are **enabled by default** and can be individually disabled via `
 | Info callback | `WithInfo(fn)` | Receives info-level messages and non-fatal mapping warnings for consumer logging |
 | Version parsing | `ParseVersion(s)` | Parses `"5.2.0"` or `"v4.8"` into `Version` for `WithPodmanVersion()` |
 | Batch write | `serialization.WriteUnits(dir, units)` | Writes all units to a directory with `<name>.<type>` filenames |
+| AutoNS | `WithAutoNS(base, anchor)` | Adds `PodmanArgs=--userns=auto:uidmapping=0:<base>:65535` to anchor, `--userns=container:<anchor>` to others, `After=`/`Requires=` deps, and `idmap` to volumes |
 
 ## Quadlet-Specific Behaviors
 
@@ -349,22 +352,43 @@ Podman resolves bare image names differently from Docker. When `WithDockerfileNo
 
 Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs before container field mapping. The default behavior uses Podman's native secret store via `.cq-secret` pseudo-quadlet units:
 
-**Default behavior (Podman secret store):**
+**Default behavior (Podman secret store, requires Podman >= 4.5.0):**
 - Environment secrets: Generates `.cq-secret` unit; during deployment, the env var value is written to `/run/comquad/secrets/<name>.env` and loaded via `podman secret create`
 - File secrets: Generates `.cq-secret` unit that loads the file directly via `podman secret create <name> <path>`
-- Container mounts: `Secret=<name>` directive mounts the secret at `/run/secrets/<name>` in the container
+- Container mounts: `Secret=<name>[,target=<path>,uid=<uid>,gid=<gid>,mode=<mode>]` directive mounts the secret at `/run/secrets/<name>` in the container with optional custom permissions
+- Environment variable exposure: `Secret=<name>,type=env,target=<VAR>` exposes the secret as an environment variable (via `x-type: env` extension)
 - Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit
 
-**Fallback (volume mount):**
-- Secrets with custom `uid`, `gid`, or `mode` fall back to direct `Volume=<file>:<target>:ro` mount
-- This preserves backward compatibility for secrets that need specific permissions
+**Fallback (Podman < 4.5.0):**
+- Falls back to direct `Volume=<file>:<target>:ro` mount for all secrets
+- Environment secrets require `WithSecretsDirectory()` to be configured
 
 **External secrets:**
-- Use native Podman `Secret=<name>` directive (requires podman >= 4.5)
+- Use native Podman `Secret=<name>` directive (requires Podman >= 4.5)
+- Support the same options (target, uid, gid, mode) and x-extensions (x-type, x-target) as managed secrets
 
 The `.cq-secret` units are converted to `.service` units by the pseudo-quadlet generator (`pseudo.ConvertPseudoUnits()`), which runs after transpilation. The generated service uses `Type=oneshot` and `RemainAfterExit=yes` to create the secret in Podman's secret store via `podman secret create`. An `ExecStop=-/usr/bin/podman secret rm <name>` directive ensures cleanup on project teardown.
 
-**Legacy behavior:** When `WithSecretsDirectory(path)` is set and a secret has custom permissions, the old behavior writes the env var to disk at `path/<secret_name>` and mounts it as a volume. This is only used for the custom-permissions fallback case.
+### Secret Extensions
+
+Secrets support x-extensions on the service reference for advanced configuration:
+
+- `x-type: env` — Expose the secret as an environment variable instead of a file mount
+- `x-target: <name>` — For `x-type: env`, sets the environment variable name; for file mounts, sets the target path
+
+Example:
+```yaml
+services:
+  web:
+    secrets:
+      - source: db_password
+        x-type: env
+        x-target: DB_PASSWORD
+```
+
+Generates: `Secret=cq-myapp-db_password,type=env,target=DB_PASSWORD`
+
+**Note:** `x-type: env` is incompatible with `uid`, `gid`, and `mode` options. If both are specified, a warning is emitted and the options are ignored.
 
 ### X-Extensions
 
@@ -538,7 +562,8 @@ Podman automatically mounts the secret at `/run/secrets/cq-project-db_password` 
 **Secret types:**
 - Environment secrets: Written to `/run/comquad/secrets/<name>.env` during deployment, then loaded via `podman secret create`
 - File secrets: Loaded directly via `podman secret create <name> <path>`
-- Custom permissions (`uid`/`gid`/`mode`): Falls back to direct `Volume=` mount (not `.cq-secret`)
+- Custom permissions (`uid`/`gid`/`mode`): Passed to `Secret=` directive as options (requires Podman >= 4.5.0)
+- Environment variable exposure: `x-type: env` extension exposes secret as env var via `Secret=<name>,type=env,target=<VAR>`
 
 Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit.
 

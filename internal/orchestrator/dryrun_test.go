@@ -375,7 +375,7 @@ func TestUp_DryRun_DoesNotWriteToTargetDir(t *testing.T) {
 	}
 
 	captureStdout(t, func() {
-		o.Up("missing", false, true, true)
+		o.Up(UpOptions{PullStrategy: "missing", DryRun: true, NoDiff: true})
 	})
 
 	if len(state.projects) != 0 {
@@ -394,7 +394,7 @@ func TestUp_DryRun_NoComposeFileReturnsError(t *testing.T) {
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 	o.cwd = dir
 
-	err := o.Up("missing", false, true, true)
+	err := o.Up(UpOptions{PullStrategy: "missing", DryRun: true, NoDiff: true})
 	if err == nil || !strings.Contains(err.Error(), "no compose file found") {
 		t.Errorf("expected 'no compose file found', got %v", err)
 	}

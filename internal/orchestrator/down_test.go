@@ -18,7 +18,7 @@ func TestDown_ProjectNotDeployed(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", t.TempDir(), state, newMockSystemdClient())
 
-	err := o.Down(false, false)
+	err := o.Down(DownOptions{})
 	if err == nil || !strings.Contains(err.Error(), "not deployed") {
 		t.Errorf("expected 'not deployed' error, got %v", err)
 	}
@@ -26,7 +26,7 @@ func TestDown_ProjectNotDeployed(t *testing.T) {
 
 func TestDown_StateError(t *testing.T) {
 	o := newTestOrchestratorWithStateErr("myapp", t.TempDir(), errors.New("state unavailable"))
-	err := o.Down(false, false)
+	err := o.Down(DownOptions{})
 	if err == nil || !strings.Contains(err.Error(), "state unavailable") {
 		t.Errorf("expected state error, got %v", err)
 	}
@@ -39,7 +39,7 @@ func TestDown_SystemdConnectionError(t *testing.T) {
 	})
 	o := newTestOrchestratorWithSystemdErr("myapp", dir, state, errors.New("dbus gone"))
 
-	err := o.Down(false, false)
+	err := o.Down(DownOptions{})
 	if err == nil || !strings.Contains(err.Error(), "dbus gone") {
 		t.Errorf("expected dbus error, got %v", err)
 	}
@@ -56,7 +56,7 @@ func TestDown_StopsUnitsBeforeRemovingFiles(t *testing.T) {
 	sys := newMockSystemdClient()
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -77,7 +77,7 @@ func TestDown_RemovesQuadletFiles(t *testing.T) {
 	})
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -99,7 +99,7 @@ func TestDown_ReloadsDaemonAfterFileRemoval(t *testing.T) {
 	sys := newMockSystemdClient()
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestDown_UnregistersProjectFromState(t *testing.T) {
 	})
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -136,7 +136,7 @@ func TestDown_ReloadDaemonError_PropagatesError(t *testing.T) {
 	sys.reloadErr = errors.New("reload failed")
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	err := o.Down(false, false)
+	err := o.Down(DownOptions{})
 	if err == nil || !strings.Contains(err.Error(), "reload failed") {
 		t.Errorf("expected reload error, got %v", err)
 	}
@@ -152,7 +152,7 @@ func TestDown_AlreadyRemovedFilesIgnored(t *testing.T) {
 	})
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Errorf("Down should tolerate already-missing quadlet files, got: %v", err)
 	}
 }
@@ -165,7 +165,7 @@ func TestDown_UnregisterError_PropagatesError(t *testing.T) {
 	state.saveErr = errors.New("disk full")
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	err := o.Down(false, false)
+	err := o.Down(DownOptions{})
 	if err == nil || !strings.Contains(err.Error(), "disk full") {
 		t.Errorf("expected unregister error, got %v", err)
 	}
@@ -186,7 +186,7 @@ func TestDown_StopsNetworkAndVolumeUnits(t *testing.T) {
 	sys := newMockSystemdClient()
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -315,7 +315,7 @@ func TestDown_JSON(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -366,7 +366,7 @@ func TestDown_StopsPseudoImageAndBuildUnits(t *testing.T) {
 	sys := newMockSystemdClient()
 	o := newTestOrchestrator("myapp", dir, state, sys)
 
-	if err := o.Down(false, false); err != nil {
+	if err := o.Down(DownOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

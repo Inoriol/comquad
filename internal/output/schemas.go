@@ -161,3 +161,9 @@ type DryRunFile struct {
 	Diff       string `json:"diff"`
 	NewContent string `json:"new_content,omitempty"`
 }
+
+type PullData struct {
+	Project      string   `json:"project"`
+	ImagesPulled []string `json:"images_pulled"`
+	Success      bool     `json:"success"`
+}

@@ -196,6 +196,63 @@ units, _ := c2q.Transpile(project,
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md#pseudo-quadlet-generator) for details on the conversion process, and [doc/comquad-secret.md](./doc/comquad-secret.md) for the `.cq-secret` unit specification.
 
+## Secret Handling
+
+Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs before container field mapping. The default behavior uses Podman's native secret store via `.cq-secret` pseudo-quadlet units:
+
+**Default behavior (Podman secret store, requires Podman >= 4.5.0):**
+- Environment secrets: Generates `.cq-secret` unit; during deployment, the env var value is written to `/run/comquad/secrets/<name>.env` and loaded via `podman secret create`
+- File secrets: Generates `.cq-secret` unit that loads the file directly via `podman secret create <name> <path>`
+- Container mounts: `Secret=<name>[,target=<path>,uid=<uid>,gid=<gid>,mode=<mode>]` directive mounts the secret at `/run/secrets/<name>` in the container with optional custom permissions
+- Environment variable exposure: `Secret=<name>,type=env,target=<VAR>` exposes the secret as an environment variable (via `x-type: env` extension)
+- Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit
+
+**Fallback (Podman < 4.5.0):**
+- Falls back to direct `Volume=<file>:<target>:ro` mount for all secrets
+- Environment secrets require `WithSecretsDirectory()` to be configured
+
+**External secrets:**
+- Use native Podman `Secret=<name>` directive (requires Podman >= 4.5)
+- Support the same options (target, uid, gid, mode) and x-extensions (x-type, x-target) as managed secrets
+
+### Secret Extensions
+
+Secrets support x-extensions on the service reference for advanced configuration:
+
+- `x-type: env` — Expose the secret as an environment variable instead of a file mount
+- `x-target: <name>` — For `x-type: env`, sets the environment variable name; for file mounts, sets the target path
+
+Example:
+```yaml
+services:
+  web:
+    secrets:
+      - source: db_password
+        x-type: env
+        x-target: DB_PASSWORD
+```
+
+Generates: `Secret=cq-myapp-db_password,type=env,target=DB_PASSWORD`
+
+## AutoNS (User Namespace Isolation)
+
+The library supports AutoNS mode for rootful deployments that provides user namespace isolation between stacks. When enabled, one container per stack becomes the "anchor" that owns the namespace, and other containers join it.
+
+**Enable AutoNS:**
+```go
+units, _ := c2q.Transpile(project,
+    c2q.WithAutoNS(65535, "db"),  // base UID, anchor service name
+)
+```
+
+**What it does:**
+- Anchor container gets `PodmanArgs=--userns=auto:uidmapping=0:<base>:65535`
+- Non-anchor containers get `PodmanArgs=--userns=container:<anchor-name>`
+- Non-anchor containers get `After=` and `Requires=` for the anchor service
+- All volumes get the `idmap` option
+
+**Anchor selection** is handled by `mapper.SelectAnchor(services)` which picks the root of the `depends_on` DAG or alphabetically first service.
+
 ## Dependencies
 
 - `github.com/compose-spec/compose-go/v2` — canonical compose parsing
