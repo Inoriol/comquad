@@ -4,13 +4,13 @@ import (
 	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
 )
 
-func ConvertPseudoUnits(units []c2qtypes.QuadletUnit) []c2qtypes.QuadletUnit {
+func ConvertPseudoUnits(units []c2qtypes.QuadletUnit, runtimeSecretsDir string) []c2qtypes.QuadletUnit {
 	var result []c2qtypes.QuadletUnit
 
 	for _, u := range units {
 		switch u.Type {
 		case c2qtypes.UnitCQSecret:
-			result = append(result, convertSecret(u))
+			result = append(result, convertSecret(u, runtimeSecretsDir))
 		case c2qtypes.UnitCQImage:
 			result = append(result, convertImage(u))
 		case c2qtypes.UnitCQBuild:

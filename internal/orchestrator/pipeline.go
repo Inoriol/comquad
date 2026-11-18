@@ -248,9 +248,13 @@ func (o *Orchestrator) copyPseudoQuadlets(projectFiles []string) error {
 		}
 	}
 
+	var runtimeSecretsDir string
 	if hasSecrets {
-		secretDir := "/run/comquad/secrets"
-		if err := os.MkdirAll(secretDir, 0700); err != nil {
+		runtimeSecretsDir, err = deploy.ResolveRuntimeSecretsDir()
+		if err != nil {
+			return fmt.Errorf("failed to resolve runtime secrets directory: %w", err)
+		}
+		if err := os.MkdirAll(runtimeSecretsDir, 0700); err != nil {
 			return fmt.Errorf("failed to create secret directory: %w", err)
 		}
 	}
@@ -275,7 +279,7 @@ func (o *Orchestrator) copyPseudoQuadlets(projectFiles []string) error {
 		}
 
 		if strings.HasSuffix(base, ".cq-secret") {
-			content, err = o.processSecretFile(content, base)
+			content, err = o.processSecretFile(content, base, runtimeSecretsDir)
 			if err != nil {
 				return fmt.Errorf("failed to process secret file %s: %w", base, err)
 			}
@@ -288,25 +292,24 @@ func (o *Orchestrator) copyPseudoQuadlets(projectFiles []string) error {
 	return nil
 }
 
-func (o *Orchestrator) processSecretFile(content []byte, filename string) ([]byte, error) {
+func (o *Orchestrator) processSecretFile(content []byte, filename string, runtimeSecretsDir string) ([]byte, error) {
 	lines := strings.Split(string(content), "\n")
 	var result []string
 
 	for _, line := range lines {
-		if strings.HasPrefix(line, "ExecStart=") && strings.Contains(line, "/run/comquad/secrets/") {
+		if strings.HasPrefix(line, "ExecStart=") && strings.Contains(line, runtimeSecretsDir+"/") {
 			parts := strings.SplitN(line, "=", 2)
 			if len(parts) == 2 {
-				secretPath := strings.TrimPrefix(parts[1], "/bin/sh -c 'podman secret create ")
-				secretPath = strings.TrimPrefix(secretPath, "--replace ")
-				secretPath = strings.Split(secretPath, " ")[1]
-				secretPath = strings.TrimSuffix(secretPath, "'")
-				
-				envVarName := extractEnvVarNameFromServiceUnit(string(content))
-				if envVarName != "" {
-					envValue := os.Getenv(envVarName)
-					if envValue != "" {
-						if err := os.WriteFile(secretPath, []byte(envValue), 0600); err != nil {
-							return nil, fmt.Errorf("failed to write secret file: %w", err)
+				execValue := parts[1]
+				secretPath := extractSecretPath(execValue, runtimeSecretsDir)
+				if secretPath != "" {
+					envVarName := extractEnvVarNameFromServiceUnit(string(content))
+					if envVarName != "" {
+						envValue := os.Getenv(envVarName)
+						if envValue != "" {
+							if err := os.WriteFile(secretPath, []byte(envValue), 0600); err != nil {
+								return nil, fmt.Errorf("failed to write secret file: %w", err)
+							}
 						}
 					}
 				}
@@ -316,6 +319,19 @@ func (o *Orchestrator) processSecretFile(content []byte, filename string) ([]byt
 	}
 
 	return []byte(strings.Join(result, "\n")), nil
+}
+
+func extractSecretPath(execValue, runtimeSecretsDir string) string {
+	idx := strings.Index(execValue, runtimeSecretsDir)
+	if idx == -1 {
+		return ""
+	}
+	rest := execValue[idx:]
+	endIdx := strings.IndexAny(rest, " '")
+	if endIdx == -1 {
+		return rest
+	}
+	return rest[:endIdx]
 }
 
 func extractEnvVarNameFromServiceUnit(content string) string {

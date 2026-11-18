@@ -22,8 +22,8 @@ func TestPull_SimpleService(t *testing.T) {
 	// Pull images without starting containers
 	output := helpers.MustSucceed(t, dir, "pull", "--name", project)
 
-	if !strings.Contains(output, "Successfully pulled images") {
-		t.Errorf("expected success message, got: %s", output)
+	if !strings.Contains(output.Stdout, "Successfully pulled images") {
+		t.Errorf("expected success message, got: %s", output.Stdout)
 	}
 
 	// Verify images were pulled but containers are not running
@@ -51,8 +51,8 @@ func TestPull_DryRun(t *testing.T) {
 	// Dry run should not pull anything
 	output := helpers.MustSucceed(t, dir, "pull", "--name", project, "--dry-run")
 
-	if !strings.Contains(output, "Dry run") {
-		t.Errorf("expected dry run output, got: %s", output)
+	if !strings.Contains(output.Stdout, "Dry run") {
+		t.Errorf("expected dry run output, got: %s", output.Stdout)
 	}
 
 	// Image should not exist after dry run
@@ -116,8 +116,8 @@ func TestCompose_Ps(t *testing.T) {
 	// compose ps should show running containers
 	output := helpers.MustSucceed(t, dir, "compose", "ps", "--name", project)
 
-	if !strings.Contains(output, "web") {
-		t.Errorf("expected 'web' service in ps output, got: %s", output)
+	if !strings.Contains(output.Stdout, "web") {
+		t.Errorf("expected 'web' service in ps output, got: %s", output.Stdout)
 	}
 }
 
@@ -136,7 +136,7 @@ func TestCompose_Logs(t *testing.T) {
 	output := helpers.MustSucceed(t, dir, "compose", "logs", "--name", project, "--tail", "5")
 
 	// Just verify it doesn't error - actual log content depends on the container
-	if output == "" {
+	if output.Stdout == "" {
 		t.Error("expected some log output")
 	}
 }
@@ -158,8 +158,8 @@ func TestCompose_Exec(t *testing.T) {
 	// compose exec should run command in container
 	output := helpers.MustSucceed(t, dir, "compose", "exec", "--name", project, "web", "echo", "hello")
 
-	if !strings.Contains(output, "hello") {
-		t.Errorf("expected 'hello' in exec output, got: %s", output)
+	if !strings.Contains(output.Stdout, "hello") {
+		t.Errorf("expected 'hello' in exec output, got: %s", output.Stdout)
 	}
 }
 

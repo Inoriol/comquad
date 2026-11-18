@@ -23,6 +23,7 @@ type Config struct {
 	ImageRetryDelay     int
 	WorkingDirectory    string
 	SecretsDir          string
+	RuntimeSecretsDir   string
 	DryRun              bool
 	BuildCacheDir          string
 	NormalizeDockerfile    bool
@@ -139,6 +140,10 @@ func WithWorkingDirectory(path string) Option {
 
 func WithSecretsDirectory(path string) Option {
 	return func(c *Config) { c.SecretsDir = path }
+}
+
+func WithRuntimeSecretsDirectory(path string) Option {
+	return func(c *Config) { c.RuntimeSecretsDir = path }
 }
 
 func WithDryRun() Option {

@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// isolateStateDir redirects XDG_DATA_HOME to a fresh temp directory for the
+// isolateStateDir redirects XDG_STATE_HOME to a fresh temp directory for the
 // duration of the test, preventing any state writes from leaking into the
-// real ~/.local/share/comquad/projects.json.
+// real ~/.local/state/comquad/projects.json.
 func isolateStateDir(t *testing.T) {
 	t.Helper()
 	tmpDir := t.TempDir()
-	old := os.Getenv("XDG_DATA_HOME")
-	os.Setenv("XDG_DATA_HOME", tmpDir)
-	t.Cleanup(func() { os.Setenv("XDG_DATA_HOME", old) })
+	old := os.Getenv("XDG_STATE_HOME")
+	os.Setenv("XDG_STATE_HOME", tmpDir)
+	t.Cleanup(func() { os.Setenv("XDG_STATE_HOME", old) })
 }
 
 func TestStateManager_RegisterAndUnregister(t *testing.T) {
@@ -111,10 +111,10 @@ func TestStateManager_ListProjects(t *testing.T) {
 }
 
 func TestStateManager_DoesNotFailOnMissingStateFile(t *testing.T) {
-	// Create a temp dir and set XDG_DATA_HOME to a non-existent location
-	oldXDG := os.Getenv("XDG_DATA_HOME")
-	os.Setenv("XDG_DATA_HOME", filepath.Join(os.TempDir(), "comquad-test-nodir"))
-	defer os.Setenv("XDG_DATA_HOME", oldXDG)
+	// Create a temp dir and set XDG_STATE_HOME to a non-existent location
+	oldXDG := os.Getenv("XDG_STATE_HOME")
+	os.Setenv("XDG_STATE_HOME", filepath.Join(os.TempDir(), "comquad-test-nodir"))
+	defer os.Setenv("XDG_STATE_HOME", oldXDG)
 
 	sm, err := NewStateManager()
 	if err != nil {

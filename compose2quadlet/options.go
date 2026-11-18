@@ -30,6 +30,7 @@ func WithImageRetry(n int) types.Option      { return types.WithImageRetry(n) }
 func WithImageRetryDelay(s int) types.Option  { return types.WithImageRetryDelay(s) }
 func WithWorkingDirectory(p string) types.Option      { return types.WithWorkingDirectory(p) }
 func WithSecretsDirectory(p string) types.Option      { return types.WithSecretsDirectory(p) }
+func WithRuntimeSecretsDirectory(p string) types.Option { return types.WithRuntimeSecretsDirectory(p) }
 func WithDryRun() types.Option                        { return types.WithDryRun() }
 func WithBuildCacheDir(p string) types.Option         { return types.WithBuildCacheDir(p) }
 func WithDockerfileNormalization() types.Option       { return types.WithDockerfileNormalization() }

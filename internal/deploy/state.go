@@ -48,12 +48,12 @@ func NewStateManager() (*StateManager, error) {
 		return nil, err
 	}
 
-	dataDir := os.Getenv("XDG_DATA_HOME")
-	if dataDir == "" {
-		dataDir = filepath.Join(home, ".local", "share")
+	stateDir := os.Getenv("XDG_STATE_HOME")
+	if stateDir == "" {
+		stateDir = filepath.Join(home, ".local", "state")
 	}
 
-	statePath := filepath.Join(dataDir, "comquad", "projects.json")
+	statePath := filepath.Join(stateDir, "comquad", "projects.json")
 
 	sm := &StateManager{
 		StateFilePath: statePath,

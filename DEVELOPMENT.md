@@ -43,6 +43,14 @@ Provides systemd D-Bus communication, Podman queries, target-directory selection
 - `SystemdClient` abstracts the D-Bus operations used by the orchestrator.
 - `StateStore` abstracts project state operations.
 
+File storage follows the XDG Base Directory Specification:
+
+- `XDG_STATE_HOME` (`~/.local/state` by default): Project state (`projects.json`) and baseline files.
+- `XDG_DATA_HOME` (`~/.local/share` by default): Secret files (podman < 4.5.0 fallback).
+- `XDG_CACHE_HOME` (`~/.cache` by default): Build cache for patched Dockerfiles.
+- `XDG_RUNTIME_DIR` (`/run/user/<uid>` by default): Runtime secrets (environment secrets staged for podman secret create) in rootless mode.
+- `XDG_CONFIG_HOME` (`~/.config` by default): Quadlet files and systemd unit files.
+
 ### `internal/logger`
 
 Implements normal, verbose, quiet, and error output. `NO_COLOR` disables ANSI color output. Errors always go to stderr; quiet mode suppresses non-error output.

@@ -379,6 +379,110 @@ func TestPremapConfigs_WithUIDGID(t *testing.T) {
 	assertDirective(t, dirs, "Mount", "type=bind,source=/etc/configs/app_config.yml,destination=/app_config,uid=1000,gid=1000,mode=0440")
 }
 
+func TestPremapSecrets_Driver(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:    "web",
+		Secrets: []types.ServiceSecretConfig{{Source: "encrypted_secret"}},
+	}
+	secrets := types.Secrets{
+		"encrypted_secret": {
+			File:   "/etc/secrets/secret.txt.gpg",
+			Driver: "pass",
+		},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	dirs, units := PremapSecrets(&svc, secrets, nil, cfg)
+
+	assertDirective(t, dirs, "Secret", "encrypted_secret.secretref")
+	if len(units) != 1 {
+		t.Fatalf("expected 1 secret unit, got %d", len(units))
+	}
+	unit := units[0]
+	if unit.Type != c2qtypes.UnitCQSecret {
+		t.Fatalf("expected cq-secret unit type, got %s", unit.Type)
+	}
+	var secretSection *c2qtypes.Section
+	for i := range unit.Sections {
+		if unit.Sections[i].Name == c2qtypes.SectionSecret {
+			secretSection = &unit.Sections[i]
+			break
+		}
+	}
+	if secretSection == nil {
+		t.Fatal("expected [Secret] section")
+	}
+	assertDirective(t, secretSection.Directives, "Driver", "pass")
+}
+
+func TestPremapSecrets_DriverOpts(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:    "web",
+		Secrets: []types.ServiceSecretConfig{{Source: "shell_secret"}},
+	}
+	secrets := types.Secrets{
+		"shell_secret": {
+			Driver: "shell",
+			DriverOpts: map[string]string{
+				"list":   "/usr/local/bin/list.sh",
+				"lookup": "/usr/local/bin/lookup.sh",
+			},
+		},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	_, units := PremapSecrets(&svc, secrets, nil, cfg)
+
+	if len(units) != 1 {
+		t.Fatalf("expected 1 secret unit, got %d", len(units))
+	}
+	unit := units[0]
+	var secretSection *c2qtypes.Section
+	for i := range unit.Sections {
+		if unit.Sections[i].Name == c2qtypes.SectionSecret {
+			secretSection = &unit.Sections[i]
+			break
+		}
+	}
+	if secretSection == nil {
+		t.Fatal("expected [Secret] section")
+	}
+	assertDirective(t, secretSection.Directives, "Source", "driver")
+	assertDirective(t, secretSection.Directives, "Driver", "shell")
+	assertDirective(t, secretSection.Directives, "DriverOpts", "list=/usr/local/bin/list.sh,lookup=/usr/local/bin/lookup.sh")
+}
+
+func TestPremapSecrets_DriverWithFile(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:    "web",
+		Secrets: []types.ServiceSecretConfig{{Source: "encrypted_secret"}},
+	}
+	secrets := types.Secrets{
+		"encrypted_secret": {
+			File:   "/etc/secrets/secret.txt.gpg",
+			Driver: "pass",
+		},
+	}
+	cfg := c2qtypes.DefaultConfig()
+	_, units := PremapSecrets(&svc, secrets, nil, cfg)
+
+	if len(units) != 1 {
+		t.Fatalf("expected 1 secret unit, got %d", len(units))
+	}
+	unit := units[0]
+	var secretSection *c2qtypes.Section
+	for i := range unit.Sections {
+		if unit.Sections[i].Name == c2qtypes.SectionSecret {
+			secretSection = &unit.Sections[i]
+			break
+		}
+	}
+	if secretSection == nil {
+		t.Fatal("expected [Secret] section")
+	}
+	assertDirective(t, secretSection.Directives, "Source", "file")
+	assertDirective(t, secretSection.Directives, "Path", "/etc/secrets/secret.txt.gpg")
+	assertDirective(t, secretSection.Directives, "Driver", "pass")
+}
+
 func TestPremapConfigs_Undefined(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",

@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-18
+
+### Added
+
+- **Secret driver support** — Secrets now support Podman's secret driver mechanism via the `driver` and `driver_opts` fields from the Compose spec (originally from Docker Swarm). This enables advanced secret storage backends:
+  - `driver: pass` — GPG-encrypted secrets via the `pass` driver
+  - `driver: shell` — Script-managed secrets with custom `list`, `lookup`, `store`, and `delete` scripts
+  - `driver_opts` — Driver-specific options passed to `podman secret create --driver-opts`
+  - Works with both file-based and environment-based secrets
+  - Driver-only secrets (shell driver without file/environment) read from stdin
+  - Updated `compose2quadlet/mapper/secrets.go` to extract `driver` and `driver_opts` from compose-go's `SecretConfig`
+  - Updated `compose2quadlet/pseudo/secret.go` to generate `podman secret create` with `--driver` and `--driver-opts` flags
+  - New `Source=driver` type in `.cq-secret` units for driver-only secrets
+  - New integration test `TestSecret_DriverWithFile` verifies driver support
+  - Updated `compose2quadlet/doc/comquad-secret.md` with driver documentation and examples
+  - Updated `compose2quadlet/doc/mapping.md` with driver field entries
+
+### Changed
+
+- **XDG Base Directory Specification compliance** — comquad now fully complies with the XDG Base Directory Specification for file storage:
+  - **`XDG_STATE_HOME`** (`~/.local/state` by default): Project state (`projects.json`) and baseline files moved from `XDG_DATA_HOME` to `XDG_STATE_HOME`. State is ephemeral and can be regenerated from Podman resources, making it more appropriate for the state directory.
+  - **`XDG_DATA_HOME`** (`~/.local/share` by default): Now only used for secret files (podman < 4.5.0 fallback). Secrets are user data that should persist.
+  - **`XDG_RUNTIME_DIR`** (`/run/user/<uid>` by default): Runtime secrets (environment secrets staged for podman secret create) now use `XDG_RUNTIME_DIR/comquad/secrets/` in rootless mode instead of hardcoded `/run/comquad/secrets/`. This follows XDG spec for user-specific runtime files and avoids requiring root permissions to create `/run/comquad/` in rootless mode.
+  - **`XDG_CACHE_HOME`** (`~/.cache` by default): Build cache continues to use this directory (no change).
+  - New `ResolveRuntimeSecretsDir()` function in `internal/deploy/filesystem.go` determines runtime secrets directory based on rootless/rootful mode.
+  - New `WithRuntimeSecretsDirectory()` option in compose2quadlet library for configuring the runtime secrets path.
+  - Updated `ConvertPseudoUnits()` to accept `runtimeSecretsDir` parameter.
+  - Fixed `processSecretFile()` to correctly extract secret paths from `ExecStart=` lines.
+  - Fixed `comquad down` to clean up runtime secrets directory.
+  - Fixed provider mode detection to only activate for `docker-compose`/`podman-compose` binary names or `PODMAN_COMPOSE_PROVIDER=comquad` env var (previously incorrectly detected `comquad up` as provider mode).
+  - Added integration tests for XDG directory compliance.
+  - Updated documentation in README.md, ARCHITECTURE.md, and compose2quadlet docs.
+
 ## [0.5.2] - 2026-11-16
 
 ### Added
@@ -22,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `compose build` — Build or rebuild services (`-f`, `--pull`)
   - `compose pull` — Pull service images
   - Global flags: `--file` (`-f`), `--project-name` (`-p`), `--dry-run`
-  - **Provider mode** — comquad can be invoked as `docker-compose` or `podman-compose` via symlinks, automatically accepting docker-compose syntax without requiring the `compose` subcommand. Also works as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`.
+  - **Provider mode** — comquad works as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`, automatically accepting docker-compose syntax without requiring the `compose` subcommand.
 - **Orchestrator options structs** — Refactored `Up()`, `Build()`, and `Down()` methods to use options structs (`UpOptions`, `DownOptions`, `PullOptions`) for cleaner APIs and forward compatibility.
 - **Compose file path support** — New `WithComposeFile(path)` method on Orchestrator allows specifying a compose file path (file or directory) instead of always searching the current working directory.
 - **`PullData` JSON schema** — New JSON output schema for `comquad pull` command with project name, pulled images list, and success status.
@@ -738,8 +771,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Containerfile: changed `fedora:43` to `fedora:41` (stable); replaced `loginctl enable-linger || true` with direct file creation to avoid silently masked failures.
 - Made `captureStdout` goroutine-safe with a `sync.Mutex`, allowing `t.Parallel()` in orchestrator unit tests.
 
-[Unreleased]: https://github.com/Inoriol/comquad/compare/v0.5.2...HEAD
-[0.5.2]: https://github.com/Inoriol/comquad/compare/v0.5.0...v0.5.1
+[Unreleased]: https://github.com/Inoriol/comquad/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/Inoriol/comquad/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/Inoriol/comquad/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Inoriol/comquad/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Inoriol/comquad/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/Inoriol/comquad/compare/v0.4.3...v0.4.4

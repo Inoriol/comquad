@@ -18,7 +18,7 @@ Secrets are generated from Compose file `secrets:` definitions. The conversion r
 
 Two source types are supported:
 
-- **Environment secrets** — The secret value is read from a host environment variable at deployment time. The value is written to a temporary file in `/run/comquad/secrets/` (mode 0600), and the generated service uses `podman secret create` to load it into Podman's secret store.
+- **Environment secrets** — The secret value is read from a host environment variable at deployment time. The value is written to a temporary file in the runtime secrets directory (mode 0600), and the generated service uses `podman secret create` to load it into Podman's secret store.
 
 - **File secrets** — The secret value is read from a file on the host filesystem. The generated service uses `podman secret create <name> <path>` to load the file contents into Podman's secret store.
 
@@ -30,6 +30,35 @@ Secrets support the following options passed to the `Secret=` directive:
 - **uid=** — UID of the secret file (mount type only).
 - **gid=** — GID of the secret file (mount type only).
 - **mode=** — File mode of the secret file (mount type only).
+
+### Secret Drivers
+
+Secrets support Podman's secret driver mechanism via the `driver` and `driver_opts` fields in the Compose file. These correspond to `podman secret create --driver` and `--driver-opts`.
+
+- **driver** — The secret driver to use (e.g., `file`, `pass`, `shell`). Defaults to `file`.
+- **driver_opts** — Driver-specific options as key-value pairs.
+
+Example with the `pass` driver for GPG-encrypted secrets:
+```yaml
+secrets:
+  my_encrypted_secret:
+    file: ./secret.txt.gpg
+    driver: pass
+```
+
+Example with the `shell` driver for script-managed secrets:
+```yaml
+secrets:
+  my_shell_secret:
+    driver: shell
+    driver_opts:
+      list: /usr/local/bin/list.sh
+      lookup: /usr/local/bin/lookup.sh
+      store: /usr/local/bin/store.sh
+      delete: /usr/local/bin/delete.sh
+```
+
+When using the `shell` driver without a `file` or `environment` field, the secret is managed entirely by the driver scripts. The generated service reads from stdin (`-`) when creating the secret.
 
 ### Environment Variable Exposure
 
@@ -91,9 +120,11 @@ The `[Secret]` section describes the secret source. It is the only custom sectio
 
 | Directive | Description |
 |---|---|
-| `Source=` | Source type: `environment` or `file` |
+| `Source=` | Source type: `environment`, `file`, or `driver` |
 | `Environment=` | Name of the host environment variable (when `Source=environment`) |
 | `Path=` | Absolute path to the secret file on the host (when `Source=file`) |
+| `Driver=` | Secret driver name (e.g., `file`, `pass`, `shell`) |
+| `DriverOpts=` | Comma-separated list of driver-specific options (`key=value,...`) |
 
 #### `Source=`
 
@@ -101,15 +132,16 @@ Required. Specifies how the secret value is obtained.
 
 - `environment` — Read from a host environment variable. Requires `Environment=` to specify which variable.
 - `file` — Read from a file on the host filesystem. Requires `Path=` to specify the file location.
+- `driver` — Managed by a secret driver. Requires `Driver=` and optionally `DriverOpts=`. Used when neither `file` nor `environment` is specified but a driver is configured.
 
 #### `Environment=`
 
 The name of the host environment variable to read the secret value from. Only valid when `Source=environment`.
 
-During deployment, comquad reads the environment variable and writes its value to a temporary file at `/run/comquad/secrets/<project>-<secret-name>.env` (mode 0600). The generated service then loads this file into Podman's secret store:
+During deployment, comquad reads the environment variable and writes its value to a temporary file at `<runtime-secrets-dir>/<name>.env` (mode 0600). The runtime secrets directory is `$XDG_RUNTIME_DIR/comquad/secrets/` for rootless mode (default: `/run/user/<uid>/comquad/secrets/`) or `/run/comquad/secrets/` for rootful mode. The generated service then loads this file into Podman's secret store:
 
 ```
-ExecStart=/bin/sh -c 'podman secret create --replace <name> /run/comquad/secrets/<name>.env'
+ExecStart=/bin/sh -c '/usr/bin/podman secret create --replace <name> <runtime-secrets-dir>/<name>.env'
 ```
 
 If the environment variable is not set or is empty at deployment time, no secret file is created and the service will fail to start.
@@ -125,6 +157,22 @@ ExecStart=/usr/bin/podman secret create --replace <name> <path>
 ```
 
 The file must exist and be readable by the systemd service at start time.
+
+#### `Driver=`
+
+The secret driver to use for storing the secret. Corresponds to `podman secret create --driver`. Supported drivers include:
+
+- `file` — Secret resides in a read-protected file (default).
+- `pass` — Secret resides in a GPG-encrypted file.
+- `shell` — Secret is managed by custom scripts.
+
+#### `DriverOpts=`
+
+Comma-separated list of driver-specific options. Corresponds to `podman secret create --driver-opts`. Used primarily with the `shell` driver to specify script paths:
+
+```
+DriverOpts=list=/usr/local/bin/list.sh,lookup=/usr/local/bin/lookup.sh
+```
 
 ## GENERATED SERVICE STRUCTURE
 
@@ -149,7 +197,7 @@ Description=comquad secret: db_password
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'podman secret create --replace db_password /run/comquad/secrets/db_password.env'
+ExecStart=/bin/sh -c '/usr/bin/podman secret create --replace db_password <runtime-secrets-dir>/db_password.env'
 ExecStop=-/usr/bin/podman secret rm db_password
 
 [Install]
@@ -177,6 +225,60 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/podman secret create --replace api_key /etc/secrets/api.key
 ExecStop=-/usr/bin/podman secret rm api_key
+
+[Install]
+WantedBy=default.target
+```
+
+### File Secret with Driver
+
+For a `.cq-secret` unit with the `pass` driver:
+
+```ini
+[Secret]
+Source=file
+Path=/etc/secrets/secret.txt.gpg
+Driver=pass
+```
+
+The generated `.service` file is:
+
+```ini
+[Unit]
+Description=comquad secret: encrypted_secret
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/podman secret create --driver=pass --replace encrypted_secret /etc/secrets/secret.txt.gpg
+ExecStop=-/usr/bin/podman secret rm encrypted_secret
+
+[Install]
+WantedBy=default.target
+```
+
+### Driver-Only Secret (shell driver)
+
+For a `.cq-secret` unit with the `shell` driver and no file or environment:
+
+```ini
+[Secret]
+Source=driver
+Driver=shell
+DriverOpts=list=/usr/local/bin/list.sh,lookup=/usr/local/bin/lookup.sh,store=/usr/local/bin/store.sh,delete=/usr/local/bin/delete.sh
+```
+
+The generated `.service` file is:
+
+```ini
+[Unit]
+Description=comquad secret: shell_secret
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '/usr/bin/podman secret create --driver=shell --driver-opts=list=/usr/local/bin/list.sh,lookup=/usr/local/bin/lookup.sh,store=/usr/local/bin/store.sh,delete=/usr/local/bin/delete.sh --replace shell_secret -'
+ExecStop=-/usr/bin/podman secret rm shell_secret
 
 [Install]
 WantedBy=default.target
@@ -321,6 +423,50 @@ Generates:
 - One `.cq-secret` unit (`shared_key`) — deduplicated
 - Two `Secret=` directives (one per container), both referencing the same Podman secret
 
+### Secret Drivers
+
+```yaml
+services:
+  web:
+    image: nginx
+    secrets:
+      - encrypted_secret
+
+secrets:
+  encrypted_secret:
+    file: ./secret.txt.gpg
+    driver: pass
+```
+
+Generates:
+- One `.cq-secret` unit (`encrypted_secret`) with `Driver=pass`
+- `Secret=cq-myapp-encrypted_secret` directive on the `web` container
+- The generated service uses `podman secret create --driver=pass`
+
+### Shell Driver (Script-Managed Secrets)
+
+```yaml
+services:
+  web:
+    image: nginx
+    secrets:
+      - shell_secret
+
+secrets:
+  shell_secret:
+    driver: shell
+    driver_opts:
+      list: /usr/local/bin/list.sh
+      lookup: /usr/local/bin/lookup.sh
+      store: /usr/local/bin/store.sh
+      delete: /usr/local/bin/delete.sh
+```
+
+Generates:
+- One `.cq-secret` unit (`shell_secret`) with `Source=driver`, `Driver=shell`, and `DriverOpts=...`
+- `Secret=cq-myapp-shell_secret` directive on the `web` container
+- The generated service uses `podman secret create --driver=shell --driver-opts=...` and reads from stdin
+
 ## FILE LOCATIONS
 
 `.cq-secret` files are stored in the systemd Quadlet directory alongside other generated units:
@@ -333,7 +479,12 @@ The companion `.service` file is written to the systemd unit directory by comqua
 - Rootless: `~/.config/systemd/user/`
 - Rootful: `/etc/systemd/system/`
 
-For environment secrets, temporary secret files are written to `/run/comquad/secrets/` (mode 0700) during deployment. These files are read by the secret service to create the Podman secret and are not automatically cleaned up.
+For environment secrets, temporary secret files are written to the runtime secrets directory (mode 0700) during deployment:
+
+- Rootless: `$XDG_RUNTIME_DIR/comquad/secrets/` (default: `/run/user/<uid>/comquad/secrets/`)
+- Rootful: `/run/comquad/secrets/`
+
+These files are read by the secret service to create the Podman secret and are not automatically cleaned up.
 
 ## SEE ALSO
 

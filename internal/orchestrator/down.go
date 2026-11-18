@@ -176,6 +176,16 @@ func (o *Orchestrator) Down(downOpts DownOptions) error {
 		os.RemoveAll(secretsDir)
 	}
 
+	if runtimeSecretsDir, err := deploy.ResolveRuntimeSecretsDir(); err == nil {
+		prefix := "cq-" + o.projectName + "-"
+		entries, _ := os.ReadDir(runtimeSecretsDir)
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), prefix) {
+				os.Remove(filepath.Join(runtimeSecretsDir, entry.Name()))
+			}
+		}
+	}
+
 	if buildCacheDir, err := resolveBuildCacheDir(o.projectName); err == nil {
 		os.RemoveAll(buildCacheDir)
 	}

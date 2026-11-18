@@ -169,7 +169,11 @@ func (o *Orchestrator) Pull(pullOpts PullOptions) error {
 		return fmt.Errorf("transpilation failed: %w", err)
 	}
 
-	units = pseudo.ConvertPseudoUnits(units)
+	runtimeSecretsDir, err := deploy.ResolveRuntimeSecretsDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve runtime secrets directory: %w", err)
+	}
+	units = pseudo.ConvertPseudoUnits(units, runtimeSecretsDir)
 
 	pullStrategy := pullOpts.PullStrategy
 	if pullStrategy == "" {

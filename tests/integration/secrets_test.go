@@ -388,3 +388,64 @@ secrets:
 	// Tear down
 	helpers.MustSucceed(t, dir, "down", "--name", project)
 }
+
+func TestSecret_DriverWithFile(t *testing.T) {
+	helpers.SkipIfSystemdUnavailable(t)
+	project := helpers.ProjectName(t)
+
+	compose := `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/alpine:latest
+    command: ["sleep", "infinity"]
+    secrets:
+      - source: file_secret
+secrets:
+  file_secret:
+    file: /tmp/test-driver-secret.txt
+    driver: file
+`
+	dir, _ := helpers.WriteCompose(t, compose)
+
+	t.Cleanup(func() {
+		helpers.Comquad(t, dir, "down", "--name", project)
+	})
+
+	// Create the secret file
+	secretContent := "driver-secret-value"
+	if err := os.WriteFile("/tmp/test-driver-secret.txt", []byte(secretContent), 0600); err != nil {
+		t.Fatalf("failed to create test secret file: %v", err)
+	}
+	t.Cleanup(func() {
+		os.Remove("/tmp/test-driver-secret.txt")
+	})
+
+	// Deploy
+	helpers.MustSucceed(t, dir, "up", "--name", project)
+
+	// Verify secret service is active
+	helpers.AssertSecretServiceActive(t, project, "file_secret", false)
+
+	// Verify container is running
+	containerName := fmt.Sprintf("%s-web", project)
+	helpers.AssertContainerRunning(t, containerName)
+
+	// Verify secret is accessible inside container
+	secretPath := fmt.Sprintf("/run/secrets/cq-%s-file_secret", project)
+	helpers.AssertSecretExists(t, containerName, secretPath)
+	helpers.AssertSecretContent(t, containerName, secretPath, secretContent)
+
+	// Verify Podman secret exists
+	helpers.AssertPodmanSecretExists(t, fmt.Sprintf("cq-%s-file_secret", project))
+
+	// Verify the secret was created with the file driver by inspecting it
+	secretInfo := helpers.GetPodmanSecretInfo(t, fmt.Sprintf("cq-%s-file_secret", project))
+	if secretInfo.SecretDriver != "file" {
+		t.Fatalf("expected secret driver to be 'file', got %q", secretInfo.SecretDriver)
+	}
+
+	// Tear down
+	helpers.MustSucceed(t, dir, "down", "--name", project)
+	helpers.AssertSecretServiceGone(t, project, "file_secret", false)
+	helpers.AssertPodmanSecretGone(t, fmt.Sprintf("cq-%s-file_secret", project))
+}
