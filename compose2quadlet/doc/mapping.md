@@ -212,6 +212,8 @@ The **Since** column tracks the minimum version required for each mapping:
 | `secrets` (long, environment, fallback) | 1 | `Volume=<path>:/run/secrets/<name>:ro` | `[Container]` | 4.4.0 | `podman run -v <path>:/run/secrets/<name>:ro` |
 | `secrets.x-type: env` | 1 | `Secret=<name>,type=env[,target=<VAR>]` | `[Container]` | 4.5.0 | `podman run --secret <name>,type=env,target=<VAR>` |
 | `secrets.x-target` | 1 | *(merged into Secret= target)* | `[Container]` | 4.5.0 | `podman run --secret <name>,target=<path>` |
+| `secrets.*.driver` | — | *(handled pre-mapping)* | — | — | `podman secret create --driver <driver>` |
+| `secrets.*.driver_opts` | — | *(handled pre-mapping)* | — | — | `podman secret create --driver-opts <opts>` |
 | `configs` (short syntax) | 1 | `Mount=type=bind,source=<path>,target=/<name>` | `[Container]` | 4.5.0 | `podman run --mount type=bind,source=<path>,target=/<name>` |
 | `configs` (long syntax) | 1 | `Mount=type=bind,...` | `[Container]` | 4.5.0 | `podman run --mount type=bind,...` |
 | `credential_spec` | 4 | — | — | — | — |

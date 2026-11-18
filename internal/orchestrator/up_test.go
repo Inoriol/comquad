@@ -34,6 +34,7 @@ func TestUp_NoComposeFileReturnsError(t *testing.T) {
 }
 
 func TestUp_InvalidYamlReturnsError(t *testing.T) {
+	isolateStateDirForTest(t)
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "compose.yaml"), "{invalid")
 	state := newMockStateStore(nil)
@@ -51,6 +52,7 @@ func TestUp_InvalidYamlReturnsError(t *testing.T) {
 }
 
 func TestUp_StateRegistrationError(t *testing.T) {
+	isolateStateDirForTest(t)
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
 
@@ -64,6 +66,7 @@ func TestUp_StateRegistrationError(t *testing.T) {
 }
 
 func TestUp_InvalidPullStrategyReturnsError(t *testing.T) {
+	isolateStateDirForTest(t)
 	dir := t.TempDir()
 	makeMinimalCompose(t, dir)
 

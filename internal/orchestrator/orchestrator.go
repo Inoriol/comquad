@@ -233,7 +233,11 @@ func (o *Orchestrator) Up(upOpts UpOptions) error {
 		return fmt.Errorf("transpilation failed: %w", err)
 	}
 
-	units = pseudo.ConvertPseudoUnits(units)
+	runtimeSecretsDir, err := deploy.ResolveRuntimeSecretsDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve runtime secrets directory: %w", err)
+	}
+	units = pseudo.ConvertPseudoUnits(units, runtimeSecretsDir)
 
 	strat, err := ParsePullStrategy(upOpts.PullStrategy)
 	if err != nil {
@@ -543,7 +547,11 @@ func (o *Orchestrator) Build(upOpts UpOptions) error {
 		return fmt.Errorf("transpilation failed: %w", err)
 	}
 
-	units = pseudo.ConvertPseudoUnits(units)
+	runtimeSecretsDir, err := deploy.ResolveRuntimeSecretsDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve runtime secrets directory: %w", err)
+	}
+	units = pseudo.ConvertPseudoUnits(units, runtimeSecretsDir)
 
 	strat, err := ParsePullStrategy(upOpts.PullStrategy)
 	if err != nil {
@@ -868,16 +876,24 @@ func resolveSecretsDir(projectName string) (string, error) {
 	return filepath.Join(dataDir, "comquad", "secrets", projectName), nil
 }
 
-func resolveBaselineDir(projectName string) (string, error) {
+func resolveStateDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	dataDir := os.Getenv("XDG_DATA_HOME")
-	if dataDir == "" {
-		dataDir = filepath.Join(home, ".local", "share")
+	stateDir := os.Getenv("XDG_STATE_HOME")
+	if stateDir == "" {
+		stateDir = filepath.Join(home, ".local", "state")
 	}
-	return filepath.Join(dataDir, "comquad", "baseline", projectName), nil
+	return filepath.Join(stateDir, "comquad"), nil
+}
+
+func resolveBaselineDir(projectName string) (string, error) {
+	stateDir, err := resolveStateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(stateDir, "baseline", projectName), nil
 }
 
 func resolveBuildCacheDir(projectName string) (string, error) {

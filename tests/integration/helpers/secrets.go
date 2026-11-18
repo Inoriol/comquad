@@ -3,10 +3,16 @@
 package helpers
 
 import (
+	"encoding/json"
 	"os/exec"
 	"strings"
 	"testing"
 )
+
+// SecretInfo contains information about a Podman secret.
+type SecretInfo struct {
+	SecretDriver string `json:"Driver"`
+}
 
 // ExecInContainer runs a command inside a running container and returns stdout.
 func ExecInContainer(t *testing.T, container, command string) string {
@@ -104,4 +110,22 @@ func AssertPodmanSecretGone(t *testing.T, secretName string) {
 			t.Fatalf("expected Podman secret %s to be removed but it still exists", secretName)
 		}
 	}
+}
+
+// GetPodmanSecretInfo retrieves information about a Podman secret.
+func GetPodmanSecretInfo(t *testing.T, secretName string) SecretInfo {
+	t.Helper()
+	ctx := exec.Command("podman", "secret", "inspect", secretName)
+	out, err := ctx.Output()
+	if err != nil {
+		t.Fatalf("podman secret inspect %s failed: %v", secretName, err)
+	}
+	var secrets []SecretInfo
+	if err := json.Unmarshal(out, &secrets); err != nil {
+		t.Fatalf("failed to parse podman secret inspect output: %v", err)
+	}
+	if len(secrets) == 0 {
+		t.Fatalf("no secret info returned for %s", secretName)
+	}
+	return secrets[0]
 }

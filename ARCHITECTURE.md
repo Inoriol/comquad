@@ -117,7 +117,7 @@ comquad keeps two kinds of local state:
 
 The baseline is deliberately separate from the files on disk. This is what makes it possible to preserve manual changes while still applying changes from `compose.yaml`.
 
-State is stored below `$XDG_DATA_HOME/comquad/`, defaulting to `~/.local/share/comquad/`. The state file is written through a temporary file and rename so an interrupted write does not leave a partial JSON file.
+State is stored below `$XDG_STATE_HOME/comquad/`, defaulting to `~/.local/state/comquad/`. The state file is written through a temporary file and rename so an interrupted write does not leave a partial JSON file.
 
 `comquad regenerate --force` rebuilds project state from managed Podman labels and Quadlet files. Because it cannot reconstruct the previous generated baseline, the next `up` uses the two-way comparison described above.
 
@@ -141,7 +141,7 @@ Container units reference their companion image or build units. This lets Quadle
 
 The pseudo-quadlet generator converts custom unit types (`.cq-*`) into standard `.service` units. Currently supports:
 
-- **`.cq-secret`**: Manages secrets using Podman's native secret store. Environment secrets are written to temporary files at `/run/comquad/secrets/` during deployment and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Custom permissions (`uid`/`gid`/`mode`) and custom target paths are passed to the `Secret=` directive (Podman 4.5.0+). Secrets can be exposed as environment variables using `x-type: env` extension. Includes `ExecStop=-/usr/bin/podman secret rm <name>` for automatic cleanup.
+- **`.cq-secret`**: Manages secrets using Podman's native secret store. Environment secrets are written to temporary files at `$XDG_RUNTIME_DIR/comquad/secrets/` (rootless) or `/run/comquad/secrets/` (rootful) during deployment and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Custom permissions (`uid`/`gid`/`mode`) and custom target paths are passed to the `Secret=` directive (Podman 4.5.0+). Secrets can be exposed as environment variables using `x-type: env` extension. Secrets support Podman's secret driver mechanism via `driver` and `driver_opts` fields (e.g., `pass` for GPG-encrypted secrets, `shell` for script-managed secrets). Includes `ExecStop=-/usr/bin/podman secret rm <name>` for automatic cleanup.
 - **`.cq-image`**: Fallback for Podman < 4.8.0 — generates `.service` with `ExecStart=podman pull`.
 - **`.cq-build`**: Fallback for Podman < 5.2.0 — generates `.service` with `ExecStart=podman build`.
 
@@ -170,7 +170,29 @@ Generated files are placed in the systemd Quadlet directory for the current exec
 
 ## AutoNS Mode (Rootful)
 
-When `COMQUAD_AUTONS=1` is set in rootful mode, comquad enables user namespace isolation between stacks. Each stack gets a dedicated 65535-wide UID/GID range from `/etc/subuid`.
+When `COMQUAD_AUTONS=1` is set in rootful mode, comquad enables user namespace isolation between stacks. Each stack gets a dedicated 65535-wide UID/GID range from `/etc/subuid`. This allows rootful containers to run with similar isolation to rootless mode.
+
+### Requirements
+
+- Rootful mode (AutoNS is not applicable to rootless)
+- Podman 4.4.0+ for `idmap` volume support
+
+### System Configuration
+
+Add a `containers` entry to `/etc/subuid` and `/etc/subgid`:
+
+```
+containers:10000000:6553600
+```
+
+This provides space for ~100 stacks with 65535 UIDs each.
+
+### Enabling AutoNS
+
+```bash
+export COMQUAD_AUTONS=1
+sudo comquad up
+```
 
 ### Anchor Selection
 
@@ -187,6 +209,12 @@ One container per stack is designated as the "anchor" that owns the user namespa
 ### Volume Handling
 
 All volume mounts get the `idmap` option for proper UID mapping within the user namespace.
+
+### Isolation Guarantees
+
+- Containers **within** a stack share one user namespace → shared volumes work naturally
+- Containers **across** stacks are in different UID ranges → fully isolated from each other
+- Host filesystem access is mapped through the UID range, providing an additional security layer
 
 ### State Persistence
 
@@ -246,7 +274,7 @@ cmd/comquad/
 ├── compose_exec.go      # compose exec subcommand
 ├── compose_build.go     # compose build subcommand
 ├── compose_pull.go      # compose pull subcommand
-└── provider.go          # Provider mode detection (docker-compose/podman-compose symlinks)
+└── provider.go          # Provider mode detection (PODMAN_COMPOSE_PROVIDER)
 ```
 
 ### Flag Translation
@@ -264,7 +292,7 @@ cmd/comquad/
 
 ### Provider Mode
 
-comquad supports being invoked as a compose provider via symlinks. When the binary is invoked as `docker-compose` or `podman-compose`, it automatically enters provider mode and accepts docker-compose syntax directly without requiring the `compose` subcommand.
+comquad supports being invoked as a compose provider via the `PODMAN_COMPOSE_PROVIDER` environment variable. When set to `comquad`, `podman compose` delegates to comquad, which automatically accepts docker-compose syntax directly without requiring the `compose` subcommand.
 
 **Implementation:**
 
@@ -276,17 +304,20 @@ The provider mode is implemented in `cmd/comquad/provider.go` and `cmd/comquad/m
 
 **Example:**
 ```
-User invokes: docker-compose up -d
-os.Args[0] = "docker-compose"
+User sets: PODMAN_COMPOSE_PROVIDER=comquad
+Runs: podman compose up -d
+
+podman invokes comquad as provider:
+os.Args[0] = "comquad"
 os.Args[1:] = ["up", "-d"]
 
 Provider mode detection inserts "compose":
-os.Args = ["docker-compose", "compose", "up", "-d"]
+os.Args = ["comquad", "compose", "up", "-d"]
 
 Cobra routes to: composeCmd → composeUpCmd
 ```
 
-This allows comquad to work as a drop-in replacement for docker-compose or as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`.
+This allows comquad to work as a podman compose provider via `PODMAN_COMPOSE_PROVIDER=comquad`.
 
 ## Orchestrator Options Structs
 

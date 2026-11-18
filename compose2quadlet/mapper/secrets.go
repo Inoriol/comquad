@@ -167,10 +167,7 @@ func processSecretPodman(serviceName string, ref types.ServiceSecretConfig, def 
 			Sections: []c2qtypes.Section{
 				{
 					Name: c2qtypes.SectionSecret,
-					Directives: []c2qtypes.Directive{
-						{Key: "Source", Values: []string{"file"}},
-						{Key: "Path", Values: []string{def.File}},
-					},
+					Directives: buildSecretDirectives("file", def.File, def.Environment, def.Driver, def.DriverOpts),
 				},
 			},
 		}
@@ -188,10 +185,25 @@ func processSecretPodman(serviceName string, ref types.ServiceSecretConfig, def 
 			Sections: []c2qtypes.Section{
 				{
 					Name: c2qtypes.SectionSecret,
-					Directives: []c2qtypes.Directive{
-						{Key: "Source", Values: []string{"environment"}},
-						{Key: "Environment", Values: []string{def.Environment}},
-					},
+					Directives: buildSecretDirectives("environment", def.File, def.Environment, def.Driver, def.DriverOpts),
+				},
+			},
+		}
+		containerDir := c2qtypes.Directive{
+			Key:    "Secret",
+			Values: []string{buildSecretValue(ref.Source+".secretref", ref, xType, xTarget)},
+		}
+		return []c2qtypes.Directive{containerDir}, []c2qtypes.QuadletUnit{secretUnit}
+	}
+
+	if def.Driver != "" {
+		secretUnit := c2qtypes.QuadletUnit{
+			Type: c2qtypes.UnitCQSecret,
+			Name: ref.Source,
+			Sections: []c2qtypes.Section{
+				{
+					Name: c2qtypes.SectionSecret,
+					Directives: buildDriverOnlyDirectives(def.Driver, def.DriverOpts),
 				},
 			},
 		}
@@ -203,6 +215,46 @@ func processSecretPodman(serviceName string, ref types.ServiceSecretConfig, def 
 	}
 
 	return nil, nil
+}
+
+func buildDriverOnlyDirectives(driver string, driverOpts map[string]string) []c2qtypes.Directive {
+	dirs := []c2qtypes.Directive{
+		{Key: "Source", Values: []string{"driver"}},
+		{Key: "Driver", Values: []string{driver}},
+	}
+	if len(driverOpts) > 0 {
+		opts := formatDriverOpts(driverOpts)
+		dirs = append(dirs, c2qtypes.Directive{Key: "DriverOpts", Values: []string{opts}})
+	}
+	return dirs
+}
+
+func buildSecretDirectives(sourceType, filePath, envVar, driver string, driverOpts map[string]string) []c2qtypes.Directive {
+	dirs := []c2qtypes.Directive{
+		{Key: "Source", Values: []string{sourceType}},
+	}
+	if sourceType == "file" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "Path", Values: []string{filePath}})
+	} else {
+		dirs = append(dirs, c2qtypes.Directive{Key: "Environment", Values: []string{envVar}})
+	}
+	if driver != "" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "Driver", Values: []string{driver}})
+	}
+	if len(driverOpts) > 0 {
+		opts := formatDriverOpts(driverOpts)
+		dirs = append(dirs, c2qtypes.Directive{Key: "DriverOpts", Values: []string{opts}})
+	}
+	return dirs
+}
+
+func formatDriverOpts(opts map[string]string) string {
+	keys := sortedKeys(opts)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, k+"="+opts[k])
+	}
+	return strings.Join(parts, ",")
 }
 
 func processSecretVolumeFallback(serviceName string, ref types.ServiceSecretConfig, def types.SecretConfig, cfg *c2qtypes.Config) ([]c2qtypes.Directive, []c2qtypes.QuadletUnit) {

@@ -137,21 +137,13 @@ comquad compose exec web bash  # Execute in container
 
 ### Provider Mode
 
-comquad can be used as a drop-in replacement for `docker-compose` or `podman-compose` via symlinks. When invoked as either of these names, comquad automatically accepts docker-compose syntax without requiring the `compose` subcommand:
+comquad can be used as a drop-in replacement for `docker-compose` or `podman-compose`. Set the `PODMAN_COMPOSE_PROVIDER` environment variable to use comquad with `podman compose`:
 
 ```bash
-# Create symlinks
-ln -s /usr/local/bin/comquad ~/.local/bin/docker-compose
-ln -s /usr/local/bin/comquad ~/.local/bin/podman-compose
-
-# Use as docker-compose
-docker-compose up -d
-docker-compose logs -f
-docker-compose down --volumes
-
-# Or use as podman compose provider
 export PODMAN_COMPOSE_PROVIDER=comquad
 podman compose up -d
+podman compose logs -f
+podman compose down --volumes
 ```
 
 This allows comquad to work seamlessly with existing docker-compose workflows and scripts while providing comquad's systemd-native benefits.
@@ -168,7 +160,7 @@ Some behavior is handled automatically:
 - Rootless privileged ports are shifted by `ROOTLESS_PORT_OFFSET`.
 - Image and build units are generated for systemd to manage.
 - SELinux labels added to volumes: `:Z` (private) for single-service volumes, `:z` (shared) for volumes used by multiple services.
-- Secrets are managed via Podman's native secret store. Environment secrets are written to temporary files at deployment time and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Secrets support custom `target`, `uid`, `gid`, and `mode` options (Podman 4.5.0+). Secrets can be exposed as environment variables using `x-type: env` extension.
+- Secrets are managed via Podman's native secret store. Environment secrets are written to temporary files at deployment time and loaded via `podman secret create`. File secrets are loaded directly. Secrets are mounted at `/run/secrets/<name>` in containers. Secrets support custom `target`, `uid`, `gid`, and `mode` options (Podman 4.5.0+). Secrets can be exposed as environment variables using `x-type: env` extension. Secrets support Podman's secret driver mechanism via `driver` and `driver_opts` fields (e.g., `pass` for GPG-encrypted secrets, `shell` for script-managed secrets).
 
 Native Quadlet directives that have no Compose equivalent can be set through x-extensions. Supported extensions: `x-container`, `x-image`, `x-build`, `x-network`, `x-volume`, and `x-systemd` (for `[Service]` and `[Unit]` sections). X-extensions override compose-generated directives when there's a conflict.
 
@@ -206,7 +198,9 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete Compose-to-Quadlet map
 | `EDITOR` | Auto-detected | Editor used by `comquad edit`. |
 | `NO_COLOR` | Unset | Set to any value to disable ANSI colors. |
 | `ROOTLESS_PORT_OFFSET` | `2000` | Offset applied to privileged ports in rootless mode. |
-| `XDG_DATA_HOME` | `~/.local/share` | Base directory for `comquad` state and deployment data. |
+| `XDG_DATA_HOME` | `~/.local/share` | Base directory for `comquad` secret files (podman < 4.5.0 fallback). |
+| `XDG_STATE_HOME` | `~/.local/state` | Base directory for `comquad` project state and baseline. |
+| `XDG_CACHE_HOME` | `~/.cache` | Base directory for `comquad` build cache. |
 | `COMQUAD_SELINUX_DANGEROUS_PATHS` | `/etc,/var,/home,/usr,/sys,/proc,/boot,/root` | Comma-separated list of host paths that trigger a warning when bind-mounted with SELinux relabeling. |
 | `COMQUAD_SKIP_REGISTRY_NORMALIZATION` | Unset | Set to any value to skip image name normalization (respects `registries.conf`). |
 | `COMQUAD_SYSTEMD_SPECIFIERS` | Unset | Set to any value to use systemd specifiers (e.g., `%h`) for paths under `$HOME`. |
@@ -214,41 +208,9 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete Compose-to-Quadlet map
 
 ## AutoNS Mode (Rootful)
 
-comquad supports optional user namespace isolation between stacks using Podman's AutoNS feature. When enabled, each stack gets a dedicated 65535-wide UID/GID range, ensuring containers within a stack share one user namespace while containers across stacks are fully isolated.
+comquad supports optional user namespace isolation between stacks using Podman's AutoNS feature. This allows you to run rootful containers with similar isolation to rootless mode - each stack gets its own dedicated UID/GID range, ensuring containers within a stack share one user namespace while containers across stacks are fully isolated.
 
-### Enabling AutoNS
-
-```bash
-export COMQUAD_AUTONS=1
-sudo comquad up
-```
-
-AutoNS is **rootful-only** and requires Podman 4.4.0+ for `idmap` volume support.
-
-### System Configuration
-
-Add a `containers` entry to `/etc/subuid` and `/etc/subgid`:
-
-```
-containers:10000000:6553600
-```
-
-This provides space for ~100 stacks with 65535 UIDs each.
-
-### How It Works
-
-1. **Anchor selection**: One container per stack is designated as the "anchor" (root of `depends_on` DAG, or alphabetically first service)
-2. **UID allocation**: comquad allocates a 65535-wide UID range from `/etc/subuid` for the stack
-3. **Namespace sharing**: The anchor gets `--userns=auto:uidmapping=0:<base>:65535`, other containers join via `--userns=container:<anchor>`
-4. **Volume idmap**: All volumes get the `idmap` option for proper UID mapping
-
-### Isolation Guarantees
-
-- Containers **within** a stack share one user namespace → shared volumes work naturally
-- Containers **across** stacks are in different UID ranges → fully isolated from each other
-- Host filesystem access is mapped through the UID range, providing an additional security layer
-
-See [TODO.md](./TODO.md) for implementation details and design decisions.
+Enable with `COMQUAD_AUTONS=1`. See [ARCHITECTURE.md](./ARCHITECTURE.md) for setup and implementation details.
 
 ## Files and State
 
@@ -257,7 +219,9 @@ Generated Quadlet files are stored in:
 - Rootless mode: `~/.config/containers/systemd`
 - Root mode: `/etc/containers/systemd`
 
-`comquad` stores project state below `$XDG_DATA_HOME/comquad/`. Successful deployments also keep a baseline used to show diffs and preserve manual changes made with `comquad edit`.
+`comquad` stores project state below `$XDG_STATE_HOME/comquad/` (default: `~/.local/state/comquad/`). Successful deployments also keep a baseline used to show diffs and preserve manual changes made with `comquad edit`.
+
+Secret files (for podman < 4.5.0 fallback) are stored below `$XDG_DATA_HOME/comquad/secrets/` (default: `~/.local/share/comquad/secrets/`).
 
 Use `comquad regenerate --force` if the local state file is lost but the managed Podman resources and Quadlet files still exist.
 

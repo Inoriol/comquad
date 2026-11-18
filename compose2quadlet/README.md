@@ -201,11 +201,12 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md#pseudo-quadlet-generator) for details on
 Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs before container field mapping. The default behavior uses Podman's native secret store via `.cq-secret` pseudo-quadlet units:
 
 **Default behavior (Podman secret store, requires Podman >= 4.5.0):**
-- Environment secrets: Generates `.cq-secret` unit; during deployment, the env var value is written to `/run/comquad/secrets/<name>.env` and loaded via `podman secret create`
+- Environment secrets: Generates `.cq-secret` unit; during deployment, the env var value is written to the runtime secrets directory (configured via `WithRuntimeSecretsDirectory()`) and loaded via `podman secret create`
 - File secrets: Generates `.cq-secret` unit that loads the file directly via `podman secret create <name> <path>`
 - Container mounts: `Secret=<name>[,target=<path>,uid=<uid>,gid=<gid>,mode=<mode>]` directive mounts the secret at `/run/secrets/<name>` in the container with optional custom permissions
 - Environment variable exposure: `Secret=<name>,type=env,target=<VAR>` exposes the secret as an environment variable (via `x-type: env` extension)
 - Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit
+- **Secret drivers**: Supports `driver` and `driver_opts` fields for Podman secret drivers (e.g., `pass` for GPG-encrypted secrets, `shell` for script-managed secrets)
 
 **Fallback (Podman < 4.5.0):**
 - Falls back to direct `Volume=<file>:<target>:ro` mount for all secrets
@@ -233,6 +234,26 @@ services:
 ```
 
 Generates: `Secret=cq-myapp-db_password,type=env,target=DB_PASSWORD`
+
+### Secret Drivers
+
+Secrets support Podman's secret driver mechanism via the `driver` and `driver_opts` fields:
+
+```yaml
+secrets:
+  encrypted_secret:
+    file: ./secret.txt.gpg
+    driver: pass
+  shell_secret:
+    driver: shell
+    driver_opts:
+      list: /usr/local/bin/list.sh
+      lookup: /usr/local/bin/lookup.sh
+      store: /usr/local/bin/store.sh
+      delete: /usr/local/bin/delete.sh
+```
+
+The `driver` field maps to `podman secret create --driver`, and `driver_opts` maps to `--driver-opts`. Supported drivers include `file` (default), `pass` (GPG-encrypted), and `shell` (script-managed).
 
 ## AutoNS (User Namespace Isolation)
 

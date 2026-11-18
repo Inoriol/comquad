@@ -579,13 +579,9 @@ cmd/comquad/
   - Set up DOCKER_HOST environment if needed
   - Use same translation logic from Phase 1
 
-**Symlink approach:**
+**Provider mode:**
 ```bash
-# Users can create symlinks:
-ln -s /usr/local/bin/comquad ~/.local/bin/docker-compose
-ln -s /usr/local/bin/comquad ~/.local/bin/podman-compose
-
-# Or set as provider:
+# Set as podman compose provider:
 export PODMAN_COMPOSE_PROVIDER=comquad
 podman compose up
 ```

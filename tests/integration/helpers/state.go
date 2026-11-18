@@ -35,13 +35,13 @@ type ProjectState struct {
 func ReadStateFile(t *testing.T) map[string]ProjectState {
     t.Helper()
 
-    stateDir := os.Getenv("XDG_DATA_HOME")
+    stateDir := os.Getenv("XDG_STATE_HOME")
     if stateDir == "" {
         home, err := os.UserHomeDir()
         if err != nil {
             t.Fatalf("could not determine home dir: %v", err)
         }
-        stateDir = filepath.Join(home, ".local", "share")
+        stateDir = filepath.Join(home, ".local", "state")
     }
 
     path := filepath.Join(stateDir, "comquad", "projects.json")

@@ -81,11 +81,31 @@ func StateFileExists() bool {
 	if err != nil {
 		return false
 	}
-	dataDir := os.Getenv("XDG_DATA_HOME")
-	if dataDir == "" {
-		dataDir = filepath.Join(home, ".local", "share")
+	stateDir := os.Getenv("XDG_STATE_HOME")
+	if stateDir == "" {
+		stateDir = filepath.Join(home, ".local", "state")
 	}
-	statePath := filepath.Join(dataDir, "comquad", "projects.json")
+	statePath := filepath.Join(stateDir, "comquad", "projects.json")
 	_, err = os.Stat(statePath)
 	return err == nil
+}
+
+// ResolveRuntimeSecretsDir returns the XDG-compliant runtime secrets directory.
+// Rootless: $XDG_RUNTIME_DIR/comquad/secrets (default: /run/user/<uid>/comquad/secrets)
+// Rootful: /run/comquad/secrets
+func ResolveRuntimeSecretsDir() (string, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	if currentUser.Uid == "0" {
+		return "/run/comquad/secrets", nil
+	}
+
+	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if runtimeDir == "" {
+		runtimeDir = filepath.Join("/run/user", currentUser.Uid)
+	}
+	return filepath.Join(runtimeDir, "comquad", "secrets"), nil
 }

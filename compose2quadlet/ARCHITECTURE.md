@@ -353,11 +353,12 @@ Podman resolves bare image names differently from Docker. When `WithDockerfileNo
 Secrets are handled via a pre-mapping interceptor (`PremapSecrets()`) that runs before container field mapping. The default behavior uses Podman's native secret store via `.cq-secret` pseudo-quadlet units:
 
 **Default behavior (Podman secret store, requires Podman >= 4.5.0):**
-- Environment secrets: Generates `.cq-secret` unit; during deployment, the env var value is written to `/run/comquad/secrets/<name>.env` and loaded via `podman secret create`
+- Environment secrets: Generates `.cq-secret` unit; during deployment, the env var value is written to the runtime secrets directory (configured via `WithRuntimeSecretsDirectory()`, typically `$XDG_RUNTIME_DIR/comquad/secrets/` for rootless or `/run/comquad/secrets/` for rootful) and loaded via `podman secret create`
 - File secrets: Generates `.cq-secret` unit that loads the file directly via `podman secret create <name> <path>`
 - Container mounts: `Secret=<name>[,target=<path>,uid=<uid>,gid=<gid>,mode=<mode>]` directive mounts the secret at `/run/secrets/<name>` in the container with optional custom permissions
 - Environment variable exposure: `Secret=<name>,type=env,target=<VAR>` exposes the secret as an environment variable (via `x-type: env` extension)
 - Secrets are deduplicated across services — a shared secret produces only one `.cq-secret` unit
+- **Secret drivers**: Supports `driver` and `driver_opts` fields for Podman secret drivers (e.g., `pass` for GPG-encrypted secrets, `shell` for script-managed secrets)
 
 **Fallback (Podman < 4.5.0):**
 - Falls back to direct `Volume=<file>:<target>:ro` mount for all secrets
@@ -389,6 +390,30 @@ services:
 Generates: `Secret=cq-myapp-db_password,type=env,target=DB_PASSWORD`
 
 **Note:** `x-type: env` is incompatible with `uid`, `gid`, and `mode` options. If both are specified, a warning is emitted and the options are ignored.
+
+### Secret Drivers
+
+Secrets support Podman's secret driver mechanism via the `driver` and `driver_opts` fields from the Compose spec (originally from Docker Swarm). The mapper extracts these fields and adds them to the `.cq-secret` unit's `[Secret]` section as `Driver=` and `DriverOpts=` directives. The pseudo-quadlet generator then passes these to `podman secret create` via `--driver` and `--driver-opts` flags.
+
+Example:
+```yaml
+secrets:
+  encrypted_secret:
+    file: ./secret.txt.gpg
+    driver: pass
+  shell_secret:
+    driver: shell
+    driver_opts:
+      list: /usr/local/bin/list.sh
+      lookup: /usr/local/bin/lookup.sh
+```
+
+Supported drivers:
+- `file` — Secret resides in a read-protected file (default)
+- `pass` — Secret resides in a GPG-encrypted file
+- `shell` — Secret is managed by custom scripts
+
+When using the `shell` driver without a `file` or `environment` field, the secret is managed entirely by the driver scripts. The generated service uses `Source=driver` and reads from stdin (`-`) when creating the secret.
 
 ### X-Extensions
 
@@ -438,14 +463,14 @@ Description=comquad secret: db_password
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'podman secret create --replace db_password /run/comquad/secrets/db_password.env'
+ExecStart=/bin/sh -c 'podman secret create --replace db_password <runtime-secrets-dir>/db_password.env'
 ExecStop=-/usr/bin/podman secret rm db_password
 
 [Install]
 WantedBy=default.target
 ```
 
-For environment secrets, comquad writes the environment variable value to `/run/comquad/secrets/<name>.env` during deployment. The secret service then loads this file into Podman's secret store.
+For environment secrets, comquad writes the environment variable value to `<runtime-secrets-dir>/<name>.env` during deployment (the path is configured via `WithRuntimeSecretsDirectory()`). The secret service then loads this file into Podman's secret store.
 
 #### `.cq-image` — Image Pull Fallback (Podman 4.4.0-4.7.x)
 
@@ -542,7 +567,7 @@ Description=comquad secret: db_password
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'podman secret create --replace db_password /run/comquad/secrets/db_password.env'
+ExecStart=/bin/sh -c 'podman secret create --replace db_password <runtime-secrets-dir>/db_password.env'
 ExecStop=-/usr/bin/podman secret rm db_password
 
 [Install]
@@ -560,7 +585,7 @@ Podman automatically mounts the secret at `/run/secrets/cq-project-db_password` 
 **Service naming:** Unlike `.cq-image` and `.cq-build`, `.cq-secret` has no native quadlet equivalent. The service name uses `-secret.service` suffix for consistency: `cq-project-db_password-secret.service`.
 
 **Secret types:**
-- Environment secrets: Written to `/run/comquad/secrets/<name>.env` during deployment, then loaded via `podman secret create`
+- Environment secrets: Written to `<runtime-secrets-dir>/<name>.env` during deployment, then loaded via `podman secret create`
 - File secrets: Loaded directly via `podman secret create <name> <path>`
 - Custom permissions (`uid`/`gid`/`mode`): Passed to `Secret=` directive as options (requires Podman >= 4.5.0)
 - Environment variable exposure: `x-type: env` extension exposes secret as env var via `Secret=<name>,type=env,target=<VAR>`

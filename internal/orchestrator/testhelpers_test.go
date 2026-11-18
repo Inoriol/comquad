@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/Inoriol/comquad/internal/deploy"
@@ -271,6 +272,27 @@ func newTestOrchestratorWithSystemdErr(projectName, cwd string, state *mockState
 // ---------------------------------------------------------------------------
 // Filesystem helpers for tests
 // ---------------------------------------------------------------------------
+
+// isolateStateDirForTest sets XDG_STATE_HOME to a temp directory and creates
+// a state file so that StateFileExists() returns true, skipping the prerequisite check.
+func isolateStateDirForTest(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	oldState := os.Getenv("XDG_STATE_HOME")
+	os.Setenv("XDG_STATE_HOME", tmpDir)
+	t.Cleanup(func() { os.Setenv("XDG_STATE_HOME", oldState) })
+
+	// Create a state file so StateFileExists() returns true
+	stateDir := filepath.Join(tmpDir, "comquad")
+	if err := os.MkdirAll(stateDir, 0755); err != nil {
+		t.Fatalf("failed to create state dir: %v", err)
+	}
+	stateFile := filepath.Join(stateDir, "projects.json")
+	if err := os.WriteFile(stateFile, []byte("{}"), 0644); err != nil {
+		t.Fatalf("failed to create state file: %v", err)
+	}
+	return tmpDir
+}
 
 // writeContainerFile writes a minimal quadlet container file to dir and
 // returns its absolute path.
