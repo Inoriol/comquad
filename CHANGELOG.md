@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Jobs support (Compose Spec v2.17.0+)** — New `jobs` top-level element support for one-shot containers that run to completion:
+  - New `comquad run JOB` command for manual job execution with `-f` (follow logs) and `--dry-run` flags
+  - Jobs generate `.container` units (same as services) and optional `.timer` units for scheduled execution
+  - Cron expressions automatically converted to systemd calendar format
+  - Schedule options: `timezone`, `missed_fires` (catch-up policy)
+  - `manual: true/false` controls whether jobs can be triggered manually
+  - Timers are enabled/started during `comquad up` and disabled/stopped during `comquad down`
+  - New `UnitTimer` type and `SectionTimer` constant for timer unit generation
+  - New `mapper/jobs.go` for job container directive mapping
+  - New `mapper/timer.go` for schedule-to-timer conversion
+  - New `mapper/cron.go` for cron-to-systemd calendar conversion
+  - New `RunOptions` struct and `Run()` method in orchestrator
+  - Added `EnableUnit`/`DisableUnit` to `SystemdClient` interface
+  - Added `Timers` field to `ResourceInfo` for state tracking
+  - Jobs skip network aliases and default network attachment (unlike services)
+  - Updated `compose2quadlet/doc/mapping.md` with jobs section
+
+### Changed
+
+- **Upgraded compose-go to v2.17.0** — Updated from v2.14.0 to v2.17.0 to get jobs support
+  - Go version requirement updated to 1.26.11
+  - `ServiceConfig` struct now uses embedded `ContainerSpec` and `WorkloadSpec`
+  - Test files need updates for new struct layout (pending)
+
 ## [0.5.3] - 2026-11-18
 
 ### Added

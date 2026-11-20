@@ -9,7 +9,7 @@ import (
 
 func TestBuilds_Basic(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app", Dockerfile: "Dockerfile"}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Dockerfile: "Dockerfile"}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -30,7 +30,7 @@ func TestBuilds_Basic(t *testing.T) {
 
 func TestBuilds_NoBuild(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -41,7 +41,7 @@ func TestBuilds_NoBuild(t *testing.T) {
 
 func TestBuilds_VersionGate(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app"}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app"}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 1}
@@ -56,7 +56,7 @@ func TestBuilds_VersionGate(t *testing.T) {
 
 func TestBuilds_VersionGate_NoPseudo(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app"}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app"}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 1}
@@ -69,7 +69,7 @@ func TestBuilds_VersionGate_NoPseudo(t *testing.T) {
 
 func TestBuilds_DockerfileInline(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{DockerfileInline: "FROM scratch", Context: "."}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{DockerfileInline: "FROM scratch", Context: "."}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -79,7 +79,7 @@ func TestBuilds_DockerfileInline(t *testing.T) {
 
 func TestBuilds_Target(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app", Target: "builder"}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Target: "builder"}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -89,7 +89,7 @@ func TestBuilds_Target(t *testing.T) {
 
 func TestBuilds_Network(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app", Network: "host"}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Network: "host"}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -99,7 +99,7 @@ func TestBuilds_Network(t *testing.T) {
 
 func TestBuilds_NoCache(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app", NoCache: true}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", NoCache: true}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -109,7 +109,7 @@ func TestBuilds_NoCache(t *testing.T) {
 
 func TestBuilds_Labels(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app", Labels: types.Labels{"version": "1.0"}}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Labels: types.Labels{"version": "1.0"}}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -119,7 +119,7 @@ func TestBuilds_Labels(t *testing.T) {
 
 func TestBuilds_Tags(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Build: &types.BuildConfig{Context: "/app", Tags: types.StringList{"myapp:latest", "myapp:v1"}}},
+		"web": types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Tags: types.StringList{"myapp:latest", "myapp:v1"}}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Builds(services, cfg)
@@ -131,8 +131,8 @@ func TestBuilds_Tags(t *testing.T) {
 func TestBuilds_Secrets(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
-			Name:  "web",
-			Build: &types.BuildConfig{Context: "/app", Secrets: []types.ServiceSecretConfig{{Source: "mysecret"}}},
+			Name:        "web",
+			WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Secrets: []types.ServiceSecretConfig{{Source: "mysecret"}}}},
 		},
 	}
 	cfg := c2qtypes.DefaultConfig()
@@ -144,8 +144,8 @@ func TestBuilds_Secrets(t *testing.T) {
 func TestBuilds_Args(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
-			Name:  "web",
-			Build: &types.BuildConfig{Context: "/app", Args: types.MappingWithEquals{"NODE_ENV": strPtr("production"), "VERSION": nil}},
+			Name:        "web",
+			WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Args: types.MappingWithEquals{"NODE_ENV": strPtr("production"), "VERSION": nil}}},
 		},
 	}
 	cfg := c2qtypes.DefaultConfig()
@@ -158,8 +158,8 @@ func TestBuilds_Args(t *testing.T) {
 func TestBuilds_Args_Unavailable(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
-			Name:  "web",
-			Build: &types.BuildConfig{Context: "/app", Args: types.MappingWithEquals{"NODE_ENV": strPtr("production")}},
+			Name:        "web",
+			WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "/app", Args: types.MappingWithEquals{"NODE_ENV": strPtr("production")}}},
 		},
 	}
 	cfg := c2qtypes.DefaultConfig()

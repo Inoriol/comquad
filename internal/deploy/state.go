@@ -16,6 +16,7 @@ type ResourceInfo struct {
 	Images     []string `json:"images"`
 	Builds     []string `json:"builds"`
 	Secrets    []string `json:"secrets"`
+	Timers     []string `json:"timers"`
 }
 
 // AutoNSRange tracks the UID range allocated for a project's AutoNS namespace

@@ -24,6 +24,7 @@ const (
 	UnitVolume    UnitType = "volume"
 	UnitImage     UnitType = "image"
 	UnitBuild     UnitType = "build"
+	UnitTimer     UnitType = "timer"
 	UnitCQSecret  UnitType = "cq-secret"
 	UnitCQImage   UnitType = "cq-image"
 	UnitCQBuild   UnitType = "cq-build"
@@ -55,4 +56,5 @@ const (
 	SectionImage     = "Image"
 	SectionBuild     = "Build"
 	SectionSecret    = "Secret"
+	SectionTimer     = "Timer"
 )

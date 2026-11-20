@@ -208,6 +208,24 @@ func (s *SystemdManager) GetInvocationID(unitName string) (string, error) {
 	return "", nil
 }
 
+// EnableUnit enables a systemd unit so it starts on boot.
+func (s *SystemdManager) EnableUnit(unitName string) error {
+	_, _, err := s.conn.EnableUnitFilesContext(context.Background(), []string{unitName}, false, false)
+	if err != nil {
+		return fmt.Errorf("failed to enable unit %s: %w", unitName, err)
+	}
+	return nil
+}
+
+// DisableUnit disables a systemd unit so it does not start on boot.
+func (s *SystemdManager) DisableUnit(unitName string) error {
+	_, err := s.conn.DisableUnitFilesContext(context.Background(), []string{unitName}, false)
+	if err != nil {
+		return fmt.Errorf("failed to disable unit %s: %w", unitName, err)
+	}
+	return nil
+}
+
 // removePodmanResources lists and removes Podman resources of the given type
 // (network or volume) that match the cq-<projectName>- prefix pattern and
 // carry the com.comquad.managed label.

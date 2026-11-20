@@ -81,6 +81,7 @@ Run commands from the directory containing the project `compose.yaml`.
 | `comquad start [service ...]` | Start all services or selected services | `--dry-run` preview |
 | `comquad stop [service ...]` | Stop all services or selected services | `--dry-run` preview |
 | `comquad restart [service ...]` | Restart all services or selected services | `--dry-run` preview |
+| `comquad run JOB` | Run a job manually | `-f` follow logs, `--dry-run` preview |
 | `comquad logs [service]` | Show service logs | `-f` follow, `--tail N`, `--since TIME`, `-t` show timestamps |
 | `comquad exec SERVICE COMMAND` | Run a command in a running container | `-u USER`, `-t` control TTY |
 | `comquad compose COMMAND` | Docker Compose compatible commands | See [Compose Compatibility](#compose-compatibility) |
@@ -190,6 +191,65 @@ volumes:
 ```
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete Compose-to-Quadlet mapping and implementation details.
+
+## Jobs (Compose Spec v2.17.0+)
+
+comquad supports the `jobs` top-level element from the Compose specification. Jobs are one-shot containers that run to completion, unlike services which are long-running.
+
+```yaml
+jobs:
+  db-migration:
+    image: myapp:latest
+    command: python manage.py migrate
+    triggers:
+      manual: true
+
+  cleanup:
+    image: busybox
+    command: sh -c 'find /data -mtime +30 -delete'
+    volumes:
+      - data:/data
+    triggers:
+      schedule:
+        - "0 3 * * *"
+
+  backup:
+    image: backup-tool
+    command: /backup.sh
+    triggers:
+      schedule:
+        - cron: "0 0 * * 0"
+          timezone: "Europe/Paris"
+          missed_fires: one
+```
+
+### Job triggers
+
+- `manual: true` — Job can be triggered with `comquad run <job>` (default behavior)
+- `manual: false` — Job cannot be triggered manually (scheduled jobs only)
+- `schedule` — List of cron expressions or schedule objects for automatic execution
+
+### Schedule options
+
+- `cron` — Cron expression (e.g., `"0 3 * * *"`)
+- `timezone` — Timezone for schedule evaluation (e.g., `"Europe/Paris"`)
+- `missed_fires` — Policy for missed runs: `one` (catch up) or `skip` (ignore)
+
+### Running jobs
+
+```bash
+comquad run db-migration        # Run job manually
+comquad run cleanup --follow    # Run and follow logs
+comquad run backup --dry-run    # Preview without running
+```
+
+### Generated units
+
+For each job, comquad generates:
+- `.container` unit — the job container
+- `.timer` unit — schedule timer (if `triggers.schedule` is specified)
+
+Timers are automatically enabled and started during `comquad up`, and disabled/stopped during `comquad down`.
 
 ## Environment Variables
 

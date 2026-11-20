@@ -15,6 +15,8 @@ type SystemdClient interface {
 	StartUnit(unitName string) error
 	StopUnit(unitName string) error
 	RestartUnit(unitName string) error
+	EnableUnit(unitName string) error
+	DisableUnit(unitName string) error
 	ListUnitsByNames(unitNames []string) ([]dbus.UnitStatus, error)
 	ListAllUnits() ([]dbus.UnitStatus, error)
 	GetInvocationID(unitName string) (string, error)

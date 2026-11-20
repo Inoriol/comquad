@@ -9,11 +9,13 @@ This document describes the internal design, conventions, and data flow of compo
 | **Compose Specification** | https://github.com/compose-spec/compose-spec/blob/master/spec.md |
 | **Compose Build Spec** | https://github.com/compose-spec/compose-spec/blob/master/build.md |
 | **Compose Deploy Spec** | https://github.com/compose-spec/compose-spec/blob/master/deploy.md |
+| **Compose Jobs Spec** | https://github.com/compose-spec/compose-spec/blob/main/jobs.md |
 | **Quadlet (podman-systemd.unit.5)** | https://github.com/podman-container-tools/podman/blob/main/docs/source/markdown/podman-systemd.unit.5.md |
 | **systemd.unit** | https://github.com/systemd/systemd/blob/main/man/systemd.unit.xml |
 | **systemd.service** | https://github.com/systemd/systemd/blob/main/man/systemd.service.xml |
 | **systemd.resource-control** | https://github.com/systemd/systemd/blob/main/man/systemd.resource-control.xml |
-| **systemd.exec** | https://github.com/systemd/systemd/blob/main/man/systemd.exec.xml |
+| **systemd.exec** | https://github.com/systemd/systemd/blob/main/man/systemd.exec.html |
+| **systemd.timer** | https://github.com/systemd/systemd/blob/main/man/systemd.timer.xml |
 | **compose-go (Go types)** | https://github.com/compose-spec/compose-go |
 | **Podman Release Notes up to v5.6.0** | https://github.com/podman-container-tools/podman/blob/main/RELEASE_NOTES.md |
 | **Podman Release Notes after v5.6.0** | https://github.com/podman-container-tools/podman/releases |
@@ -38,7 +40,7 @@ footer of each option in `systemd.resource-control`.
 
 **Library, not a CLI.** No `main()`, no cobra, no command-line interface. Two entry points: `Transpile()` for callers who already have a compose-go `*types.Project`, and `TranspileFile()` which loads the compose file and transpiles in one call.
 
-**Narrow focus:** compose → quadlet only. No Kubernetes, no pods, no artifacts. Only quadlet types relevant to compose: `.container`, `.network`, `.volume`, `.image`, `.build`.
+**Narrow focus:** compose → quadlet only. No Kubernetes, no pods, no artifacts. Only quadlet types relevant to compose: `.container`, `.network`, `.volume`, `.image`, `.build`, `.timer`.
 
 **Consumer:** [comquad](https://github.com/Inoriol/comquad) imports this library. comquad keeps the CLI, orchestration (`up`/`down`/`start`/`stop`/`logs`), state management, and D-Bus communication. The library absorbs the `internal/{preprocess,transpile,cook,graft}` pipeline.
 
@@ -89,6 +91,9 @@ compose2quadlet/
 │   ├── build.go              # Builds() — .build quadlets (fatal error pre-5.2.0)
 │   ├── network.go            # Networks() — top-level .network quadlets
 │   ├── volume.go             # Volumes() — top-level .volume quadlets
+│   ├── jobs.go               # JobContainer(), JobImages(), JobBuilds(), JobUnit() — jobs support (Compose Spec v2.17.0+)
+│   ├── timer.go              # Timers() — .timer units for scheduled jobs
+│   ├── cron.go               # CronToSystemdCalendar() — cron → systemd calendar conversion
 │   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor; generates .cq-secret units and Secret= directives with options (target, uid, gid, mode, type)
 │   ├── dockerfile.go         # PatchDockerfileFROM() — normalize bare image names in FROM lines
 │   ├── extensions.go         # Extract*Extensions() — x-extension extraction for quadlet-only directives
@@ -167,6 +172,7 @@ SectionVolume    = "Volume"
 SectionImage     = "Image"
 SectionBuild     = "Build"
 SectionSecret    = "Secret"
+SectionTimer     = "Timer"
 ```
 
 ## Data Flow
@@ -204,7 +210,15 @@ Transpile(project, opts...)
     │       ├── network.go:  project.Networks → .network units ✅
     │       └── volume.go:   project.Volumes → .volume units ✅
     │
-    ├── 5. Opinionated transforms (opinionated/) ✅
+    ├── 5. Jobs processing (Compose Spec v2.17.0+) ✅
+    │       For each job:
+    │       ├── jobs.go: JobContainer() → [Container] directives ✅
+    │       ├── jobs.go: JobUnit() → [Unit] dependencies ✅
+    │       ├── jobs.go: JobImages() → .image quadlets ✅
+    │       ├── jobs.go: JobBuilds() → .build quadlets ✅
+    │       └── timer.go: Timers() → .timer units for scheduled jobs ✅
+    │
+    ├── 6. Opinionated transforms (opinionated/) ✅
     │       ├── prefix.go:        cq-<project>- prefix on all unit names
     │       ├── references.go:    rewrite Network=, Volume=, Image=, Mount=, After= references
     │       ├── containername.go: default ContainerName=<project>-<service> when unspecified

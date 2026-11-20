@@ -145,6 +145,21 @@ func (o *Orchestrator) Down(downOpts DownOptions) error {
 	}
 
 	for _, f := range state.Files {
+		if strings.HasSuffix(f, ".timer") {
+			unitName := TimerFileToUnitName(f)
+			if !output.IsJSONMode() {
+				logger.Print("Disabling and stopping timer: " + unitName)
+			}
+			if err := dbusMgr.DisableUnit(unitName); err != nil {
+				logger.Warn("Failed to disable timer " + unitName + ": " + err.Error())
+			}
+			if err := dbusMgr.StopUnit(unitName); err != nil {
+				logger.Warn("Failed to stop timer " + unitName + ": " + err.Error())
+			}
+		}
+	}
+
+	for _, f := range state.Files {
 		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
 			logger.Warn("Failed to remove file " + f + ": " + err.Error())
 		}

@@ -167,6 +167,14 @@ func (m *mockSystemdClient) RestartUnit(unitName string) error {
 	return nil
 }
 
+func (m *mockSystemdClient) EnableUnit(unitName string) error {
+	return nil
+}
+
+func (m *mockSystemdClient) DisableUnit(unitName string) error {
+	return nil
+}
+
 func (m *mockSystemdClient) ListUnitsByNames(names []string) ([]dbus.UnitStatus, error) {
 	if m.listErr != nil {
 		return nil, m.listErr

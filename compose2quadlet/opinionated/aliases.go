@@ -20,6 +20,10 @@ func ApplyNetworkAliases(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c
 
 		svcName := strings.TrimPrefix(units[ui].Name, prefix)
 
+		if cfg.JobNames != nil && cfg.JobNames[svcName] {
+			continue
+		}
+
 		for si := range units[ui].Sections {
 			if units[ui].Sections[si].Name != c2qtypes.SectionContainer {
 				continue

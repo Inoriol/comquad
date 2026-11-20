@@ -87,6 +87,11 @@ func (o *Orchestrator) registerState(projectFiles []string, autoNSRange *deploy.
 			name = strings.TrimSuffix(name, ".cq-secret")
 			resources.Secrets = append(resources.Secrets, name)
 		}
+		if strings.HasSuffix(base, ".timer") {
+			name := strings.TrimPrefix(base, prefix)
+			name = strings.TrimSuffix(name, ".timer")
+			resources.Timers = append(resources.Timers, name)
+		}
 	}
 
 	return stateMgr.RegisterProject(deploy.ProjectState{
@@ -187,7 +192,16 @@ func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Resu
 		}
 	}
 
-	// Start container units (skip anchor if already started)
+	// Start service container units (skip jobs and anchor if already started)
+	composeProject, _ := loadComposeProject(o.resolveComposeFile())
+	jobNames := make(map[string]bool)
+	if composeProject != nil {
+		for name := range composeProject.Jobs {
+			jobNames[name] = true
+		}
+	}
+	prefix := "cq-" + o.projectName + "-"
+
 	for _, f := range projectFiles {
 		if !strings.HasSuffix(f, ".container") {
 			continue
@@ -195,6 +209,13 @@ func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Resu
 		if anchorService != "" && filepath.Base(f) == "cq-"+o.projectName+"-"+anchorService+".container" {
 			continue
 		}
+
+		containerName := strings.TrimPrefix(filepath.Base(f), prefix)
+		containerName = strings.TrimSuffix(containerName, ".container")
+		if jobNames[containerName] {
+			continue
+		}
+
 		unitName := ContainerFileToUnitName(f)
 		if !output.IsJSONMode() {
 			logger.Action("Starting unit: " + unitName)
@@ -212,6 +233,25 @@ func (o *Orchestrator) startContainers(projectFiles []string, res reconcile.Resu
 			if err := dbusMgr.StartUnit(unitName); err != nil {
 				return fmt.Errorf("failed to start unit %s: %w", unitName, err)
 			}
+		}
+	}
+
+	// Start and enable timer units
+	for _, f := range projectFiles {
+		if !strings.HasSuffix(f, ".timer") {
+			continue
+		}
+		unitName := TimerFileToUnitName(f)
+		if !output.IsJSONMode() {
+			logger.Action("Enabling and starting timer: " + unitName)
+		}
+
+		if err := dbusMgr.EnableUnit(unitName); err != nil {
+			logger.Warn(fmt.Sprintf("failed to enable timer %s: %v", unitName, err))
+		}
+
+		if err := dbusMgr.StartUnit(unitName); err != nil {
+			return fmt.Errorf("failed to start timer %s: %w", unitName, err)
 		}
 	}
 

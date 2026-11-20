@@ -43,6 +43,11 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 
 	cfg.SharedVolumes = analyzeSharedVolumes(project.Services)
 
+	cfg.JobNames = make(map[string]bool)
+	for name := range project.Jobs {
+		cfg.JobNames[name] = true
+	}
+
 	var units []QuadletUnit
 	secretUnitMap := make(map[string]QuadletUnit)
 
@@ -107,6 +112,39 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 
 	volUnits := mapper.Volumes(project.Volumes, cfg)
 	units = append(units, volUnits...)
+
+	for name, job := range project.Jobs {
+		var sections []Section
+
+		unitDirs := mapper.JobUnit(job, cfg)
+		if len(unitDirs) > 0 {
+			sections = append(sections, Section{Name: SectionUnit, Directives: unitDirs})
+		}
+
+		containerDirs := mapper.JobContainer(job, cfg)
+		if len(containerDirs) > 0 {
+			sections = append(sections, Section{Name: SectionContainer, Directives: containerDirs})
+		}
+
+		if len(sections) == 0 {
+			continue
+		}
+
+		units = append(units, QuadletUnit{
+			Type:     UnitContainer,
+			Name:     name,
+			Sections: sections,
+		})
+	}
+
+	jobImageUnits := mapper.JobImages(project.Jobs, cfg)
+	units = append(units, jobImageUnits...)
+
+	jobBuildUnits := mapper.JobBuilds(project.Jobs, cfg)
+	units = append(units, jobBuildUnits...)
+
+	timerUnits := mapper.Timers(project.Jobs, cfg)
+	units = append(units, timerUnits...)
 
 	for _, w := range cfg.Warnings {
 		if w.Level == WarningFatal {

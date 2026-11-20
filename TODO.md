@@ -7,6 +7,50 @@ For long-term goals, refer to the [roadmap](./ROADMAP.md).
 - **Value-level merge** — Multi-value directives (`Environment=`, `Volume=`, `PublishPort=`) are merged at key granularity; independent additions to the same key currently conflict instead of being merged per line.
 - **Diff rendering** — The unified diff implementation is homegrown; it could be replaced with `go-udiff` if richer output is ever needed.
 
+### Jobs Support (compose-spec v2.17.0+)
+
+Jobs are one-shot containers that run to completion, defined in the `jobs` top-level element of compose files.
+
+**Completed:**
+- ✅ Upgrade compose-go to v2.17.0 with jobs support
+- ✅ Add `UnitTimer` type and `SectionTimer` constant
+- ✅ Create `mapper/jobs.go` for job container unit generation
+- ✅ Create `mapper/timer.go` for schedule → .timer unit conversion
+- ✅ Create `mapper/cron.go` for cron-to-systemd calendar conversion
+- ✅ Update `transpile.go` to process jobs
+- ✅ Add `RunOptions` struct and `Run()` method to orchestrator
+- ✅ Add `comquad run` command for manual job execution
+- ✅ Update `up` to enable/start timers and skip job containers
+- ✅ Update `down` to disable/stop timers during teardown
+- ✅ Add `EnableUnit`/`DisableUnit` to SystemdClient interface
+- ✅ Add `Timers` field to ResourceInfo for state tracking
+
+**Leftover tasks:**
+- [ ] Fix test files for compose-go v2.17.0 API changes (ContainerSpec/WorkloadSpec embedding)
+  - `compose2quadlet/mapper/container_test.go`
+  - `compose2quadlet/mapper/image_test.go`
+  - `compose2quadlet/mapper/unit_test.go`
+  - `compose2quadlet/mapper/service_test.go`
+  - `compose2quadlet/mapper/healthcheck_test.go`
+  - `compose2quadlet/mapper/network_test.go`
+  - `compose2quadlet/mapper/volume_test.go`
+  - `compose2quadlet/mapper/secrets_test.go`
+  - `compose2quadlet/mapper/ports_test.go`
+  - `compose2quadlet/mapper/extensions_test.go`
+  - `compose2quadlet/transpile_test.go`
+  - `compose2quadlet/version_test.go`
+- [ ] Add unit tests for `mapper/jobs.go`
+- [ ] Add unit tests for `mapper/timer.go`
+- [ ] Add unit tests for `mapper/cron.go` (cron-to-systemd calendar conversion)
+- [ ] Add integration tests for jobs lifecycle (up, run, down)
+- [ ] Update `ps` command to show job status
+- [ ] Update `start`/`stop`/`restart` commands to handle jobs
+- [ ] Update `view` command to display jobs
+- [ ] Add JSON output support for `run` command
+- [ ] Update `list` command to show job count
+- [ ] Update cockpit-comquad to display jobs
+- [ ] Add `compose run` subcommand for docker-compose compatibility
+
 ### Packaging & Distribution
 
 - **Homebrew tap (Linux-only)** — Create separate `homebrew-comquad` repo with two formulas:

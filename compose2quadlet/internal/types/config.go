@@ -36,6 +36,7 @@ type Config struct {
 	ExternalVolumes        map[string]string
 	PseudoQuadlet          bool
 	AutoNS                 *AutoNSConfig
+	JobNames               map[string]bool
 }
 
 type AutoNSConfig struct {
