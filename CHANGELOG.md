@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cockpit plugin shared utilities** — New `cockpit-comquad/src/utils.ts` with shared helper functions:
+  - `getStatusColor()` — Centralized status color mapping for project/service/container states
+  - `getFileStatusColor()` — File status color mapping for dry-run previews
+  - `toggleSetItem()` — Generic Set toggle helper for expandable file lists
+  - Constants: `COMQAD_PATHS`, `COMPOSE_FILES`, `COLORS` for hardcoded values
 - **Jobs support (Compose Spec v2.17.0+)** — New `jobs` top-level element support for one-shot containers that run to completion:
   - New `comquad run JOB` command for manual job execution with `-f` (follow logs) and `--dry-run` flags
   - Jobs generate `.container` units (same as services) and optional `.timer` units for scheduled execution
@@ -40,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Cockpit plugin code quality improvements** — Refactored cockpit-comquad to reduce duplication and improve type safety:
+  - Extracted duplicated `getStatusColor` function from `ProjectsList.tsx`, `ProjectDetail.tsx`, and `StackDeploy.tsx` into shared `utils.ts`
+  - Extracted duplicated `toggleFile` logic into `toggleSetItem()` helper
+  - Standardized error handling patterns across all components (consistent `catch` style)
+  - Removed unused variables: `deploying` state in `app.tsx`, `onRefresh` prop in `ProjectsList`
+  - Replaced `any` types with `unknown` in `client.ts` and `i18n.ts` for better type safety
+  - Fixed `as any` type assertion in `ProjectDetail.tsx` with proper type cast
+  - Removed invalid `isHoverable` prop from `Tr` component (was causing React warning)
 - **Upgraded compose-go to v2.17.0** — Updated from v2.14.0 to v2.17.0 to get jobs support
   - Go version requirement updated to 1.26.11
   - `ServiceConfig` struct now uses embedded `ContainerSpec` and `WorkloadSpec`
@@ -47,6 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reconcile package timer support** — `Compute()` and `Apply()` now accept separate quadlet and systemd unit directories. Timer files routed to systemd directory, other units to quadlet directory.
 - **Labels transform** — `ApplyLabels()` now skips `[Timer]` and `[Install]` sections in addition to `[Service]`, `[Unit]`, and `[Image]`
 - **Cron conversion** — `convertField()` now converts `*/5` to `00/5` (systemd calendar format) instead of `*/5` (invalid)
+
+### Fixed
+
+- **Cockpit plugin security vulnerabilities** — Fixed 14 npm vulnerabilities (2 critical, 2 high, 10 moderate):
+  - Updated `vitest` from 2.x to 5.x (fixes critical Prototype Pollution RCE in `tinypool`)
+  - Updated `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to 8.73.0
+  - All vulnerabilities resolved: `npm audit` reports 0 vulnerabilities
+- **Cockpit plugin TypeScript configuration** — Updated `tsconfig.json`:
+  - Changed `jsx: "react"` to `jsx: "react-jsx"` for React 17+ automatic runtime (better performance, no need to import React)
 
 ## [0.5.3] - 2026-11-18
 

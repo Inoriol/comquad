@@ -30,6 +30,7 @@ import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { ArrowLeftIcon, SyncIcon, ExternalLinkAltIcon, LockIcon, UnlockIcon, PlayIcon } from '@patternfly/react-icons';
 import * as client from './client';
 import { _ } from './i18n';
+import { getStatusColor, getFileStatusColor, toggleSetItem } from './utils';
 import type { Project, ViewData, Container, DryRunData, Job } from './types';
 
 interface ProjectDetailProps {
@@ -37,33 +38,6 @@ interface ProjectDetailProps {
     onBack: () => void;
     onRefresh: () => void;
 }
-
-const getStatusColor = (status: string): 'green' | 'grey' | 'orange' | 'red' | 'blue' => {
-    switch (status) {
-        case 'healthy':
-        case 'running':
-            return 'green';
-        case 'up':
-            return 'blue';
-        case 'stopped':
-            return 'grey';
-        case 'degraded':
-            return 'orange';
-        case 'failed':
-            return 'red';
-        default:
-            return 'grey';
-    }
-};
-
-const getFileStatusColor = (status: string): 'green' | 'blue' | 'red' | 'orange' => {
-    switch (status) {
-        case 'created': return 'green';
-        case 'changed': return 'blue';
-        case 'removed': return 'red';
-        default: return 'orange';
-    }
-};
 
 export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onRefresh }) => {
     const [activeTab, setActiveTab] = useState(0);
@@ -169,17 +143,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
         setDeleteVolumes(false);
     };
 
-    const toggleFile = (name: string) => {
-        setExpandedFiles(prev => {
-            const next = new Set(prev);
-            if (next.has(name)) {
-                next.delete(name);
-            } else {
-                next.add(name);
-            }
-            return next;
-        });
-    };
+    const toggleFile = (name: string) => toggleSetItem(expandedFiles, setExpandedFiles, name);
 
     const handleResourceClick = async (resourceName: string) => {
         setResourceModal({ open: true, name: resourceName, content: '', loading: true });
@@ -665,7 +629,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                     <Button
                         key='confirm'
                         variant={confirmModal.action === 'remove' ? 'danger' : confirmModal.action === 'stop' ? 'warning' : 'primary'}
-                        onClick={() => handleAction(confirmModal.action as any)}
+                        onClick={() => handleAction(confirmModal.action as 'update' | 'stop' | 'remove')}
                         isLoading={actionLoading}
                   >
                         {confirmModal.action === 'remove' ? _('Remove') : confirmModal.action === 'stop' ? _('Stop') : _('Update')}

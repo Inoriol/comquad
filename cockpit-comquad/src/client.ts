@@ -58,19 +58,17 @@ let comquadPath: string | null = null;
 async function findComquad (): Promise<string> {
     if (comquadPath) return comquadPath;
 
-    // Try common locations
     const paths = [
         '/usr/local/bin/comquad',
         '/usr/bin/comquad',
         '/opt/comquad/comquad'
     ];
 
-    // Also check user's home directory
     try {
         const home = await cockpit.spawn(['sh', '-c', 'echo $HOME'], { err: 'message' });
         paths.push(`${home.trim()}/go/bin/comquad`);
         paths.push(`${home.trim()}/.local/bin/comquad`);
-    } catch (e) {
+    } catch {
         // Ignore errors finding home
     }
 
@@ -79,12 +77,11 @@ async function findComquad (): Promise<string> {
             await cockpit.spawn(['test', '-x', path], { err: 'message' });
             comquadPath = path;
             return path;
-        } catch (e) {
+        } catch {
             // Not found at this path, continue
         }
     }
 
-    // Fallback to just "comquad" and hope it's in PATH
     comquadPath = 'comquad';
     return comquadPath;
 }
@@ -98,9 +95,10 @@ async function runComquad (args: string[], options?: { directory?: string }): Pr
             err: 'message'
         });
         return output;
-    } catch (error: any) {
-        const message = error?.message || error?.toString() || 'Unknown error';
-        const problem = error?.problem || '';
+    } catch (error: unknown) {
+        const err = error as { message?: string; problem?: string };
+        const message = err?.message || String(error) || 'Unknown error';
+        const problem = err?.problem || '';
         throw new Error(`${problem ? problem + ': ' : ''}${message}`);
     }
 }

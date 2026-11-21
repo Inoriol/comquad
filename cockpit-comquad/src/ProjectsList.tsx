@@ -1,30 +1,14 @@
 import React from 'react';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { Badge, Button, Label } from '@patternfly/react-core';
+import { Badge, Label } from '@patternfly/react-core';
 import { _ } from './i18n';
+import { getStatusColor } from './utils';
 import type { Project } from './types';
 
 interface ProjectsListProps {
     projects: Project[];
     onSelect: (project: Project) => void;
-    onRefresh: () => void;
 }
-
-const getStatusColor = (status: string): 'green' | 'grey' | 'orange' | 'red' | 'blue' => {
-    switch (status) {
-        case 'healthy':
-        case 'running':
-            return 'green';
-        case 'up':
-            return 'blue';
-        case 'stopped':
-            return 'grey';
-        case 'degraded':
-            return 'orange';
-        default:
-            return 'grey';
-    }
-};
 
 export const ProjectsList: React.FC<ProjectsListProps> = ({ projects, onSelect }) => {
     return (
@@ -45,7 +29,6 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ projects, onSelect }
                         key={project.name}
                         isClickable
                         onRowClick={() => onSelect(project)}
-                        isHoverable
                   >
                         <Td dataLabel={_('Name')}>
                             <strong>{project.name}</strong>

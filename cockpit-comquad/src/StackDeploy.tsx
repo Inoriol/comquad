@@ -18,21 +18,13 @@ import { ArrowLeftIcon, FolderOpenIcon, EyeIcon } from '@patternfly/react-icons'
 import * as client from './client';
 import { DirectoryPicker } from './DirectoryPicker';
 import { _ } from './i18n';
+import { getFileStatusColor, toggleSetItem } from './utils';
 import type { DryRunData } from './types';
 
 interface StackDeployProps {
     onDeployComplete: () => void;
     onCancel: () => void;
 }
-
-const getStatusColor = (status: string): 'green' | 'blue' | 'red' | 'orange' => {
-    switch (status) {
-        case 'created': return 'green';
-        case 'changed': return 'blue';
-        case 'removed': return 'red';
-        default: return 'orange';
-    }
-};
 
 export const StackDeploy: React.FC<StackDeployProps> = ({ onDeployComplete, onCancel }) => {
     const [path, setPath] = useState('');
@@ -82,17 +74,7 @@ export const StackDeploy: React.FC<StackDeployProps> = ({ onDeployComplete, onCa
         }
     };
 
-    const toggleFile = (name: string) => {
-        setExpandedFiles(prev => {
-            const next = new Set(prev);
-            if (next.has(name)) {
-                next.delete(name);
-            } else {
-                next.add(name);
-            }
-            return next;
-        });
-    };
+    const toggleFile = (name: string) => toggleSetItem(expandedFiles, setExpandedFiles, name);
 
     const handleDirectorySelect = (selectedPath: string) => {
         setPath(selectedPath);
@@ -267,7 +249,7 @@ export const StackDeploy: React.FC<StackDeployProps> = ({ onDeployComplete, onCa
                                                 key={file.name}
                                                 toggleText={
                                                     <span>
-                                                        <Label color={getStatusColor(file.status)} isCompact>
+                                                        <Label color={getFileStatusColor(file.status)} isCompact>
                                                             {file.status}
                                                       </Label>
                                                         {' '}<code>{file.name}</code>
