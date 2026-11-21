@@ -46,6 +46,11 @@ func (o *Orchestrator) Pull(pullOpts PullOptions) error {
 		return err
 	}
 
+	systemdUnitDir, err := o.resolveSystemdUnitDir()
+	if err != nil {
+		return err
+	}
+
 	isRootless := deploy.IsRootless()
 	selinuxEnabled := deploy.IsSELinuxEnabled()
 
@@ -197,7 +202,7 @@ func (o *Orchestrator) Pull(pullOpts PullOptions) error {
 	}
 
 	prefix := "cq-" + o.projectName + "-"
-	plan, err := reconcile.Compute(targetDir, baselineDir, prefix, units)
+	plan, err := reconcile.Compute(targetDir, systemdUnitDir, baselineDir, prefix, units)
 	if err != nil {
 		return fmt.Errorf("computing changes: %w", err)
 	}
@@ -209,13 +214,13 @@ func (o *Orchestrator) Pull(pullOpts PullOptions) error {
 	if !output.IsJSONMode() {
 		logger.Action("Reconciling quadlet files...")
 	}
-	result, err := reconcile.Apply(targetDir, baselineDir, plan)
+	result, err := reconcile.Apply(targetDir, systemdUnitDir, baselineDir, plan)
 	if err != nil {
 		return fmt.Errorf("reconciling quadlet files: %w", err)
 	}
 	o.reportReconcile(result)
 
-	projectFiles, err := o.collectProjectFiles(targetDir)
+	projectFiles, err := o.collectProjectFiles(targetDir, systemdUnitDir)
 	if err != nil {
 		return err
 	}

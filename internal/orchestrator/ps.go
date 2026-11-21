@@ -38,6 +38,14 @@ func (o *Orchestrator) Ps(all bool) error {
 	}
 	defer dbusMgr.Close()
 
+	composeProject, _ := loadComposeProject(o.resolveComposeFile())
+	jobNames := make(map[string]bool)
+	if composeProject != nil {
+		for name := range composeProject.Jobs {
+			jobNames[name] = true
+		}
+	}
+
 	var unitNames []string
 	for _, c := range containers {
 		unitNames = append(unitNames, "cq-"+c.Name+".service")
@@ -91,11 +99,17 @@ func (o *Orchestrator) Ps(all bool) error {
 					HostPort:      p.HostPort,
 				}
 			}
+			containerType := "service"
+			shortName := strings.TrimPrefix(c.Name, o.projectName+"-")
+			if jobNames[shortName] {
+				containerType = "job"
+			}
 			jsonContainers[i] = output.ContainerJSON{
 				Name:         c.Name,
 				Image:        c.Image,
 				Command:      c.Command,
 				Service:      c.Service,
+				Type:         containerType,
 				State:        c.State,
 				Status:       c.Status,
 				Ports:        ports,
@@ -112,20 +126,20 @@ func (o *Orchestrator) Ps(all bool) error {
 		return output.PrintJSON(&output.PSData{Containers: jsonContainers})
 	}
 
-	printPsTable(containers)
+	printPsTable(containers, o.projectName, jobNames)
 
 	return nil
 }
 
-func printPsTable(containers []ContainerInfo) {
+func printPsTable(containers []ContainerInfo, projectName string, jobNames map[string]bool) {
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
 	tw.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 3, WidthMax: 30},
+		{Number: 4, WidthMax: 30},
 	})
-	tw.AppendHeader(table.Row{"NAME", "IMAGE", "COMMAND", "SERVICE", "CREATED", "STATUS", "PORTS"})
+	tw.AppendHeader(table.Row{"NAME", "IMAGE", "COMMAND", "TYPE", "SERVICE", "CREATED", "STATUS", "PORTS"})
 
-	cmdMaxLen := 30 * 2 // 2 lines at WidthMax
+	cmdMaxLen := 30 * 2
 
 	for _, c := range containers {
 		status := c.Status
@@ -143,10 +157,17 @@ func printPsTable(containers []ContainerInfo) {
 			command = command[:cmdMaxLen-3] + "..."
 		}
 
+		containerType := "service"
+		shortName := strings.TrimPrefix(c.Name, projectName+"-")
+		if jobNames[shortName] {
+			containerType = "job"
+		}
+
 		tw.AppendRow(table.Row{
 			c.Name,
 			c.Image,
 			command,
+			containerType,
 			c.Service,
 			created,
 			status,

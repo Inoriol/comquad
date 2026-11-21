@@ -28,7 +28,8 @@ import type {
     DownData,
     UpData,
     LogsData,
-    DryRunData
+    DryRunData,
+    RunData
 } from './types';
 
 interface ComquadResponse<T> {
@@ -187,4 +188,9 @@ export async function checkComposeFile (dirPath: string): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+export async function runJob (projectPath: string, jobName: string): Promise<RunData> {
+    const output = await runComquad(['comquad', 'run', '--json', jobName], { directory: projectPath });
+    return parseResponse<RunData>(output);
 }

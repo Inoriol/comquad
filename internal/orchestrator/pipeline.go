@@ -30,17 +30,29 @@ func (o *Orchestrator) resolveSystemdUnitDir() (string, error) {
 	return unitDir, nil
 }
 
-func (o *Orchestrator) collectProjectFiles(targetDir string) ([]string, error) {
-	entries, err := os.ReadDir(targetDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read target directory: %w", err)
-	}
-
+func (o *Orchestrator) collectProjectFiles(quadletDir, systemdUnitDir string) ([]string, error) {
 	var projectFiles []string
 	prefix := "cq-" + o.projectName + "-"
+	
+	// Collect from quadlet directory
+	entries, err := os.ReadDir(quadletDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read quadlet directory: %w", err)
+	}
 	for _, f := range entries {
 		if strings.HasPrefix(f.Name(), prefix) {
-			projectFiles = append(projectFiles, filepath.Join(targetDir, f.Name()))
+			projectFiles = append(projectFiles, filepath.Join(quadletDir, f.Name()))
+		}
+	}
+	
+	// Collect timer files from systemd unit directory
+	entries, err = os.ReadDir(systemdUnitDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read systemd unit directory: %w", err)
+	}
+	for _, f := range entries {
+		if strings.HasPrefix(f.Name(), prefix) && strings.HasSuffix(f.Name(), ".timer") {
+			projectFiles = append(projectFiles, filepath.Join(systemdUnitDir, f.Name()))
 		}
 	}
 

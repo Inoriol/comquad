@@ -216,7 +216,7 @@ func TestReconcile_FirstDeploy(t *testing.T) {
 	baseline := t.TempDir()
 	units := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
 
-	res, err := Reconcile(target, baseline, "cq-app-", units)
+	res, err := Reconcile(target, target, baseline, "cq-app-", units)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,10 +232,10 @@ func TestReconcile_ReDeployUnchanged(t *testing.T) {
 	baseline := t.TempDir()
 	units := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
 
-	if _, err := Reconcile(target, baseline, "cq-app-", units); err != nil {
+	if _, err := Reconcile(target, target, baseline, "cq-app-", units); err != nil {
 		t.Fatal(err)
 	}
-	res, err := Reconcile(target, baseline, "cq-app-", units)
+	res, err := Reconcile(target, target, baseline, "cq-app-", units)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,10 +250,10 @@ func TestReconcile_ComposeChange(t *testing.T) {
 	v1 := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
 	v2 := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web-v2.image")))}
 
-	if _, err := Reconcile(target, baseline, "cq-app-", v1); err != nil {
+	if _, err := Reconcile(target, target, baseline, "cq-app-", v1); err != nil {
 		t.Fatal(err)
 	}
-	res, err := Reconcile(target, baseline, "cq-app-", v2)
+	res, err := Reconcile(target, target, baseline, "cq-app-", v2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func TestReconcile_PreservesManualEdit(t *testing.T) {
 	baseline := t.TempDir()
 	units := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
 
-	if _, err := Reconcile(target, baseline, "cq-app-", units); err != nil {
+	if _, err := Reconcile(target, target, baseline, "cq-app-", units); err != nil {
 		t.Fatal(err)
 	}
 
@@ -277,7 +277,7 @@ func TestReconcile_PreservesManualEdit(t *testing.T) {
 	writeDisk(t, target, disk)
 
 	// Re-deploy with unchanged compose: the manual edit must be preserved.
-	res, err := Reconcile(target, baseline, "cq-app-", units)
+	res, err := Reconcile(target, target, baseline, "cq-app-", units)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,14 +293,14 @@ func TestReconcile_ConflictPreservesUserEdit(t *testing.T) {
 	v1 := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
 	v2 := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web-v2.image")))}
 
-	if _, err := Reconcile(target, baseline, "cq-app-", v1); err != nil {
+	if _, err := Reconcile(target, target, baseline, "cq-app-", v1); err != nil {
 		t.Fatal(err)
 	}
 
 	disk := container("cq-app-web", sec("Container", dir("Image", "custom.image")))
 	writeDisk(t, target, disk)
 
-	res, err := Reconcile(target, baseline, "cq-app-", v2)
+	res, err := Reconcile(target, target, baseline, "cq-app-", v2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +321,7 @@ func TestReconcile_NoBaselineFallback(t *testing.T) {
 	writeDisk(t, target, disk)
 
 	units := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
-	res, err := Reconcile(target, baseline, "cq-app-", units)
+	res, err := Reconcile(target, target, baseline, "cq-app-", units)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,13 +339,13 @@ func TestReconcile_RemovesStaleFiles(t *testing.T) {
 		container("cq-app-web", sec("Container", dir("Image", "web.image"))),
 		container("cq-app-db", sec("Container", dir("Image", "db.image"))),
 	}
-	if _, err := Reconcile(target, baseline, "cq-app-", old); err != nil {
+	if _, err := Reconcile(target, target, baseline, "cq-app-", old); err != nil {
 		t.Fatal(err)
 	}
 
 	// db service removed from compose.
 	newUnits := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
-	res, err := Reconcile(target, baseline, "cq-app-", newUnits)
+	res, err := Reconcile(target, target, baseline, "cq-app-", newUnits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ func TestReconcile_AddsNewService(t *testing.T) {
 	baseline := t.TempDir()
 
 	v1 := []c2q.QuadletUnit{container("cq-app-web", sec("Container", dir("Image", "web.image")))}
-	if _, err := Reconcile(target, baseline, "cq-app-", v1); err != nil {
+	if _, err := Reconcile(target, target, baseline, "cq-app-", v1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -373,7 +373,7 @@ func TestReconcile_AddsNewService(t *testing.T) {
 		container("cq-app-web", sec("Container", dir("Image", "web.image"))),
 		container("cq-app-db", sec("Container", dir("Image", "db.image"))),
 	}
-	res, err := Reconcile(target, baseline, "cq-app-", v2)
+	res, err := Reconcile(target, target, baseline, "cq-app-", v2)
 	if err != nil {
 		t.Fatal(err)
 	}

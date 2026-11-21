@@ -16,6 +16,7 @@ type projectRow struct {
 	name     string
 	status   string
 	services string
+	jobs     string
 	source   string
 }
 
@@ -67,16 +68,37 @@ func (o *Orchestrator) List(filter string) error {
 	for _, p := range projects {
 		prefix := "cq-" + p.ProjectName + "-"
 
-		var containerUnits []string
-		for _, f := range p.Files {
-			if strings.HasSuffix(filepath.Base(f), ".container") {
-				containerUnits = append(containerUnits, f)
+		var serviceContainerUnits []string
+		var jobContainerUnits []string
+		var timerUnits []string
+
+		composeProject, _ := loadComposeProject(p.SourcePath)
+		jobNames := make(map[string]bool)
+		if composeProject != nil {
+			for name := range composeProject.Jobs {
+				jobNames[name] = true
 			}
 		}
 
-		total := len(containerUnits)
+		for _, f := range p.Files {
+			if strings.HasSuffix(filepath.Base(f), ".container") {
+				base := filepath.Base(f)
+				containerName := strings.TrimSuffix(base, ".container")
+				shortName := strings.TrimPrefix(containerName, prefix)
+				if jobNames[shortName] {
+					jobContainerUnits = append(jobContainerUnits, f)
+				} else {
+					serviceContainerUnits = append(serviceContainerUnits, f)
+				}
+			}
+			if strings.HasSuffix(filepath.Base(f), ".timer") {
+				timerUnits = append(timerUnits, f)
+			}
+		}
+
+		total := len(serviceContainerUnits)
 		running := 0
-		for _, f := range containerUnits {
+		for _, f := range serviceContainerUnits {
 			base := filepath.Base(f)
 			short := shortName(base, prefix)
 			unitName := prefix + short + ".service"
@@ -86,19 +108,36 @@ func (o *Orchestrator) List(filter string) error {
 			}
 		}
 
+		totalJobs := len(jobContainerUnits)
+		activeTimers := 0
+		for _, f := range timerUnits {
+			unitName := TimerFileToUnitName(f)
+			st := unitMap[unitName]
+			if st.active == "active" {
+				activeTimers++
+			}
+		}
+
 		status := "healthy"
-		if total == 0 {
+		if total == 0 && totalJobs == 0 {
 			status = "up"
-		} else if running == 0 {
+		} else if total > 0 && running == 0 {
 			status = "stopped"
-		} else if running < total {
+		} else if total > 0 && running < total {
 			status = "degraded"
+		}
+
+		servicesStr := fmt.Sprintf("%d/%d", running, total)
+		jobsStr := fmt.Sprintf("%d timers", activeTimers)
+		if totalJobs > 0 {
+			jobsStr = fmt.Sprintf("%d jobs, %d timers", totalJobs, activeTimers)
 		}
 
 		rows = append(rows, projectRow{
 			name:     p.ProjectName,
 			status:   status,
-			services: fmt.Sprintf("%d/%d", running, total),
+			services: servicesStr,
+			jobs:     jobsStr,
 			source:   p.SourcePath,
 		})
 
@@ -108,7 +147,8 @@ func (o *Orchestrator) List(filter string) error {
 				SourcePath: p.SourcePath,
 				Files:      len(p.Files),
 				Status:     status,
-				Services:   fmt.Sprintf("%d/%d", running, total),
+				Services:   servicesStr,
+				Jobs:       jobsStr,
 			}
 			if p.Resources != nil {
 				jp.Resources = &output.ResourcesJSON{
@@ -118,6 +158,7 @@ func (o *Orchestrator) List(filter string) error {
 					Images:     p.Resources.Images,
 					Builds:     p.Resources.Builds,
 					Secrets:    p.Resources.Secrets,
+					Timers:     p.Resources.Timers,
 				}
 			}
 			jsonProjects = append(jsonProjects, jp)
@@ -130,9 +171,9 @@ func (o *Orchestrator) List(filter string) error {
 
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
-	tw.AppendHeader(table.Row{"NAME", "STATUS", "SERVICES", "SOURCE"})
+	tw.AppendHeader(table.Row{"NAME", "STATUS", "SERVICES", "JOBS", "SOURCE"})
 	for _, r := range rows {
-		tw.AppendRow(table.Row{r.name, r.status, r.services, r.source})
+		tw.AppendRow(table.Row{r.name, r.status, r.services, r.jobs, r.source})
 	}
 	logger.Print(tw.Render())
 

@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `Timers` field to `ResourceInfo` for state tracking
   - Jobs skip network aliases and default network attachment (unlike services)
   - Updated `compose2quadlet/doc/mapping.md` with jobs section
+  - **`ps` command job type display** — New TYPE column in `ps` output distinguishes services from jobs
+  - **`view` command jobs section** — New JOBS section in `view` output shows job name, status, image, schedule, and manual trigger status. Timers shown in RESOURCES table.
+  - **`list` command jobs column** — New JOBS column shows job count and active timer count
+  - **`start`/`stop`/`restart` timer support** — Commands now handle `.timer` files and skip job containers when no arguments given
+  - **`compose run` subcommand** — Docker-compose compatible `compose run JOB` command for manual job execution
+  - **Cockpit plugin jobs support** — New Jobs tab in ProjectDetail with run button and schedule display. Jobs column in ProjectsList.
+  - **JSON output improvements** — New `RunData` schema for `run` command. Added `Timers` field to `ResourcesJSON`, `Type` field to `ContainerJSON`, `Jobs` field to `ViewData` and `ProjectJSON`.
+  - **Integration tests** — New `jobs_test.go` with 9 tests covering up, run, down, ps, view, list, and compose run
+  - **Timer file placement** — Timer files now written to systemd user directory (`~/.config/systemd/user`) instead of quadlet directory, fixing systemd recognition
+  - **Cron conversion fix** — Fixed `*/5 * * * *` conversion from invalid `*-*-* *:*/5:00` to valid `*-*-* *:00/5:00`
+  - **Timer label exclusion** — Labels no longer added to `[Timer]` and `[Install]` sections (unsupported by systemd)
+  - **Project file collection** — `collectProjectFiles()` now collects from both quadlet and systemd directories
 
 ### Changed
 
@@ -32,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Go version requirement updated to 1.26.11
   - `ServiceConfig` struct now uses embedded `ContainerSpec` and `WorkloadSpec`
   - Test files need updates for new struct layout (pending)
+- **Reconcile package timer support** — `Compute()` and `Apply()` now accept separate quadlet and systemd unit directories. Timer files routed to systemd directory, other units to quadlet directory.
+- **Labels transform** — `ApplyLabels()` now skips `[Timer]` and `[Install]` sections in addition to `[Service]`, `[Unit]`, and `[Image]`
+- **Cron conversion** — `convertField()` now converts `*/5` to `00/5` (systemd calendar format) instead of `*/5` (invalid)
 
 ## [0.5.3] - 2026-11-18
 

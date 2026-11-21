@@ -24,9 +24,7 @@ Jobs are one-shot containers that run to completion, defined in the `jobs` top-l
 - ✅ Update `down` to disable/stop timers during teardown
 - ✅ Add `EnableUnit`/`DisableUnit` to SystemdClient interface
 - ✅ Add `Timers` field to ResourceInfo for state tracking
-
-**Leftover tasks:**
-- [ ] Fix test files for compose-go v2.17.0 API changes (ContainerSpec/WorkloadSpec embedding)
+- ✅ Fix test files for compose-go v2.17.0 API changes (ContainerSpec/WorkloadSpec embedding)
   - `compose2quadlet/mapper/container_test.go`
   - `compose2quadlet/mapper/image_test.go`
   - `compose2quadlet/mapper/unit_test.go`
@@ -39,17 +37,19 @@ Jobs are one-shot containers that run to completion, defined in the `jobs` top-l
   - `compose2quadlet/mapper/extensions_test.go`
   - `compose2quadlet/transpile_test.go`
   - `compose2quadlet/version_test.go`
-- [ ] Add unit tests for `mapper/jobs.go`
-- [ ] Add unit tests for `mapper/timer.go`
-- [ ] Add unit tests for `mapper/cron.go` (cron-to-systemd calendar conversion)
-- [ ] Add integration tests for jobs lifecycle (up, run, down)
-- [ ] Update `ps` command to show job status
-- [ ] Update `start`/`stop`/`restart` commands to handle jobs
-- [ ] Update `view` command to display jobs
-- [ ] Add JSON output support for `run` command
-- [ ] Update `list` command to show job count
-- [ ] Update cockpit-comquad to display jobs
-- [ ] Add `compose run` subcommand for docker-compose compatibility
+- ✅ Add unit tests for `mapper/jobs.go`
+- ✅ Add unit tests for `mapper/timer.go`
+- ✅ Add unit tests for `mapper/cron.go` (cron-to-systemd calendar conversion)
+
+**Leftover tasks:**
+- [x] Add integration tests for jobs lifecycle (up, run, down)
+- [x] Update `ps` command to show job status
+- [x] Update `start`/`stop`/`restart` commands to handle jobs
+- [x] Update `view` command to display jobs
+- [x] Add JSON output support for `run` command
+- [x] Update `list` command to show job count
+- [x] Update cockpit-comquad to display jobs
+- [x] Add `compose run` subcommand for docker-compose compatibility
 
 ### Packaging & Distribution
 

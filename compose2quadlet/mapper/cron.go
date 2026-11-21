@@ -44,31 +44,38 @@ func CronToSystemdCalendar(cron string) (string, error) {
 func convertTimePart(hour, minute string) string {
 	h := convertField(hour, 0, 23)
 	m := convertField(minute, 0, 59)
+	
+	// Zero-pad single digit numeric values (not wildcards or special chars)
+	if len(h) == 1 && h[0] >= '0' && h[0] <= '9' {
+		h = "0" + h
+	}
+	if len(m) == 1 && m[0] >= '0' && m[0] <= '9' {
+		m = "0" + m
+	}
+	
 	return fmt.Sprintf("%s:%s:00", h, m)
 }
 
 func convertDatePart(dom, month, dow string) string {
-	var parts []string
-
+	// Build date part: YYYY-MM-DD
+	dateParts := []string{"*", "*", "*"}
+	
 	if month != "*" {
-		parts = append(parts, convertMonth(month))
+		dateParts[1] = convertMonth(month)
+	}
+	
+	if dom != "*" {
+		dateParts[2] = convertField(dom, 1, 31)
+	}
+	
+	result := strings.Join(dateParts, "-")
+
+	// Day of week comes after the date if present
+	if dow != "*" {
+		result = result + " " + convertDow(dow)
 	}
 
-	if dom != "*" && dow != "*" {
-		d := convertField(dom, 1, 31)
-		w := convertDow(dow)
-		parts = append(parts, fmt.Sprintf("%s %s", d, w))
-	} else if dom != "*" {
-		parts = append(parts, convertField(dom, 1, 31))
-	} else if dow != "*" {
-		parts = append(parts, convertDow(dow))
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return strings.Join(parts, " ")
+	return result
 }
 
 func convertField(field string, min, max int) string {
@@ -81,7 +88,11 @@ func convertField(field string, min, max int) string {
 		base := parts[0]
 		step := parts[1]
 		if base == "*" {
-			return fmt.Sprintf("*..*%s/%s", "", step)
+			// In cron, */5 means "every 5" starting from the beginning of the range
+			// In systemd calendar, this is expressed as start/step
+			// For minutes: 00/5, for hours: 00/5, etc.
+			start := fmt.Sprintf("%02d", min)
+			return fmt.Sprintf("%s/%s", start, step)
 		}
 		return fmt.Sprintf("%s/%s", convertRange(base, min, max), step)
 	}
@@ -94,15 +105,34 @@ func convertField(field string, min, max int) string {
 		return strings.Join(converted, ",")
 	}
 
-	return convertRange(field, min, max)
+	result := convertRange(field, min, max)
+	
+	// Zero-pad single digit numeric values for day/month
+	if len(result) == 1 && result[0] >= '0' && result[0] <= '9' && min >= 1 {
+		result = "0" + result
+	}
+	
+	return result
+}
+
+func zeroPadSingleDigit(s string, min int) string {
+	if min < 1 {
+		return s
+	}
+	if len(s) == 1 && s[0] >= '0' && s[0] <= '9' {
+		return "0" + s
+	}
+	return s
 }
 
 func convertRange(field string, min, max int) string {
 	if strings.Contains(field, "-") {
 		parts := strings.SplitN(field, "-", 2)
-		return parts[0] + ".." + parts[1]
+		start := zeroPadSingleDigit(parts[0], min)
+		end := zeroPadSingleDigit(parts[1], min)
+		return start + ".." + end
 	}
-	return field
+	return zeroPadSingleDigit(field, min)
 }
 
 func convertMonth(month string) string {

@@ -10,7 +10,7 @@ import (
 func TestPremapSecrets_External(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "db_password", Target: "/run/secrets/db_password"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "db_password", Target: "/run/secrets/db_password"}}},
 	}
 	secrets := types.Secrets{
 		"db_password": {Name: "my-secret", External: types.External(true)},
@@ -27,7 +27,7 @@ func TestPremapSecrets_External(t *testing.T) {
 func TestPremapSecrets_External_DefaultName(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "db_password"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "db_password"}}},
 	}
 	secrets := types.Secrets{
 		"db_password": {External: types.External(true)},
@@ -41,7 +41,7 @@ func TestPremapSecrets_External_DefaultName(t *testing.T) {
 func TestPremapSecrets_File(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "db_password"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "db_password"}}},
 	}
 	secrets := types.Secrets{
 		"db_password": {File: "/etc/secrets/db_password.txt"},
@@ -64,7 +64,7 @@ func TestPremapSecrets_File(t *testing.T) {
 func TestPremapSecrets_CustomTarget(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "db_password", Target: "/custom/path/secret"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "db_password", Target: "/custom/path/secret"}}},
 	}
 	secrets := types.Secrets{
 		"db_password": {File: "/etc/secrets/db_password.txt"},
@@ -81,7 +81,7 @@ func TestPremapSecrets_CustomTarget(t *testing.T) {
 func TestPremapSecrets_Environment(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "db_password"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "db_password"}}},
 	}
 	secrets := types.Secrets{
 		"db_password": {Environment: "DB_PASSWORD"},
@@ -101,7 +101,7 @@ func TestPremapSecrets_Environment(t *testing.T) {
 func TestPremapSecrets_Undefined(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "nonexistent"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "nonexistent"}}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	dirs, _ := PremapSecrets(&svc, types.Secrets{}, nil, cfg)
@@ -117,7 +117,7 @@ func TestPremapSecrets_Undefined(t *testing.T) {
 func TestPremapSecrets_ExternalUnavailable(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "s"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "s"}}},
 	}
 	secrets := types.Secrets{
 		"s": {External: types.External(true)},
@@ -148,11 +148,12 @@ func TestPremapSecrets_CustomPermissions(t *testing.T) {
 	mode := types.FileMode(0400)
 	svc := types.ServiceConfig{
 		Name: "web",
-		Secrets: []types.ServiceSecretConfig{{
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{
 			Source: "db_password",
 			UID:    "1000",
 			GID:    "1000",
 			Mode:   &mode,
+		},
 		}},
 	}
 	secrets := types.Secrets{
@@ -170,7 +171,7 @@ func TestPremapSecrets_CustomPermissions(t *testing.T) {
 func TestPremapSecrets_RelativeTarget(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "db_password", Target: "my_secret"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "db_password", Target: "my_secret"}}},
 	}
 	secrets := types.Secrets{
 		"db_password": {File: "/etc/secrets/db_password.txt"},
@@ -184,10 +185,11 @@ func TestPremapSecrets_RelativeTarget(t *testing.T) {
 func TestPremapSecrets_XTypeEnv(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name: "web",
-		Secrets: []types.ServiceSecretConfig{{
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{
 			Source: "db_password",
 			Extensions: types.Extensions{
 				"x-type": "env",
+		},
 			},
 		}},
 	}
@@ -206,11 +208,12 @@ func TestPremapSecrets_XTypeEnv(t *testing.T) {
 func TestPremapSecrets_XTypeEnvWithTarget(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name: "web",
-		Secrets: []types.ServiceSecretConfig{{
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{
 			Source: "db_password",
 			Extensions: types.Extensions{
 				"x-type":   "env",
 				"x-target": "DB_PASSWORD",
+		},
 			},
 		}},
 	}
@@ -226,10 +229,11 @@ func TestPremapSecrets_XTypeEnvWithTarget(t *testing.T) {
 func TestPremapSecrets_XTargetOnly(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name: "web",
-		Secrets: []types.ServiceSecretConfig{{
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{
 			Source: "db_password",
 			Extensions: types.Extensions{
 				"x-target": "/custom/path",
+		},
 			},
 		}},
 	}
@@ -246,12 +250,13 @@ func TestPremapSecrets_XTypeEnvWithPerms_Warning(t *testing.T) {
 	mode := types.FileMode(0400)
 	svc := types.ServiceConfig{
 		Name: "web",
-		Secrets: []types.ServiceSecretConfig{{
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{
 			Source: "db_password",
 			UID:    "1000",
 			Mode:   &mode,
 			Extensions: types.Extensions{
 				"x-type": "env",
+		},
 			},
 		}},
 	}
@@ -270,7 +275,7 @@ func TestPremapSecrets_XTypeEnvWithPerms_Warning(t *testing.T) {
 func TestPremapSecrets_VersionFallback_File(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "db_password"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "db_password"}}},
 	}
 	secrets := types.Secrets{
 		"db_password": {File: "/etc/secrets/db_password.txt"},
@@ -289,10 +294,11 @@ func TestPremapSecrets_VersionFallback_CustomPerms(t *testing.T) {
 	mode := types.FileMode(0400)
 	svc := types.ServiceConfig{
 		Name: "web",
-		Secrets: []types.ServiceSecretConfig{{
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{
 			Source: "db_password",
 			UID:    "1000",
 			Mode:   &mode,
+		},
 		}},
 	}
 	secrets := types.Secrets{
@@ -312,11 +318,12 @@ func TestPremapSecrets_ExternalWithOptions(t *testing.T) {
 	mode := types.FileMode(0400)
 	svc := types.ServiceConfig{
 		Name: "web",
-		Secrets: []types.ServiceSecretConfig{{
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{
 			Source: "db_password",
 			Target: "/custom/path",
 			UID:    "1000",
 			Mode:   &mode,
+		},
 		}},
 	}
 	secrets := types.Secrets{
@@ -331,7 +338,8 @@ func TestPremapSecrets_ExternalWithOptions(t *testing.T) {
 func TestPremapConfigs_Basic(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Configs: []types.ServiceConfigObjConfig{{Source: "app_config", Target: "/etc/app/config.yml"}},
+		ContainerSpec: types.ContainerSpec{Configs: []types.ServiceConfigObjConfig{{Source: "app_config", Target: "/etc/app/config.yml"}},
+		},
 	}
 	configs := types.Configs{
 		"app_config": {File: "/etc/configs/app_config.yml"},
@@ -348,7 +356,8 @@ func TestPremapConfigs_Basic(t *testing.T) {
 func TestPremapConfigs_DefaultTarget(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Configs: []types.ServiceConfigObjConfig{{Source: "app_config"}},
+		ContainerSpec: types.ContainerSpec{Configs: []types.ServiceConfigObjConfig{{Source: "app_config"}},
+		},
 	}
 	configs := types.Configs{
 		"app_config": {File: "/etc/configs/app_config.yml"},
@@ -363,12 +372,12 @@ func TestPremapConfigs_WithUIDGID(t *testing.T) {
 	mode := types.FileMode(0440)
 	svc := types.ServiceConfig{
 		Name: "web",
-		Configs: []types.ServiceConfigObjConfig{{
+		ContainerSpec: types.ContainerSpec{Configs: []types.ServiceConfigObjConfig{{
 			Source: "app_config",
 			UID:    "1000",
 			GID:    "1000",
 			Mode:   &mode,
-		}},
+		}}},
 	}
 	configs := types.Configs{
 		"app_config": {File: "/etc/configs/app_config.yml"},
@@ -382,7 +391,7 @@ func TestPremapConfigs_WithUIDGID(t *testing.T) {
 func TestPremapSecrets_Driver(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "encrypted_secret"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "encrypted_secret"}}},
 	}
 	secrets := types.Secrets{
 		"encrypted_secret": {
@@ -417,7 +426,7 @@ func TestPremapSecrets_Driver(t *testing.T) {
 func TestPremapSecrets_DriverOpts(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "shell_secret"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "shell_secret"}}},
 	}
 	secrets := types.Secrets{
 		"shell_secret": {
@@ -453,7 +462,7 @@ func TestPremapSecrets_DriverOpts(t *testing.T) {
 func TestPremapSecrets_DriverWithFile(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Secrets: []types.ServiceSecretConfig{{Source: "encrypted_secret"}},
+		ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "encrypted_secret"}}},
 	}
 	secrets := types.Secrets{
 		"encrypted_secret": {
@@ -486,7 +495,8 @@ func TestPremapSecrets_DriverWithFile(t *testing.T) {
 func TestPremapConfigs_Undefined(t *testing.T) {
 	svc := types.ServiceConfig{
 		Name:    "web",
-		Configs: []types.ServiceConfigObjConfig{{Source: "nonexistent"}},
+		ContainerSpec: types.ContainerSpec{Configs: []types.ServiceConfigObjConfig{{Source: "nonexistent"}},
+		},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	dirs, _ := PremapSecrets(&svc, nil, types.Configs{}, cfg)

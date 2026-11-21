@@ -128,6 +128,8 @@ Depending on the Compose file, comquad can generate:
 | Compose resource | Quadlet resource |
 |---|---|
 | Service | `.container` |
+| Job | `.container` |
+| Job schedule | `.timer` (in systemd unit directory) |
 | Image reference | `.image` |
 | Build block | `.build` |
 | Network | `.network` |
@@ -136,6 +138,8 @@ Depending on the Compose file, comquad can generate:
 | External secret | `Secret=` directive |
 
 Container units reference their companion image or build units. This lets Quadlet and systemd express dependencies between pulling or building an image and starting its container.
+
+Timer files are native systemd units and are stored in the systemd user directory (`~/.config/systemd/user` for rootless, `/etc/systemd/system` for root) rather than the Quadlet directory.
 
 ### Pseudo-Quadlet Generator
 
@@ -397,8 +401,9 @@ The `cockpit-comquad/` directory contains a Cockpit web UI plugin for managing c
 
 The plugin provides:
 
-- Stack dashboard with project status and service counts
-- Project detail view with services, containers, and resources tabs
+- Stack dashboard with project status, service counts, and job/timer counts
+- Project detail view with services, jobs, containers, and resources tabs
+- Jobs tab with manual run button and schedule display
 - Stack deployment via directory browser with change preview (dry-run)
 - Lifecycle management (start/stop/restart/remove) with confirmation dialogs
 - Update diff preview showing file changes before applying

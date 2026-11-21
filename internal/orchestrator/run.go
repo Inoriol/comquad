@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,12 +22,12 @@ func (o *Orchestrator) Run(runOpts RunOptions) error {
 	_ = stateMgr
 
 	prefix := "cq-" + o.projectName + "-"
-	jobContainerName := prefix + runOpts.JobName + ".container"
+	jobContainerFile := prefix + runOpts.JobName + ".container"
 	jobServiceName := prefix + runOpts.JobName + ".service"
 
 	found := false
 	for _, f := range state.Files {
-		if f == jobContainerName {
+		if filepath.Base(f) == jobContainerFile {
 			found = true
 			break
 		}
@@ -51,11 +52,11 @@ func (o *Orchestrator) Run(runOpts RunOptions) error {
 
 	if runOpts.DryRun {
 		if output.IsJSONMode() {
-			return output.PrintJSON(map[string]interface{}{
-				"project": o.projectName,
-				"job":     runOpts.JobName,
-				"action":  "run",
-				"dry_run": true,
+			return output.PrintJSON(&output.RunData{
+				Project: o.projectName,
+				Job:     runOpts.JobName,
+				Action:  "run",
+				DryRun:  true,
 			})
 		}
 		logger.Print(fmt.Sprintf("Would run job: %s", runOpts.JobName))
@@ -82,11 +83,11 @@ func (o *Orchestrator) Run(runOpts RunOptions) error {
 	}
 
 	if output.IsJSONMode() {
-		return output.PrintJSON(map[string]interface{}{
-			"project": o.projectName,
-			"job":     runOpts.JobName,
-			"action":  "run",
-			"success": true,
+		return output.PrintJSON(&output.RunData{
+			Project: o.projectName,
+			Job:     runOpts.JobName,
+			Action:  "run",
+			Success: true,
 		})
 	}
 

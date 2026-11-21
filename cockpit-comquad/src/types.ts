@@ -23,7 +23,8 @@ export interface Project {
     source_path: string;
     files: number;
     status: 'healthy' | 'up' | 'stopped' | 'degraded' | 'unknown';
-    services: string; // "running/total" format
+    services: string;
+    jobs?: string;
     resources?: Resources;
 }
 
@@ -34,6 +35,7 @@ export interface Resources {
     images: string[];
     builds: string[];
     secrets?: string[];
+    timers?: string[];
 }
 
 // Container list response
@@ -46,6 +48,7 @@ export interface Container {
     image: string;
     command: string;
     service: string;
+    type: string;
     state: string;
     status: string;
     ports: Port[];
@@ -72,6 +75,7 @@ export interface ViewData {
     source_path: string;
     status: string;
     services: Service[];
+    jobs?: Job[];
     resources: Resource[];
 }
 
@@ -81,6 +85,15 @@ export interface Service {
     image: string;
     networks: string[];
     volumes: string[];
+}
+
+export interface Job {
+    name: string;
+    status: string;
+    image: string;
+    schedule?: string;
+    manual: boolean;
+    last_run?: string;
 }
 
 export interface Resource {
@@ -161,4 +174,13 @@ export interface DryRunFile {
     status: string;
     diff: string;
     new_content?: string;
+}
+
+// Run job response
+export interface RunData {
+    project: string;
+    job: string;
+    action: string;
+    dry_run?: boolean;
+    success?: boolean;
 }

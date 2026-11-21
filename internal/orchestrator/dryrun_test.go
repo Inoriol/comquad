@@ -42,7 +42,7 @@ func captureStdout(t *testing.T, fn func()) string {
 
 func dryRunPlan(t *testing.T, targetDir string, units []c2q.QuadletUnit) reconcile.Plan {
 	t.Helper()
-	plan, err := reconcile.Compute(targetDir, t.TempDir(), "cq-myapp-", units)
+	plan, err := reconcile.Compute(targetDir, targetDir, t.TempDir(), "cq-myapp-", units)
 	if err != nil {
 		t.Fatal(err)
 	}

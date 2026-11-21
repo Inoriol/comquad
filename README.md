@@ -124,6 +124,7 @@ comquad compose exec web bash  # Execute in container
 | `compose exec` | Execute a command in a running container |
 | `compose build` | Build or rebuild services |
 | `compose pull` | Pull service images |
+| `compose run` | Run a job manually |
 
 ### Key Differences from Docker Compose
 
@@ -279,6 +280,11 @@ Generated Quadlet files are stored in:
 - Rootless mode: `~/.config/containers/systemd`
 - Root mode: `/etc/containers/systemd`
 
+Timer files (for scheduled jobs) are stored in the systemd user directory:
+
+- Rootless mode: `~/.config/systemd/user`
+- Root mode: `/etc/systemd/system`
+
 `comquad` stores project state below `$XDG_STATE_HOME/comquad/` (default: `~/.local/state/comquad/`). Successful deployments also keep a baseline used to show diffs and preserve manual changes made with `comquad edit`.
 
 Secret files (for podman < 4.5.0 fallback) are stored below `$XDG_DATA_HOME/comquad/secrets/` (default: `~/.local/share/comquad/secrets/`).
@@ -293,8 +299,9 @@ Use `comquad regenerate --force` if the local state file is lost but the managed
 
 A web-based UI plugin for Cockpit is available in the `cockpit-comquad/` directory. It provides:
 
-- Stack dashboard with project status and service counts
-- Project detail view with services, containers, and resources
+- Stack dashboard with project status, service counts, and job/timer counts
+- Project detail view with services, jobs, containers, and resources tabs
+- Jobs tab with manual run button and schedule display
 - Stack deployment via directory browser with change preview
 - Lifecycle management (start/stop/restart/remove) with update diff preview
 - Resource unit file viewer (click resource names to view quadlet content)

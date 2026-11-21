@@ -29,6 +29,7 @@ type ProjectJSON struct {
 	Files      int             `json:"files"`
 	Status     string          `json:"status"`
 	Services   string          `json:"services"`
+	Jobs       string          `json:"jobs,omitempty"`
 	Resources  *ResourcesJSON  `json:"resources,omitempty"`
 }
 
@@ -39,6 +40,7 @@ type ResourcesJSON struct {
 	Images     []string `json:"images"`
 	Builds     []string `json:"builds"`
 	Secrets    []string `json:"secrets,omitempty"`
+	Timers     []string `json:"timers,omitempty"`
 }
 
 type PSData struct {
@@ -50,6 +52,7 @@ type ContainerJSON struct {
 	Image        string        `json:"image"`
 	Command      string        `json:"command"`
 	Service      string        `json:"service"`
+	Type         string        `json:"type"`
 	State        string        `json:"state"`
 	Status       string        `json:"status"`
 	Ports        []PortJSON    `json:"ports"`
@@ -75,6 +78,7 @@ type ViewData struct {
 	SourcePath string         `json:"source_path"`
 	Status     string         `json:"status"`
 	Services   []ServiceJSON  `json:"services"`
+	Jobs       []JobJSON      `json:"jobs,omitempty"`
 	Resources  []ResourceJSON `json:"resources"`
 }
 
@@ -84,6 +88,15 @@ type ServiceJSON struct {
 	Image    string   `json:"image"`
 	Networks []string `json:"networks"`
 	Volumes  []string `json:"volumes"`
+}
+
+type JobJSON struct {
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	Image     string `json:"image"`
+	Schedule  string `json:"schedule,omitempty"`
+	Manual    bool   `json:"manual"`
+	LastRun   string `json:"last_run,omitempty"`
 }
 
 type ResourceJSON struct {
@@ -166,4 +179,12 @@ type PullData struct {
 	Project      string   `json:"project"`
 	ImagesPulled []string `json:"images_pulled"`
 	Success      bool     `json:"success"`
+}
+
+type RunData struct {
+	Project string `json:"project"`
+	Job     string `json:"job"`
+	Action  string `json:"action"`
+	DryRun  bool   `json:"dry_run,omitempty"`
+	Success bool   `json:"success,omitempty"`
 }

@@ -34,6 +34,7 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ projects, onSelect }
                     <Th>{_('Name')}</Th>
                     <Th>{_('Status')}</Th>
                     <Th>{_('Services')}</Th>
+                    <Th>{_('Jobs')}</Th>
                     <Th>{_('Source Path')}</Th>
                     <Th>{_('Files')}</Th>
               </Tr>
@@ -56,6 +57,11 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ projects, onSelect }
                       </Td>
                         <Td dataLabel={_('Services')}>
                             <Badge>{project.services}</Badge>
+                      </Td>
+                        <Td dataLabel={_('Jobs')}>
+                            {project.jobs
+                                ? <Badge isRead>{project.jobs}</Badge>
+                                : '—'}
                       </Td>
                         <Td dataLabel={_('Source Path')}>
                             <code style={{ fontSize: '0.9em' }}>{project.source_path}</code>

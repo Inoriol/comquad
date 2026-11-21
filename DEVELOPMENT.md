@@ -117,9 +117,13 @@ The `ensureProjectDeployed` helper centralizes state lookup for commands that re
 
 ## Logs and Status
 
-`ps` queries Podman for managed containers and combines the result with systemd unit state. Podman supplies container metadata such as image, command, ports, and exit code; systemd supplies the current unit state.
+`ps` queries Podman for managed containers and combines the result with systemd unit state. Podman supplies container metadata such as image, command, ports, and exit code; systemd supplies the current unit state. The output includes a TYPE column distinguishing services from jobs.
 
 For running units, `logs` uses the unit's current invocation ID to avoid mixing logs from older container runs. For stopped or failed units, it shows historical journal output. Logs from multiple units are collected as JSON, sorted by timestamp, and prefixed with the unit name.
+
+`view` shows a project overview with separate SERVICES and JOBS sections. Jobs display their schedule and manual trigger status. Timer resources are shown in the RESOURCES table.
+
+`list` shows a JOBS column with job count and active timer count.
 
 ## Output Levels
 
