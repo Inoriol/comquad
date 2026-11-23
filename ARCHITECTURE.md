@@ -397,21 +397,28 @@ In JSON mode, operational messages (logger output) are suppressed to keep stdout
 
 ## Packaging
 
-comquad uses GoReleaser with nFPM to generate RPM and DEB packages for distribution. The release workflow builds two packages:
+comquad uses GoReleaser with nFPM to generate RPM and DEB packages for distribution. GoReleaser also publishes a Homebrew cask for Linux users. The release workflow builds packages and a cask:
 
 ### Package Structure
 
-**comquad package:**
+**comquad package (RPM/DEB):**
 - `/usr/bin/comquad` — CLI binary
 - `/usr/share/bash-completion/completions/comquad` — Bash completion
 - `/usr/share/zsh/vendor-completions/_comquad` — Zsh completion
 - `/usr/share/fish/vendor_completions.d/comquad.fish` — Fish completion
 - `/usr/share/doc/comquad/copyright` — License file
 
-**cockpit-comquad package:**
+**cockpit-comquad package (RPM/DEB):**
 - `/usr/share/cockpit/comquad/` — Cockpit web UI plugin assets
 - Depends on `comquad` package
 - Recommends `cockpit` (DEB) / Suggests `cockpit` (RPM)
+
+**comquad cask (Homebrew):**
+- Binary linked to `$(brew --prefix)/bin/comquad`
+- Shell completions (bash, zsh, fish)
+- Depends on `podman` formula
+- Linux-only (amd64, arm64)
+- Published to `Inoriol/homebrew-tap`
 
 ### Build Process
 
@@ -421,13 +428,16 @@ The release workflow (`.github/workflows/release.yml`):
    - Builds binaries for Linux (amd64, arm64, riscv64)
    - Generates shell completions via `scripts/completions.sh`
    - Creates RPM and DEB packages via nFPM
+   - Generates Homebrew cask with SHA256 checksums
+   - Publishes cask to `Inoriol/homebrew-tap`
    - Signs checksums with cosign (optional)
    - Attaches packages to GitHub release
 
 ### Configuration
 
 Package configuration is in `.goreleaser.yml`:
-- `nfpms` section defines package metadata and file mappings
+- `nfpms` section defines RPM/DEB package metadata and file mappings
+- `homebrew_casks` section defines Homebrew cask configuration
 - `builds` section configures Go build settings
 - `archives` section defines tarball contents
 - `changelog` section groups commits by type (feat, fix, docs, etc.)

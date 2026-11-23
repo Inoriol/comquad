@@ -155,7 +155,12 @@ goreleaser release --snapshot --clean --skip=publish
 # Inspect packages
 rpm -qlp dist/comquad_*.rpm
 dpkg-deb -c dist/comquad_*.deb
+
+# Inspect generated Homebrew cask
+cat dist/homebrew/Casks/comquad.rb
 ```
+
+Note: `homebrew_casks` requires GoReleaser v2.10+. The CI workflow uses `~> v2` which gets the latest version.
 
 ### Release Workflow
 
@@ -168,13 +173,15 @@ git push origin v1.0.0
 
 The GitHub Actions workflow (`.github/workflows/release.yml`):
 1. Builds cockpit-comquad and creates a tarball
-2. Runs GoReleaser to build binaries and packages
-3. Creates a draft release with all artifacts
+2. Runs GoReleaser to build binaries, packages, and Homebrew cask
+3. Publishes cask to `Inoriol/homebrew-tap` (requires `HOMEBREW_TAP_TOKEN` secret)
+4. Creates a draft release with all artifacts
 
 ### Package Configuration
 
 Package metadata is defined in `.goreleaser.yml`:
 - `nfpms` — RPM/DEB package configuration
+- `homebrew_casks` — Homebrew cask configuration (Linux-only, amd64 + arm64)
 - `builds` — Go build settings (trimpath, ldflags, architectures)
 - `archives` — Tarball contents and naming
 - `changelog` — Commit grouping and filtering

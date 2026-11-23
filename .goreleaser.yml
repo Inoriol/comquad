@@ -131,6 +131,25 @@ nfpms:
       deb:
         file_name_template: "cockpit-comquad_{{ .Version }}_{{ .Arch }}"
 
+homebrew_casks:
+  - name: comquad
+    repository:
+      owner: Inoriol
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/Inoriol/comquad
+    description: Docker Compose-like CLI for Podman Quadlets and systemd
+    license: MIT
+    dependencies:
+      - formula: podman
+    completions:
+      bash: "completions/comquad.bash"
+      zsh: "completions/comquad.zsh"
+      fish: "completions/comquad.fish"
+    caveats: |
+      comquad requires Podman 4.4+ and systemd with Quadlet support.
+      Install Podman via your system package manager (dnf, apt, etc.).
+
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256

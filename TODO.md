@@ -55,10 +55,11 @@ Jobs are one-shot containers that run to completion, defined in the `jobs` top-l
 
 - **Man pages** — Add man pages to the `comquad` package. Generate from CLI help or write manually. Include in nFPM `contents` section.
 
-- **Homebrew tap (Linux-only)** — Create separate `homebrew-comquad` repo with two formulas:
-  - `comquad` formula: CLI-only, downloads Linux binaries from main repo releases, `depends_on :linux` to restrict to Linux. Architectures: amd64, arm64 (no risc-v — homebrew doesn't properly support it).
-  - `cockpit-comquad` formula: Cockpit plugin that uses Homebrew's `post_install_steps` with `sudo: true` to create a symlink from `(share/"cockpit-comquad")` to `/usr/share/cockpit/comquad`. Depends on `comquad` formula (auto-installs CLI first). Uses modern Homebrew feature designed for system-path installations.
-  - Automate formula updates via GitHub Actions on main repo release.
+- **Homebrew tap (Linux-only)** ✅ — Create `Inoriol/homebrew-tap` repo with Homebrew cask:
+   - `comquad` cask: CLI-only, downloads Linux binaries from main repo releases, `depends_on :linux` to restrict to Linux. Architectures: amd64, arm64 (no risc-v — homebrew doesn't properly support it).
+   - `cockpit-comquad` excluded from Homebrew (immutable distros like Bazzite have read-only `/usr/share/cockpit/`, so cockpit plugin should only be distributed via RPM/DEB).
+   - Automate cask updates via GitHub Actions on main repo release using GoReleaser's `homebrew_casks` feature.
+   - Uses `homebrew_casks` (not deprecated `brews`/formulas) per Homebrew's current model for pre-built binaries.
 
 - **deb packages** ✅ — Use goreleaser `nfpms` to build two packages:
   - `comquad` package: Go binary + shell completions (bash, zsh, fish), architectures: amd64, arm64, riscv64

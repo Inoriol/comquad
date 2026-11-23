@@ -58,6 +58,12 @@ sudo dnf install ./comquad-*.rpm
 sudo dnf install ./cockpit-comquad-*.rpm  # Optional: Cockpit web UI plugin
 ```
 
+**Homebrew (Linux):**
+```bash
+brew tap Inoriol/homebrew-tap
+brew install --cask comquad
+```
+
 ### From Source
 
 Build from source:

@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-23
+
 ### Added
 
+- **Homebrew tap** — comquad is now available via Homebrew for Linux users:
+  - New `Inoriol/homebrew-tap` repository with `comquad` cask
+  - GoReleaser `homebrew_casks` configuration auto-generates and publishes cask on release
+  - Linux-only (amd64, arm64), depends on `podman` formula
+  - Shell completions (bash, zsh, fish) included
+  - Install via: `brew tap Inoriol/homebrew-tap && brew install --cask comquad`
 - **RPM and DEB packaging** — GoReleaser now generates RPM and DEB packages for distribution via nFPM:
   - `comquad` package: CLI binary + shell completions (bash, zsh, fish) for amd64, arm64, riscv64
   - `cockpit-comquad` package: Cockpit web UI plugin assets, depends on `comquad`, recommends/suggests `cockpit`
