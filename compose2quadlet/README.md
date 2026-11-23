@@ -82,6 +82,9 @@ func main() {
   - `unit.go` — `depends_on` → `[Unit]` dependencies and health polling hooks
   - `image.go`, `build.go` — companion `.image` and `.build` structural units
   - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
+  - `jobs.go` — job container directives (Compose Spec v2.17.0+)
+  - `timer.go` — job schedule → `.timer` unit conversion
+  - `cron.go` — cron expression → systemd calendar format conversion
   - `secrets.go` — pre-mapping interceptor for secrets and configs; generates `.cq-secret` units for Podman secret store management
   - `dockerfile.go` — `PatchDockerfileFROM()` normalizes bare image names in Dockerfile FROM lines
   - `extensions.go` — x-extension extraction for quadlet-only directives
@@ -254,6 +257,46 @@ secrets:
 ```
 
 The `driver` field maps to `podman secret create --driver`, and `driver_opts` maps to `--driver-opts`. Supported drivers include `file` (default), `pass` (GPG-encrypted), and `shell` (script-managed).
+
+## Jobs (Compose Spec v2.17.0+)
+
+The library supports the `jobs` top-level element from the Compose specification. Jobs are one-shot containers that run to completion, unlike services which are long-running.
+
+**Job processing:**
+- `mapper.JobContainer()` — Maps job configuration to `[Container]` directives (same as services)
+- `mapper.JobImages()` — Generates `.image` companion units for jobs
+- `mapper.JobBuilds()` — Generates `.build` companion units for jobs
+- `mapper.JobUnit()` — Generates `[Unit]` dependencies for jobs
+- `mapper.Timers()` — Generates `.timer` units for scheduled jobs
+
+**Timer generation:**
+- Cron expressions are converted to systemd calendar format via `CronToSystemdCalendar()`
+- Timezone support via `OnCalendar=<timezone> <calendar>` syntax
+- `missed_fires: one` maps to `Persistent=true` for catch-up behavior
+
+**Job vs Service differences:**
+- Jobs skip network alias injection (no DNS discovery needed)
+- Jobs skip default network attachment
+- Jobs generate `.timer` units when `triggers.schedule` is present
+
+Example:
+```yaml
+jobs:
+  db-migration:
+    image: myapp:latest
+    command: python manage.py migrate
+    triggers:
+      manual: true
+
+  cleanup:
+    image: busybox
+    command: sh -c 'find /data -mtime +30 -delete'
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"
+          timezone: "Europe/Paris"
+          missed_fires: one
+```
 
 ## AutoNS (User Namespace Isolation)
 

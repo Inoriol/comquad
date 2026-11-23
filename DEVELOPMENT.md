@@ -117,9 +117,13 @@ The `ensureProjectDeployed` helper centralizes state lookup for commands that re
 
 ## Logs and Status
 
-`ps` queries Podman for managed containers and combines the result with systemd unit state. Podman supplies container metadata such as image, command, ports, and exit code; systemd supplies the current unit state.
+`ps` queries Podman for managed containers and combines the result with systemd unit state. Podman supplies container metadata such as image, command, ports, and exit code; systemd supplies the current unit state. The output includes a TYPE column distinguishing services from jobs.
 
 For running units, `logs` uses the unit's current invocation ID to avoid mixing logs from older container runs. For stopped or failed units, it shows historical journal output. Logs from multiple units are collected as JSON, sorted by timestamp, and prefixed with the unit name.
+
+`view` shows a project overview with separate SERVICES and JOBS sections. Jobs display their schedule and manual trigger status. Timer resources are shown in the RESOURCES table.
+
+`list` shows a JOBS column with job count and active timer count.
 
 ## Output Levels
 
@@ -130,6 +134,74 @@ For running units, `logs` uses the unit's current invocation ID to avoid mixing 
 | Quiet | `-q`, `--quiet` | Errors only |
 
 Quiet mode takes precedence over verbose mode. Errors are not suppressed.
+
+## Packaging and Release
+
+### Local Testing
+
+Test package builds locally without publishing:
+
+```bash
+# Generate completions
+./scripts/completions.sh
+
+# Build cockpit-comquad web assets
+cd cockpit-comquad && npm run build && cd ..
+mkdir -p cockpit-dist && cp -r cockpit-comquad/dist/* cockpit-dist/
+
+# Run GoReleaser snapshot
+goreleaser release --snapshot --clean --skip=publish
+
+# Inspect packages
+rpm -qlp dist/comquad_*.rpm
+dpkg-deb -c dist/comquad_*.deb
+
+# Inspect generated Homebrew cask
+cat dist/homebrew/Casks/comquad.rb
+```
+
+Note: `homebrew_casks` requires GoReleaser v2.10+. The CI workflow uses `~> v2` which gets the latest version.
+
+### Release Workflow
+
+The release is triggered by pushing a tag matching `v*`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The GitHub Actions workflow (`.github/workflows/release.yml`):
+1. Builds cockpit-comquad and creates a tarball
+2. Runs GoReleaser to build binaries, packages, and Homebrew cask
+3. Publishes cask to `Inoriol/homebrew-tap` (requires `HOMEBREW_TAP_TOKEN` secret)
+4. Creates a draft release with all artifacts
+
+### Package Configuration
+
+Package metadata is defined in `.goreleaser.yml`:
+- `nfpms` — RPM/DEB package configuration
+- `homebrew_casks` — Homebrew cask configuration (Linux-only, amd64 + arm64)
+- `builds` — Go build settings (trimpath, ldflags, architectures)
+- `archives` — Tarball contents and naming
+- `changelog` — Commit grouping and filtering
+
+### Adding New Files to Packages
+
+To include additional files in the packages:
+
+1. Add to `nfpms.contents` in `.goreleaser.yml`:
+   ```yaml
+   contents:
+     - src: ./path/to/file
+       dst: /usr/share/comquad/file
+       file_info:
+         mode: 0644
+   ```
+
+2. For generated files (completions, man pages), add generation to `scripts/completions.sh` or a similar script.
+
+3. Test locally with `goreleaser release --snapshot --clean --skip=publish`.
 
 ## Testing Architecture
 

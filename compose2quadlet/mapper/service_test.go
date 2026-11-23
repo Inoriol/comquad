@@ -10,55 +10,55 @@ import (
 func TestService_MemoryMax(t *testing.T) {
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 4}
-	svc := types.ServiceConfig{Name: "web", MemLimit: 1_073_741_824}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{MemLimit: 1_073_741_824}}
 	dirs := Service(svc, cfg)
 	assertDirective(t, dirs, "MemoryMax", "1073741824")
 }
 
 func TestService_MemoryLow(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", MemReservation: 536_870_912}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{MemReservation: 536_870_912}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "MemoryLow", "536870912")
 }
 
 func TestService_MemorySwapMax(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", MemSwapLimit: 2_147_483_648}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{MemSwapLimit: 2_147_483_648}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "MemorySwapMax", "2147483648")
 }
 
 func TestService_CPUQuota(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", CPUS: 2.5}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{CPUS: 2.5}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "CPUQuota", "250%")
 }
 
 func TestService_CPUWeight(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", CPUShares: 512}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{CPUShares: 512}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "CPUWeight", "50")
 }
 
 func TestService_CPUQuotaPeriodSec(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", CPUPeriod: 50000}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{CPUPeriod: 50000}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "CPUQuotaPeriodSec", "50ms")
 }
 
 func TestService_CPUSet(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", CPUSet: "0,1"}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{CPUSet: "0,1"}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "AllowedCPUs", "0,1")
 }
 
 func TestService_TasksMax(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", PidsLimit: 500}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{PidsLimit: 500}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "TasksMax", "500")
 }
 
 func TestService_OOMKillDisable(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", OomKillDisable: true}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{OomKillDisable: true}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	for _, d := range dirs {
 		if d.Key == "ManagedOOMMemoryPressure" || d.Key == "PodmanArgs" {
@@ -68,25 +68,25 @@ func TestService_OOMKillDisable(t *testing.T) {
 }
 
 func TestService_OOMScoreAdjust(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", OomScoreAdj: 500}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{OomScoreAdj: 500}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "OOMScoreAdjust", "500")
 }
 
 func TestService_Blkio(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", BlkioConfig: &types.BlkioConfig{Weight: 500}}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{BlkioConfig: &types.BlkioConfig{Weight: 500}}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "IOWeight", "500")
 }
 
 func TestService_BlkioDevices(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", BlkioConfig: &types.BlkioConfig{
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{BlkioConfig: &types.BlkioConfig{
 		WeightDevice:    []types.WeightDevice{{Path: "/dev/sda", Weight: 100}},
 		DeviceReadBps:   []types.ThrottleDevice{{Path: "/dev/sda", Rate: 1048576}},
 		DeviceWriteBps:  []types.ThrottleDevice{{Path: "/dev/sdb", Rate: 2097152}},
 		DeviceReadIOps:  []types.ThrottleDevice{{Path: "/dev/sdc", Rate: 1000}},
 		DeviceWriteIOps: []types.ThrottleDevice{{Path: "/dev/sdd", Rate: 2000}},
-	}}
+	}}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "IODeviceWeight", "/dev/sda 100")
 	assertDirective(t, dirs, "IOReadBandwidthMax", "/dev/sda 1048576")
@@ -163,23 +163,23 @@ func TestService_DeployResources(t *testing.T) {
 }
 
 func TestService_Ulimits_P2(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", Ulimits: map[string]*types.UlimitsConfig{
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Ulimits: map[string]*types.UlimitsConfig{
 		"nofile": {Soft: 1024, Hard: 2048},
 		"nproc":  {Single: 65535},
-	}}
+	}}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "LimitNOFILE", "1024:2048")
 	assertDirective(t, dirs, "LimitNPROC", "65535")
 }
 
 func TestService_Slice(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", Cgroup: "/system.slice/myapp.slice"}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Cgroup: "/system.slice/myapp.slice"}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	assertDirective(t, dirs, "Slice", "/system.slice/myapp.slice")
 }
 
 func TestService_Slice_SkipHost(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", Cgroup: "host"}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Cgroup: "host"}}
 	dirs := Service(svc, c2qtypes.DefaultConfig())
 	if hasDirective(dirs, "Slice", "") {
 		t.Fatal("should not emit Slice for cgroup: host")

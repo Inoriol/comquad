@@ -137,7 +137,7 @@ func TestCollectProjectFiles_ReturnsProjectFiles(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	files, err := o.collectProjectFiles(dir)
+	files, err := o.collectProjectFiles(dir, dir)
 	if err != nil {
 		t.Fatalf("collectProjectFiles: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestCollectProjectFiles_EmptyDir(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", dir, state, newMockSystemdClient())
 
-	files, err := o.collectProjectFiles(dir)
+	files, err := o.collectProjectFiles(dir, dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestCollectProjectFiles_NonExistentDirReturnsError(t *testing.T) {
 	state := newMockStateStore(nil)
 	o := newTestOrchestrator("myapp", t.TempDir(), state, newMockSystemdClient())
 
-	_, err := o.collectProjectFiles("/nonexistent/path/xyz")
+	_, err := o.collectProjectFiles("/nonexistent/path/xyz", "/nonexistent/path/xyz")
 	if err == nil {
 		t.Error("expected error for non-existent directory")
 	}
@@ -204,11 +204,11 @@ func TestRollbackDeploy_RestoresPreviousState(t *testing.T) {
 		},
 	}
 
-	plan, err := reconcile.Compute(targetDir, baselineDir, "cq-myapp-", units)
+	plan, err := reconcile.Compute(targetDir, targetDir, baselineDir, "cq-myapp-", units)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reconcile.Apply(targetDir, baselineDir, plan); err != nil {
+	if _, err := reconcile.Apply(targetDir, targetDir, baselineDir, plan); err != nil {
 		t.Fatal(err)
 	}
 

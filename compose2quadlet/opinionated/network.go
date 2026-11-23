@@ -1,6 +1,10 @@
 package opinionated
 
-import c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
+import (
+	"strings"
+
+	c2qtypes "github.com/Inoriol/comquad/compose2quadlet/internal/types"
+)
 
 const defaultNetworkName = "default"
 
@@ -9,9 +13,15 @@ func ApplyDefaultNetwork(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c
 		return units
 	}
 
+	prefix := cfg.FilePrefix + cfg.ProjectName + "-"
+
 	needsDefault := false
 	for _, u := range units {
 		if u.Type == c2qtypes.UnitContainer {
+			svcName := strings.TrimPrefix(u.Name, prefix)
+			if cfg.JobNames != nil && cfg.JobNames[svcName] {
+				continue
+			}
 			containerHasNetwork := false
 			for _, s := range u.Sections {
 				if s.Name == c2qtypes.SectionContainer {
@@ -66,6 +76,10 @@ func ApplyDefaultNetwork(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c
 
 	for ui := range units {
 		if units[ui].Type != c2qtypes.UnitContainer {
+			continue
+		}
+		svcName := strings.TrimPrefix(units[ui].Name, prefix)
+		if cfg.JobNames != nil && cfg.JobNames[svcName] {
 			continue
 		}
 		for si := range units[ui].Sections {

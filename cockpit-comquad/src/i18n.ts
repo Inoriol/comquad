@@ -3,22 +3,22 @@ declare global {
         cockpit: {
             gettext: (str: string) => string;
             ngettext: (singular: string, plural: string, n: number) => string;
-            format: (fmt: string, ...args: any[]) => string;
+            format: (fmt: string, ...args: unknown[]) => string;
         };
     }
     const cockpit: {
         gettext: (str: string) => string;
         ngettext: (singular: string, plural: string, n: number) => string;
-        format: (fmt: string, ...args: any[]) => string;
+        format: (fmt: string, ...args: unknown[]) => string;
     };
 }
 
-export const _ = (str: string, ...args: any[]): string => {
+export const _ = (str: string, ...args: unknown[]): string => {
     const translated = cockpit.gettext(str);
     if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-        return cockpit.format(translated, args[0]);
+        return cockpit.format(translated, args[0] as Record<string, unknown>);
     }
     return translated;
 };
 export const ngettext = (singular: string, plural: string, n: number): string => cockpit.ngettext(singular, plural, n);
-export const format = (fmt: string, ...args: any[]): string => cockpit.format(fmt, ...args);
+export const format = (fmt: string, ...args: unknown[]): string => cockpit.format(fmt, ...args);

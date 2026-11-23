@@ -103,7 +103,9 @@ func MergeUnit(base, disk, new c2q.QuadletUnit) (c2q.QuadletUnit, []Conflict) {
 }
 
 // Compute builds a Plan describing the changes needed without touching disk.
-func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Plan, error) {
+// quadletDir is for quadlet units (containers, networks, volumes, images, builds).
+// systemdUnitDir is for native systemd units (timers).
+func Compute(quadletDir, systemdUnitDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Plan, error) {
 	var plan Plan
 	expected := make(map[string]bool, len(units))
 
@@ -112,6 +114,15 @@ func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Pl
 		expected[filename] = true
 
 		newContent := serialization.Marshal(u)
+		
+		// Timer files go to systemd unit directory, others go to quadlet directory
+		var targetDir string
+		if u.Type == "timer" {
+			targetDir = systemdUnitDir
+		} else {
+			targetDir = quadletDir
+		}
+		
 		fp := FilePlan{
 			Name:            filename,
 			TargetPath:      filepath.Join(targetDir, filename),
@@ -160,10 +171,19 @@ func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Pl
 		}
 	}
 
-	stale := findStaleNames(targetDir, prefix, expected)
+	stale := findStaleNames(quadletDir, prefix, expected)
+	stale = append(stale, findStaleNames(systemdUnitDir, prefix, expected)...)
 	stale = append(stale, findStaleNames(baselineDir, prefix, expected)...)
 	for _, name := range dedupe(stale) {
-		old, _, err := readFile(filepath.Join(targetDir, name))
+		// Determine which directory this stale file is in
+		var staleDir string
+		if strings.HasSuffix(name, ".timer") {
+			staleDir = systemdUnitDir
+		} else {
+			staleDir = quadletDir
+		}
+		
+		old, _, err := readFile(filepath.Join(staleDir, name))
 		if err != nil {
 			return plan, err
 		}
@@ -173,7 +193,7 @@ func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Pl
 		}
 		plan.Files = append(plan.Files, FilePlan{
 			Name:        name,
-			TargetPath:  filepath.Join(targetDir, name),
+			TargetPath:  filepath.Join(staleDir, name),
 			BasePath:    filepath.Join(baselineDir, name),
 			Status:      StatusRemoved,
 			OldContent:  old,
@@ -188,9 +208,12 @@ func Compute(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Pl
 
 // Apply executes a Plan, writing files, updating baselines, and removing stale
 // entries. It returns a Result summarizing what changed.
-func Apply(targetDir, baselineDir string, plan Plan) (Result, error) {
+func Apply(quadletDir, systemdUnitDir, baselineDir string, plan Plan) (Result, error) {
 	var res Result
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(quadletDir, 0755); err != nil {
+		return res, err
+	}
+	if err := os.MkdirAll(systemdUnitDir, 0755); err != nil {
 		return res, err
 	}
 	if err := os.MkdirAll(baselineDir, 0755); err != nil {
@@ -262,12 +285,12 @@ func rollbackApply(applied []FilePlan, current FilePlan, cause error) error {
 }
 
 // Reconcile computes and applies changes in a single step.
-func Reconcile(targetDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Result, error) {
-	plan, err := Compute(targetDir, baselineDir, prefix, units)
+func Reconcile(quadletDir, systemdUnitDir, baselineDir, prefix string, units []c2q.QuadletUnit) (Result, error) {
+	plan, err := Compute(quadletDir, systemdUnitDir, baselineDir, prefix, units)
 	if err != nil {
 		return Result{}, err
 	}
-	return Apply(targetDir, baselineDir, plan)
+	return Apply(quadletDir, systemdUnitDir, baselineDir, plan)
 }
 
 // section is a normalized view of a unit section: ordered directive keys with

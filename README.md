@@ -42,6 +42,30 @@ Use `comquad up --no-diff` to apply changes without displaying the diff or askin
 
 ## Installation
 
+### From Package Repositories
+
+RPM and DEB packages are available on the [releases page](https://github.com/Inoriol/comquad/releases).
+
+**Debian/Ubuntu:**
+```bash
+sudo apt install ./comquad_*.deb
+sudo apt install ./cockpit-comquad_*.deb  # Optional: Cockpit web UI plugin
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install ./comquad-*.rpm
+sudo dnf install ./cockpit-comquad-*.rpm  # Optional: Cockpit web UI plugin
+```
+
+**Homebrew (Linux):**
+```bash
+brew tap Inoriol/homebrew-tap
+brew install --cask comquad
+```
+
+### From Source
+
 Build from source:
 
 ```bash
@@ -81,6 +105,7 @@ Run commands from the directory containing the project `compose.yaml`.
 | `comquad start [service ...]` | Start all services or selected services | `--dry-run` preview |
 | `comquad stop [service ...]` | Stop all services or selected services | `--dry-run` preview |
 | `comquad restart [service ...]` | Restart all services or selected services | `--dry-run` preview |
+| `comquad run JOB` | Run a job manually | `-f` follow logs, `--dry-run` preview |
 | `comquad logs [service]` | Show service logs | `-f` follow, `--tail N`, `--since TIME`, `-t` show timestamps |
 | `comquad exec SERVICE COMMAND` | Run a command in a running container | `-u USER`, `-t` control TTY |
 | `comquad compose COMMAND` | Docker Compose compatible commands | See [Compose Compatibility](#compose-compatibility) |
@@ -123,6 +148,7 @@ comquad compose exec web bash  # Execute in container
 | `compose exec` | Execute a command in a running container |
 | `compose build` | Build or rebuild services |
 | `compose pull` | Pull service images |
+| `compose run` | Run a job manually |
 
 ### Key Differences from Docker Compose
 
@@ -191,6 +217,65 @@ volumes:
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete Compose-to-Quadlet mapping and implementation details.
 
+## Jobs (Compose Spec v2.17.0+)
+
+comquad supports the `jobs` top-level element from the Compose specification. Jobs are one-shot containers that run to completion, unlike services which are long-running.
+
+```yaml
+jobs:
+  db-migration:
+    image: myapp:latest
+    command: python manage.py migrate
+    triggers:
+      manual: true
+
+  cleanup:
+    image: busybox
+    command: sh -c 'find /data -mtime +30 -delete'
+    volumes:
+      - data:/data
+    triggers:
+      schedule:
+        - "0 3 * * *"
+
+  backup:
+    image: backup-tool
+    command: /backup.sh
+    triggers:
+      schedule:
+        - cron: "0 0 * * 0"
+          timezone: "Europe/Paris"
+          missed_fires: one
+```
+
+### Job triggers
+
+- `manual: true` — Job can be triggered with `comquad run <job>` (default behavior)
+- `manual: false` — Job cannot be triggered manually (scheduled jobs only)
+- `schedule` — List of cron expressions or schedule objects for automatic execution
+
+### Schedule options
+
+- `cron` — Cron expression (e.g., `"0 3 * * *"`)
+- `timezone` — Timezone for schedule evaluation (e.g., `"Europe/Paris"`)
+- `missed_fires` — Policy for missed runs: `one` (catch up) or `skip` (ignore)
+
+### Running jobs
+
+```bash
+comquad run db-migration        # Run job manually
+comquad run cleanup --follow    # Run and follow logs
+comquad run backup --dry-run    # Preview without running
+```
+
+### Generated units
+
+For each job, comquad generates:
+- `.container` unit — the job container
+- `.timer` unit — schedule timer (if `triggers.schedule` is specified)
+
+Timers are automatically enabled and started during `comquad up`, and disabled/stopped during `comquad down`.
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -216,8 +301,13 @@ Enable with `COMQUAD_AUTONS=1`. See [ARCHITECTURE.md](./ARCHITECTURE.md) for set
 
 Generated Quadlet files are stored in:
 
-- Rootless mode: `~/.config/containers/systemd`
+- Rootless mode: `$XDG_CONFIG_HOME/containers/systemd` (default: `~/.config/containers/systemd`)
 - Root mode: `/etc/containers/systemd`
+
+Timer files (for scheduled jobs) are stored in the systemd user directory:
+
+- Rootless mode: `$XDG_CONFIG_HOME/systemd/user` (default: `~/.config/systemd/user`)
+- Root mode: `/etc/systemd/system`
 
 `comquad` stores project state below `$XDG_STATE_HOME/comquad/` (default: `~/.local/state/comquad/`). Successful deployments also keep a baseline used to show diffs and preserve manual changes made with `comquad edit`.
 
@@ -233,8 +323,9 @@ Use `comquad regenerate --force` if the local state file is lost but the managed
 
 A web-based UI plugin for Cockpit is available in the `cockpit-comquad/` directory. It provides:
 
-- Stack dashboard with project status and service counts
-- Project detail view with services, containers, and resources
+- Stack dashboard with project status, service counts, and job/timer counts
+- Project detail view with services, jobs, containers, and resources tabs
+- Jobs tab with manual run button and schedule display
 - Stack deployment via directory browser with change preview
 - Lifecycle management (start/stop/restart/remove) with update diff preview
 - Resource unit file viewer (click resource names to view quadlet content)

@@ -189,3 +189,39 @@ secrets:
     file: /tmp/test-custom.key
 `
 }
+
+// JobCompose returns a compose with a service and a manual job.
+func JobCompose(project string) string {
+	return `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/nginx:alpine
+    ports:
+      - "8082:80"
+jobs:
+  migrate:
+    image: docker.io/library/alpine:latest
+    command: ["echo", "migration complete"]
+    triggers:
+      manual: true
+`
+}
+
+// JobScheduledCompose returns a compose with a scheduled job.
+func JobScheduledCompose(project string) string {
+	return `name: ` + project + `
+services:
+  web:
+    image: docker.io/library/nginx:alpine
+    ports:
+      - "8083:80"
+jobs:
+  cleanup:
+    image: docker.io/library/alpine:latest
+    command: ["echo", "cleanup done"]
+    triggers:
+      manual: true
+      schedule:
+        - cron: "0 3 * * *"
+`
+}

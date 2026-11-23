@@ -20,6 +20,7 @@ const (
 	UnitVolume    = types.UnitVolume
 	UnitImage     = types.UnitImage
 	UnitBuild     = types.UnitBuild
+	UnitTimer     = types.UnitTimer
 	UnitCQSecret  = types.UnitCQSecret
 	UnitCQImage   = types.UnitCQImage
 	UnitCQBuild   = types.UnitCQBuild
@@ -39,6 +40,7 @@ const (
 	SectionImage     = types.SectionImage
 	SectionBuild     = types.SectionBuild
 	SectionSecret    = types.SectionSecret
+	SectionTimer     = types.SectionTimer
 )
 
 type TranspileOption = types.Option

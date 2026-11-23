@@ -128,6 +128,8 @@ Depending on the Compose file, comquad can generate:
 | Compose resource | Quadlet resource |
 |---|---|
 | Service | `.container` |
+| Job | `.container` |
+| Job schedule | `.timer` (in systemd unit directory) |
 | Image reference | `.image` |
 | Build block | `.build` |
 | Network | `.network` |
@@ -136,6 +138,8 @@ Depending on the Compose file, comquad can generate:
 | External secret | `Secret=` directive |
 
 Container units reference their companion image or build units. This lets Quadlet and systemd express dependencies between pulling or building an image and starting its container.
+
+Timer files are native systemd units and are stored in the systemd user directory (`~/.config/systemd/user` for rootless, `/etc/systemd/system` for root) rather than the Quadlet directory.
 
 ### Pseudo-Quadlet Generator
 
@@ -391,14 +395,64 @@ When adding JSON support to a new command:
 
 In JSON mode, operational messages (logger output) are suppressed to keep stdout clean for JSON parsing. Only the final JSON result is emitted.
 
+## Packaging
+
+comquad uses GoReleaser with nFPM to generate RPM and DEB packages for distribution. GoReleaser also publishes a Homebrew cask for Linux users. The release workflow builds packages and a cask:
+
+### Package Structure
+
+**comquad package (RPM/DEB):**
+- `/usr/bin/comquad` — CLI binary
+- `/usr/share/bash-completion/completions/comquad` — Bash completion
+- `/usr/share/zsh/vendor-completions/_comquad` — Zsh completion
+- `/usr/share/fish/vendor_completions.d/comquad.fish` — Fish completion
+- `/usr/share/doc/comquad/copyright` — License file
+
+**cockpit-comquad package (RPM/DEB):**
+- `/usr/share/cockpit/comquad/` — Cockpit web UI plugin assets
+- Depends on `comquad` package
+- Recommends `cockpit` (DEB) / Suggests `cockpit` (RPM)
+
+**comquad cask (Homebrew):**
+- Binary linked to `$(brew --prefix)/bin/comquad`
+- Shell completions (bash, zsh, fish)
+- Depends on `podman` formula
+- Linux-only (amd64, arm64)
+- Published to `Inoriol/homebrew-tap`
+
+### Build Process
+
+The release workflow (`.github/workflows/release.yml`):
+1. Builds cockpit-comquad web assets and creates a tarball
+2. Runs GoReleaser which:
+   - Builds binaries for Linux (amd64, arm64, riscv64)
+   - Generates shell completions via `scripts/completions.sh`
+   - Creates RPM and DEB packages via nFPM
+   - Generates Homebrew cask with SHA256 checksums
+   - Publishes cask to `Inoriol/homebrew-tap`
+   - Signs checksums with cosign (optional)
+   - Attaches packages to GitHub release
+
+### Configuration
+
+Package configuration is in `.goreleaser.yml`:
+- `nfpms` section defines RPM/DEB package metadata and file mappings
+- `homebrew_casks` section defines Homebrew cask configuration
+- `builds` section configures Go build settings
+- `archives` section defines tarball contents
+- `changelog` section groups commits by type (feat, fix, docs, etc.)
+
+The `cockpit-comquad` package uses `meta: true` to exclude the binary (it's provided by the `comquad` dependency).
+
 ## Cockpit Plugin
 
 The `cockpit-comquad/` directory contains a Cockpit web UI plugin for managing comquad projects. The plugin communicates with comquad via `cockpit.spawn()` calls to the CLI with `--json` flag. It does not require a separate backend daemon.
 
 The plugin provides:
 
-- Stack dashboard with project status and service counts
-- Project detail view with services, containers, and resources tabs
+- Stack dashboard with project status, service counts, and job/timer counts
+- Project detail view with services, jobs, containers, and resources tabs
+- Jobs tab with manual run button and schedule display
 - Stack deployment via directory browser with change preview (dry-run)
 - Lifecycle management (start/stop/restart/remove) with confirmation dialogs
 - Update diff preview showing file changes before applying

@@ -443,8 +443,8 @@ func TestExtractExtensions_InvalidSectionFormat(t *testing.T) {
 
 func TestContainerExtensions_OverrideBehavior(t *testing.T) {
 	svc := types.ServiceConfig{
-		Name:        "web",
-		PidsLimit:   100,
+		Name:            "web",
+		ContainerSpec:   types.ContainerSpec{PidsLimit: 100},
 		Extensions: types.Extensions{
 			"x-container": map[string]interface{}{
 				"PidsLimit": 200,
@@ -472,8 +472,8 @@ func TestContainerExtensions_OverrideBehavior(t *testing.T) {
 
 func TestServiceExtensions_OverrideBehavior(t *testing.T) {
 	svc := types.ServiceConfig{
-		Name:      "web",
-		MemLimit:  536870912,
+		Name:            "web",
+		ContainerSpec:   types.ContainerSpec{MemLimit: 536870912},
 		Extensions: types.Extensions{
 			"x-systemd": map[string]interface{}{
 				"Service": map[string]interface{}{

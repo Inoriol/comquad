@@ -8,7 +8,7 @@ import (
 )
 
 func TestUnit_DependsOn(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true}, "redis": {Condition: "service_started", Required: false}}}
+	svc := types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true}, "redis": {Condition: "service_started", Required: false}}}}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Unit(svc, cfg)
 
@@ -19,11 +19,11 @@ func TestUnit_DependsOn(t *testing.T) {
 }
 
 func TestUnit_DependsOnSortedOrder(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{
+	svc := types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 		"zdb": {Condition: "service_started", Required: true},
 		"adb": {Condition: "service_started", Required: true},
 		"mdb": {Condition: "service_started", Required: false},
-	}}
+	}}}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Unit(svc, cfg)
 
@@ -45,7 +45,7 @@ func TestUnit_DependsOnSortedOrder(t *testing.T) {
 }
 
 func TestUnit_DependsOn_Restart(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true, Restart: true}}}
+	svc := types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true, Restart: true}}}}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Unit(svc, cfg)
 
@@ -55,7 +55,7 @@ func TestUnit_DependsOn_Restart(t *testing.T) {
 }
 
 func TestUnit_DependsOn_Empty(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{}}
+	svc := types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{}}}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Unit(svc, cfg)
 	if len(dirs) != 0 {
@@ -64,7 +64,7 @@ func TestUnit_DependsOn_Empty(t *testing.T) {
 }
 
 func TestUnit_DependsOn_ServiceHealthy(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_healthy", Required: true}}}
+	svc := types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{"db": {Condition: "service_healthy", Required: true}}}}
 	cfg := c2qtypes.DefaultConfig()
 	serviceDirs := UnitService(svc, cfg)
 	if len(serviceDirs) == 0 {
@@ -74,7 +74,7 @@ func TestUnit_DependsOn_ServiceHealthy(t *testing.T) {
 }
 
 func TestUnit_DependsOn_ServiceCompletedSuccessfully(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"init": {Condition: "service_completed_successfully", Required: true}}}
+	svc := types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{"init": {Condition: "service_completed_successfully", Required: true}}}}
 	cfg := c2qtypes.DefaultConfig()
 	unitDirs := Unit(svc, cfg)
 
@@ -88,10 +88,10 @@ func TestUnit_DependsOn_ServiceCompletedSuccessfully(t *testing.T) {
 }
 
 func TestUnit_DependsOn_MixedConditions(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{
+	svc := types.ServiceConfig{Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 		"db":    {Condition: "service_healthy", Required: true},
 		"cache": {Condition: "service_started", Required: false},
-	}}
+	}}}
 	cfg := c2qtypes.DefaultConfig()
 	unitDirs := Unit(svc, cfg)
 	assertDirective(t, unitDirs, "Requires", "db.container")
@@ -107,7 +107,7 @@ func TestUnit_DependsOn_MixedConditions(t *testing.T) {
 }
 
 func TestUnit_PseudoImage_Deps(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 6}
 	cfg.PseudoQuadlet = true
@@ -118,8 +118,8 @@ func TestUnit_PseudoImage_Deps(t *testing.T) {
 
 func TestUnit_PseudoBuild_Deps(t *testing.T) {
 	svc := types.ServiceConfig{
-		Name:  "app",
-		Build: &types.BuildConfig{},
+		Name:         "app",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 8}
@@ -130,7 +130,7 @@ func TestUnit_PseudoBuild_Deps(t *testing.T) {
 }
 
 func TestUnit_NativeImage_NoPseudoDeps(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 8}
 	cfg.PseudoQuadlet = false
@@ -141,7 +141,7 @@ func TestUnit_NativeImage_NoPseudoDeps(t *testing.T) {
 }
 
 func TestUnit_PseudoQuadletDisabled_NoDeps(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
+	svc := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 6}
 	cfg.PseudoQuadlet = false

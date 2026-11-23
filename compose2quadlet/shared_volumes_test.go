@@ -10,14 +10,18 @@ func TestAnalyzeSharedVolumes_NamedVolumeShared(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
 			Name: "web",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeVolume, Source: "data"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeVolume, Source: "data"},
+				},
 			},
 		},
 		"db": types.ServiceConfig{
 			Name: "db",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeVolume, Source: "data"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeVolume, Source: "data"},
+				},
 			},
 		},
 	}
@@ -32,14 +36,18 @@ func TestAnalyzeSharedVolumes_NamedVolumeNotShared(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
 			Name: "web",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeVolume, Source: "webdata"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeVolume, Source: "webdata"},
+				},
 			},
 		},
 		"db": types.ServiceConfig{
 			Name: "db",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeVolume, Source: "dbdata"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeVolume, Source: "dbdata"},
+				},
 			},
 		},
 	}
@@ -57,14 +65,18 @@ func TestAnalyzeSharedVolumes_BindMountShared(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
 			Name: "web",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeBind, Source: "/shared/config"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeBind, Source: "/shared/config"},
+				},
 			},
 		},
 		"api": types.ServiceConfig{
 			Name: "api",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeBind, Source: "/shared/config"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeBind, Source: "/shared/config"},
+				},
 			},
 		},
 	}
@@ -79,14 +91,18 @@ func TestAnalyzeSharedVolumes_BindMountNotShared(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
 			Name: "web",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeBind, Source: "/web/config"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeBind, Source: "/web/config"},
+				},
 			},
 		},
 		"api": types.ServiceConfig{
 			Name: "api",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeBind, Source: "/api/config"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeBind, Source: "/api/config"},
+				},
 			},
 		},
 	}
@@ -104,9 +120,11 @@ func TestAnalyzeSharedVolumes_SameServiceMultipleRefs(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
 			Name: "web",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeVolume, Source: "data"},
-				{Type: types.VolumeTypeVolume, Source: "data"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeVolume, Source: "data"},
+					{Type: types.VolumeTypeVolume, Source: "data"},
+				},
 			},
 		},
 	}
@@ -121,14 +139,18 @@ func TestAnalyzeSharedVolumes_TmpfsIgnored(t *testing.T) {
 	services := types.Services{
 		"web": types.ServiceConfig{
 			Name: "web",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeTmpfs, Target: "/tmp"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeTmpfs, Target: "/tmp"},
+				},
 			},
 		},
 		"api": types.ServiceConfig{
 			Name: "api",
-			Volumes: []types.ServiceVolumeConfig{
-				{Type: types.VolumeTypeTmpfs, Target: "/tmp"},
+			ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeTmpfs, Target: "/tmp"},
+				},
 			},
 		},
 	}

@@ -36,4 +36,5 @@ func init() {
 	composeCmd.AddCommand(composeExecCmd)
 	composeCmd.AddCommand(composeBuildCmd)
 	composeCmd.AddCommand(composePullCmd)
+	composeCmd.AddCommand(composeRunCmd)
 }

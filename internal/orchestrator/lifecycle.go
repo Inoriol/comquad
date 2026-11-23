@@ -11,17 +11,39 @@ import (
 )
 
 // resolveUnits resolves unit names from the project state.
-// If services is empty, all container units are returned.
-// If services is non-empty, only matching container units are returned.
+// If services is empty, all container units (excluding job containers) and timer units are returned.
+// If services is non-empty, only matching container units and their associated timers are returned.
 func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 	_, state, err := o.ensureProjectDeployed()
 	if err != nil {
 		return nil, err
 	}
 
+	composeProject, _ := loadComposeProject(o.resolveComposeFile())
+	jobNames := make(map[string]bool)
+	if composeProject != nil {
+		for name := range composeProject.Jobs {
+			jobNames[name] = true
+		}
+	}
+	prefix := "cq-" + o.projectName + "-"
+
 	if len(services) == 0 {
 		var units []string
 		for _, f := range state.Files {
+			if strings.HasSuffix(f, ".timer") {
+				if unitName := fileToUnitName(f); unitName != "" {
+					units = append(units, unitName)
+				}
+				continue
+			}
+			if strings.HasSuffix(f, ".container") {
+				containerName := strings.TrimSuffix(filepath.Base(f), ".container")
+				shortName := strings.TrimPrefix(containerName, prefix)
+				if jobNames[shortName] {
+					continue
+				}
+			}
 			if strings.HasSuffix(f, ".container") || strings.HasSuffix(f, ".image") || strings.HasSuffix(f, ".build") ||
 				strings.HasSuffix(f, ".cq-secret") || strings.HasSuffix(f, ".cq-image") || strings.HasSuffix(f, ".cq-build") {
 				if unitName := fileToUnitName(f); unitName != "" {
@@ -54,6 +76,9 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 			} else if strings.HasSuffix(base, ".cq-build") {
 				nameWithoutExt = strings.TrimSuffix(base, ".cq-build")
 				ext = ".cq-build"
+			} else if strings.HasSuffix(base, ".timer") {
+				nameWithoutExt = strings.TrimSuffix(base, ".timer")
+				ext = ".timer"
 			} else {
 				continue
 			}
@@ -66,6 +91,14 @@ func (o *Orchestrator) resolveUnits(services []string) ([]string, error) {
 				strings.TrimPrefix(nameWithoutExt, servicePrefix) == svc ||
 				strings.TrimPrefix(nameWithoutExt, "cq-") == svc {
 				matches = append(matches, f)
+			}
+		}
+		if jobNames[svc] {
+			timerFile := prefix + svc + ".timer"
+			for _, f := range state.Files {
+				if f == timerFile {
+					matches = append(matches, f)
+				}
 			}
 		}
 		if len(matches) == 0 {
@@ -105,6 +138,8 @@ func fileToUnitName(f string) string {
 		return CQImageFileToUnitName(f)
 	case strings.HasSuffix(f, ".cq-build"):
 		return CQBuildFileToUnitName(f)
+	case strings.HasSuffix(f, ".timer"):
+		return TimerFileToUnitName(f)
 	default:
 		return ""
 	}

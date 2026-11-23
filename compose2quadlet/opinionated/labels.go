@@ -21,7 +21,8 @@ func ApplyLabels(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qtypes.
 		for si := range units[ui].Sections {
 			sec := &units[ui].Sections[si]
 			if sec.Name == c2qtypes.SectionService || sec.Name == c2qtypes.SectionUnit ||
-				sec.Name == c2qtypes.SectionImage {
+				sec.Name == c2qtypes.SectionImage || sec.Name == c2qtypes.SectionTimer ||
+				sec.Name == c2qtypes.SectionInstall {
 				continue
 			}
 			for _, k := range keys {

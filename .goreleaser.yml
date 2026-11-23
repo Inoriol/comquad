@@ -3,37 +3,201 @@ version: 2
 before:
   hooks:
     - go mod tidy
+    - ./scripts/completions.sh
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
 
 builds:
-  - main: ./cmd/comquad/
+  - id: comquad
+    main: ./cmd/comquad/
     env:
       - CGO_ENABLED=0
     ldflags:
       - -s -w
       - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .CommitDate }}
+      - -X main.builtBy=goreleaser
     goos:
       - linux
     goarch:
       - amd64
       - arm64
+      - riscv64
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
-  - formats: [tar.gz]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - name_template: >-
+      {{- .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    builds_info:
+      group: root
+      owner: root
+      mtime: "{{ .CommitDate }}"
+    files:
+      - src: README.md
+        info:
+          owner: root
+          group: root
+          mtime: "{{ .CommitDate }}"
+      - src: LICENSE
+        info:
+          owner: root
+          group: root
+          mtime: "{{ .CommitDate }}"
+      - src: completions/*
+        info:
+          owner: root
+          group: root
+          mtime: "{{ .CommitDate }}"
+
+nfpms:
+  - id: comquad
+    package_name: comquad
+    vendor: Inoriol
+    homepage: https://github.com/Inoriol/comquad
+    maintainer: Comquad Maintainers
+    description: Docker Compose-like CLI for Podman Quadlets and systemd
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    section: utils
+    priority: optional
+    mtime: "{{ .CommitDate }}"
+    contents:
+      - src: ./completions/comquad.bash
+        dst: /usr/share/bash-completion/completions/comquad
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: ./completions/comquad.zsh
+        dst: /usr/share/zsh/vendor-completions/_comquad
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: ./completions/comquad.fish
+        dst: /usr/share/fish/vendor_completions.d/comquad.fish
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: ./LICENSE
+        dst: /usr/share/doc/comquad/copyright
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
+        - changelog-file-missing-in-native-package
+
+  - id: cockpit-comquad
+    package_name: cockpit-comquad
+    vendor: Inoriol
+    homepage: https://github.com/Inoriol/comquad
+    maintainer: Comquad Maintainers
+    description: Cockpit UI plugin for comquad
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    meta: true
+    dependencies:
+      - comquad
+    contents:
+      - src: ./cockpit-dist/
+        dst: /usr/share/cockpit/comquad/
+    recommends:
+      - cockpit
+    overrides:
+      rpm:
+        file_name_template: "cockpit-comquad-{{ .Version }}-1.{{ .Arch }}"
+        recommends: []
+        suggests:
+          - cockpit
+      deb:
+        file_name_template: "cockpit-comquad_{{ .Version }}_{{ .Arch }}"
+
+homebrew_casks:
+  - name: comquad
+    repository:
+      owner: Inoriol
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/Inoriol/comquad
+    description: Docker Compose-like CLI for Podman Quadlets and systemd
+    license: MIT
+    dependencies:
+      - formula: podman
+    completions:
+      bash: "completions/comquad.bash"
+      zsh: "completions/comquad.zsh"
+      fish: "completions/comquad.fish"
+    caveats: |
+      comquad requires Podman 4.4+ and systemd with Quadlet support.
+      Install Podman via your system package manager (dnf, apt, etc.).
 
 checksum:
   name_template: "checksums.txt"
+  algorithm: sha256
 
 release:
+  draft: true
+  prerelease: auto
+  header: |
+    ## What's Changed
+  footer: |
+    **Full Changelog**: https://github.com/Inoriol/comquad/compare/{{ .PreviousTag }}...{{ .Tag }}
   extra_files:
     - glob: "extra-dist/cockpit-comquad-*.tar.gz"
 
-snapshot:
-  version_template: "{{ incpatch .Version }}-next"
-
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
-      - "^docs:"
       - "^test:"
+      - "^test\\("
+      - "^chore: update$"
+      - "^chore: docs$"
+      - "^docs: update$"
+      - "^chore: schema$"
+      - "^chore: typo$"
+      - "^chore: auto-update generated files$"
+      - "^chore: schema update$"
+      - "^chore\\(deps\\): "
+      - "^(build|ci): "
+      - "^ci\\("
+      - merge conflict
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: "New Features"
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 100
+    - title: "Security updates"
+      regexp: '^.*?sec(\(.+\))??!?:.+$'
+      order: 150
+    - title: "Bug fixes"
+      regexp: '^.*?(fix|refactor)(\(.+\))??!?:.+$'
+      order: 200
+    - title: "Documentation updates"
+      regexp: ^.*?docs?(\(.+\))??!?:.+$
+      order: 400
+    - title: Other work
+      order: 9999

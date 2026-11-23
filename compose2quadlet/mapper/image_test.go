@@ -9,7 +9,7 @@ import (
 
 func TestImages_Basic(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -39,7 +39,7 @@ func TestImages_NoImage(t *testing.T) {
 
 func TestImages_PullPolicy(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest", PullPolicy: "always"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest", PullPolicy: "always"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -49,7 +49,7 @@ func TestImages_PullPolicy(t *testing.T) {
 
 func TestImages_PullPolicy_Unavailable(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest", PullPolicy: "always"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest", PullPolicy: "always"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 5}
@@ -65,7 +65,7 @@ func TestImages_PullPolicy_Unavailable(t *testing.T) {
 
 func TestImages_IfNotPresent(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest", PullPolicy: "if_not_present"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest", PullPolicy: "if_not_present"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -75,7 +75,7 @@ func TestImages_IfNotPresent(t *testing.T) {
 
 func TestImages_InvalidPolicy(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest", PullPolicy: "daily"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest", PullPolicy: "daily"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -87,7 +87,7 @@ func TestImages_InvalidPolicy(t *testing.T) {
 
 func TestImages_Platform(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "alpine:latest", Platform: "linux/arm64/v8"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine:latest", Platform: "linux/arm64/v8"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -99,7 +99,7 @@ func TestImages_Platform(t *testing.T) {
 
 func TestImages_Platform_OSOnly(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "alpine:latest", Platform: "linux"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine:latest", Platform: "linux"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -112,7 +112,7 @@ func TestImages_Platform_OSOnly(t *testing.T) {
 
 func TestImages_Retry(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -123,7 +123,7 @@ func TestImages_Retry(t *testing.T) {
 
 func TestImages_Retry_Unavailable(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 4}
@@ -136,8 +136,8 @@ func TestImages_Retry_Unavailable(t *testing.T) {
 
 func TestImages_Multiple(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest"},
-		"db":  types.ServiceConfig{Name: "db", Image: "postgres:15"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}},
+		"db":  types.ServiceConfig{Name: "db", ContainerSpec: types.ContainerSpec{Image: "postgres:15"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	units := Images(services, cfg)
@@ -156,7 +156,7 @@ func TestImages_Multiple(t *testing.T) {
 
 func TestImages_SkipNormalization(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "nginx:latest"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx:latest"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.SkipImageNormalization = true
@@ -171,7 +171,7 @@ func TestImages_SkipNormalization(t *testing.T) {
 
 func TestImages_SkipNormalization_UserImage(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "myuser/myimage:v1"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "myuser/myimage:v1"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.SkipImageNormalization = true
@@ -183,7 +183,7 @@ func TestImages_SkipNormalization_UserImage(t *testing.T) {
 
 func TestImages_SkipNormalization_CustomRegistry(t *testing.T) {
 	services := types.Services{
-		"web": types.ServiceConfig{Name: "web", Image: "ghcr.io/owner/image:tag"},
+		"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "ghcr.io/owner/image:tag"}},
 	}
 	cfg := c2qtypes.DefaultConfig()
 	cfg.SkipImageNormalization = true

@@ -27,6 +27,14 @@ type serviceRow struct {
 	vols   []string
 }
 
+type jobRow struct {
+	name     string
+	status   string
+	image    string
+	schedule string
+	manual   bool
+}
+
 type resourceRow struct {
 	name string
 	kind string
@@ -35,7 +43,7 @@ type resourceRow struct {
 
 func shortName(fileName, projectPrefix string) string {
 	name := strings.TrimPrefix(fileName, projectPrefix)
-	for _, ext := range []string{".container", ".image", ".network", ".volume", ".build", ".cq-secret", ".cq-image", ".cq-build"} {
+	for _, ext := range []string{".container", ".image", ".network", ".volume", ".build", ".cq-secret", ".cq-image", ".cq-build", ".timer"} {
 		name = strings.TrimSuffix(name, ext)
 	}
 	return name
@@ -111,6 +119,14 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 		return fmt.Errorf("failed to list units: %w", err)
 	}
 
+	composeProject, _ := loadComposeProject(o.resolveComposeFile())
+	jobNames := make(map[string]bool)
+	if composeProject != nil {
+		for name := range composeProject.Jobs {
+			jobNames[name] = true
+		}
+	}
+
 	prefix := "cq-" + o.projectName + "-"
 	unitMap := make(map[string]unitStatus)
 	for _, u := range allUnits {
@@ -120,15 +136,16 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 	}
 
 	if len(unitMap) == 0 {
-	if output.IsJSONMode() {
-		return output.PrintJSON(&output.ViewData{
-			Project:    o.projectName,
-			SourcePath: state.SourcePath,
-			Status:     "unknown",
-			Services:   []output.ServiceJSON{},
-			Resources:  []output.ResourceJSON{},
-		})
-	}
+		if output.IsJSONMode() {
+			return output.PrintJSON(&output.ViewData{
+				Project:    o.projectName,
+				SourcePath: state.SourcePath,
+				Status:     "unknown",
+				Services:   []output.ServiceJSON{},
+				Jobs:       []output.JobJSON{},
+				Resources:  []output.ResourceJSON{},
+			})
+		}
 		logger.Printf("No units found for project %s\n", o.projectName)
 		return nil
 	}
@@ -143,8 +160,10 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 	}
 
 	var services []serviceRow
+	var jobs []jobRow
 	var resources []resourceRow
 	var jsonServices []output.ServiceJSON
+	var jsonJobs []output.JobJSON
 	var jsonResources []output.ResourceJSON
 
 	for _, f := range state.Files {
@@ -168,41 +187,61 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 				status = "failed"
 			}
 
-			row := serviceRow{name: short, status: status}
-			jsonSvc := output.ServiceJSON{Name: short, Status: status}
+			isJob := jobNames[short]
 
 			content := fileContents[f]
+			img := ""
+			var nets, vols []string
 			for _, line := range strings.Split(content, "\n") {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "Image=") {
-					img := displayImage(strings.TrimPrefix(trimmed, "Image="), fileContents)
-					row.image = img
-					jsonSvc.Image = img
+					img = displayImage(strings.TrimPrefix(trimmed, "Image="), fileContents)
 				}
 				if strings.HasPrefix(trimmed, "Network=") {
 					netRef := strings.TrimPrefix(trimmed, "Network=")
 					netRef = strings.TrimSuffix(netRef, ".network")
 					netShort := strings.TrimPrefix(netRef, prefix)
-					row.nets = append(row.nets, netShort)
-					jsonSvc.Networks = append(jsonSvc.Networks, netShort)
+					nets = append(nets, netShort)
 				}
 				if strings.HasPrefix(trimmed, "Volume=") {
 					volRef := strings.TrimPrefix(trimmed, "Volume=")
 					parts := strings.SplitN(volRef, ":", 3)
 					volName := strings.TrimSuffix(parts[0], ".volume")
 					volShort := strings.TrimPrefix(volName, prefix)
-					row.vols = append(row.vols, volShort)
-					jsonSvc.Volumes = append(jsonSvc.Volumes, volShort)
+					vols = append(vols, volShort)
 				}
 				if strings.HasPrefix(trimmed, "Mount=") {
 					mountVal := strings.TrimPrefix(trimmed, "Mount=")
 					dest := mountDestination(mountVal)
-					row.vols = append(row.vols, dest)
-					jsonSvc.Volumes = append(jsonSvc.Volumes, dest)
+					vols = append(vols, dest)
 				}
 			}
-			services = append(services, row)
-			jsonServices = append(jsonServices, jsonSvc)
+
+			if isJob {
+				schedule := ""
+				manual := true
+				if composeProject != nil {
+					if job, ok := composeProject.Jobs[short]; ok {
+						if job.Triggers != nil && len(job.Triggers.Schedule) > 0 {
+							var parts []string
+							for _, s := range job.Triggers.Schedule {
+								parts = append(parts, s.Cron)
+							}
+							schedule = strings.Join(parts, ", ")
+						}
+						if job.Triggers.Manual != nil {
+							manual = *job.Triggers.Manual
+						}
+					}
+				}
+				jobs = append(jobs, jobRow{name: short, status: status, image: img, schedule: schedule, manual: manual})
+				jsonJobs = append(jsonJobs, output.JobJSON{Name: short, Status: status, Image: img, Schedule: schedule, Manual: manual})
+			} else {
+				row := serviceRow{name: short, status: status, image: img, nets: nets, vols: vols}
+				services = append(services, row)
+				jsonSvc := output.ServiceJSON{Name: short, Status: status, Image: img, Networks: nets, Volumes: vols}
+				jsonServices = append(jsonServices, jsonSvc)
+			}
 		}
 
 		if strings.HasSuffix(base, ".image") {
@@ -253,11 +292,28 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 			resources = append(resources, resourceRow{name: short + ".cq-build", kind: "build", info: "—"})
 			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".cq-build", Type: "build"})
 		}
+
+		if strings.HasSuffix(base, ".timer") {
+			timerUnit := prefix + short + ".timer"
+			st := unitMap[timerUnit]
+			timerStatus := st.active
+			if timerStatus == "" {
+				timerStatus = "unknown"
+			} else if st.active == "active" {
+				timerStatus = "active"
+			} else if st.active == "inactive" {
+				timerStatus = "inactive"
+			}
+			resources = append(resources, resourceRow{name: short + ".timer", kind: "timer", info: timerStatus})
+			jsonResources = append(jsonResources, output.ResourceJSON{Name: short + ".timer", Type: "timer", Info: timerStatus})
+		}
 	}
 
 	sort.Slice(services, func(i, j int) bool { return services[i].name < services[j].name })
+	sort.Slice(jobs, func(i, j int) bool { return jobs[i].name < jobs[j].name })
 	sort.Slice(resources, func(i, j int) bool { return resources[i].name < resources[j].name })
 	sort.Slice(jsonServices, func(i, j int) bool { return jsonServices[i].Name < jsonServices[j].Name })
+	sort.Slice(jsonJobs, func(i, j int) bool { return jsonJobs[i].Name < jsonJobs[j].Name })
 	sort.Slice(jsonResources, func(i, j int) bool { return jsonResources[i].Name < jsonResources[j].Name })
 
 	activeCount := 0
@@ -268,11 +324,11 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 	}
 
 	status := "healthy"
-	if len(services) == 0 {
+	if len(services) == 0 && len(jobs) == 0 {
 		status = "up"
-	} else if activeCount == 0 {
+	} else if len(services) > 0 && activeCount == 0 {
 		status = "stopped"
-	} else if activeCount < len(services) {
+	} else if len(services) > 0 && activeCount < len(services) {
 		status = "degraded"
 	}
 
@@ -282,6 +338,7 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 			SourcePath: state.SourcePath,
 			Status:     status,
 			Services:   jsonServices,
+			Jobs:       jsonJobs,
 			Resources:  jsonResources,
 		})
 	}
@@ -305,6 +362,25 @@ func (o *Orchestrator) viewProject(state deploy.ProjectState) error {
 				volStr = "—"
 			}
 			tw.AppendRow(table.Row{s.name, s.status, s.image, netStr, volStr})
+		}
+		logger.Print(tw.Render())
+	}
+
+	if len(jobs) > 0 {
+		logger.Print("JOBS")
+		tw := table.NewWriter()
+		tw.SetStyle(table.StyleLight)
+		tw.AppendHeader(table.Row{"NAME", "STATUS", "IMAGE", "SCHEDULE", "MANUAL"})
+		for _, j := range jobs {
+			sched := j.schedule
+			if sched == "" {
+				sched = "—"
+			}
+			manualStr := "yes"
+			if !j.manual {
+				manualStr = "no"
+			}
+			tw.AppendRow(table.Row{j.name, j.status, j.image, sched, manualStr})
 		}
 		logger.Print(tw.Render())
 	}

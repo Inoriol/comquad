@@ -42,6 +42,7 @@ The **Since** column tracks the minimum version required for each mapping:
 | `.image` | 4.8.0 |
 | `.pod` | 5.0.0 |
 | `.build` | 5.2.0 |
+| `.timer` | (systemd native) |
 | `.artifact` | 5.7.0 |
 
 ## Priority Legend
@@ -444,7 +445,75 @@ Generated as companion unit for every service with `image:`.
 
 ---
 
-## 15. Completely Unsupported
+## 15. Jobs (compose-spec v2.17.0+)
+
+Jobs are one-shot containers that run to completion. Unlike services which are long-running, jobs execute a task and then exit.
+
+Jobs share the same namespace as services and support most container configuration fields via embedded `ContainerSpec` and `WorkloadSpec`.
+
+### Job-specific fields
+
+| Compose field | P | Target directive | Target section | Since | Notes |
+|---|---|---|---|---|---|
+| `jobs.<name>.profiles` | 4 | — | — | — | Runtime selection; comquad handles at orchestration level |
+| `jobs.<name>.extends` | 4 | — | — | — | Multi-file composition; handled by compose-go loader |
+| `jobs.<name>.triggers.manual` | — | *(orchestration only)* | — | — | Controls whether `comquad run` is allowed |
+| `jobs.<name>.triggers.schedule` | — | `OnCalendar=` | `[Timer]` | — | Cron expression → systemd calendar |
+| `jobs.<name>.triggers.schedule[].timezone` | — | `OnCalendar=<tz> <calendar>` | `[Timer]` | — | Timezone prefix for OnCalendar |
+| `jobs.<name>.triggers.schedule[].missed_fires` | — | `Persistent=true` | `[Timer]` | — | When `one` (default), catch up missed runs |
+| `jobs.<name>.triggers.schedule[].concurrency` | 4 | — | — | — | `forbid` is default systemd behavior |
+
+### Job Container fields
+
+Jobs support the same container fields as services (image, command, environment, volumes, networks, etc.) via embedded `ContainerSpec` and `WorkloadSpec`. See sections 1-14 for the full mapping.
+
+### Generated units
+
+For each job, comquad generates:
+- `.container` unit — the job container (same as services)
+- `.image` unit — companion image unit (if `image:` is specified)
+- `.build` unit — companion build unit (if `build:` is specified)
+- `.timer` unit — schedule timer (if `triggers.schedule` is specified)
+
+### Timer unit format
+
+```ini
+[Unit]
+Description=Timer for job <name>
+
+[Timer]
+OnCalendar=<calendar-expression>
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+### Cron to systemd calendar conversion
+
+| Cron expression | systemd calendar |
+|---|---|
+| `0 3 * * *` | `*-*-* 03:00:00` |
+| `0 3 * * 0` | `Sun *-*-* 03:00:00` |
+| `0 0 1 * *` | `*-*-01 00:00:00` |
+| `0 0 1 1 *` | `*-01-01 00:00:00` |
+| `*/5 * * * *` | `*-*-* *:00/5:00` |
+| `0 3 * * 1-5` | `Mon..Fri *-*-* 03:00:00` |
+
+### Job vs Service differences
+
+| Aspect | Service | Job |
+|---|---|---|
+| Lifecycle | Long-running | Runs to completion |
+| Restart policy | `Restart=always/on-failure` | `Restart=no` (oneshot) |
+| Network aliases | Auto-injected | Not injected |
+| Default network | Auto-attached | Not auto-attached |
+| Timer | N/A | Generated if `triggers.schedule` present |
+| Manual trigger | N/A | `comquad run <job>` |
+
+---
+
+## 16. Completely Unsupported
 
 | Field | Reason |
 |---|---|
@@ -459,12 +528,12 @@ Generated as companion unit for every service with `image:`.
 
 ---
 
-## 16. Quadlet-Only Directives (No Compose Equivalent)
+## 17. Quadlet-Only Directives (No Compose Equivalent)
 
 These directives are supported by Quadlet but have **no corresponding Compose spec field**.
 They are available via the **x-extension mechanism** (see `x-container`, `x-image`, `x-build`, `x-network`, `x-volume`, `x-systemd` in README.md).
 
-### 16.1 `[Container]` — Quadlet-only (via `x-container`)
+### 17.1 `[Container]` — Quadlet-only (via `x-container`)
 
 | Directive | Podman equivalent | Since | Notes |
 |---|---|---|---|
@@ -498,13 +567,13 @@ They are available via the **x-extension mechanism** (see `x-container`, `x-imag
 | `UIDMap=` | `--uidmap=` | 4.8.0 | UID mapping for user namespace |
 | `Umask=` | `--umask=` | 4.8.0 | Container process umask |
 
-### 16.2 `[Network]` — Quadlet-only (via `x-network`)
+### 17.2 `[Network]` — Quadlet-only (via `x-network`)
 
 | Directive | Podman equivalent | Since | Notes |
 |---|---|---|---|
 | `ContainersConfModule=` | `--module=` | 4.7.0 | Load containers.conf(5) module |
 
-### 16.3 `[Volume]` — Quadlet-only (via `x-volume`)
+### 17.3 `[Volume]` — Quadlet-only (via `x-volume`)
 
 | Directive | Podman equivalent | Since | Notes |
 |---|---|---|---|
@@ -513,7 +582,7 @@ They are available via the **x-extension mechanism** (see `x-container`, `x-imag
 | `Image=` | *(artifact volume)* | 6.0.0 | Back volume with OCI artifact image |
 | `User=` | *(chown)* | 6.0.0 | UID owner of volume mount point |
 
-### 16.4 `[Build]` — Quadlet-only (via `x-build`)
+### 17.4 `[Build]` — Quadlet-only (via `x-build`)
 
 | Directive | Podman equivalent | Since | Notes |
 |---|---|---|---|
@@ -533,7 +602,7 @@ They are available via the **x-extension mechanism** (see `x-container`, `x-imag
 | `Variant=` | `--variant=` | 5.2.0 | Target platform variant |
 | `Volume=` | `--volume=` | 5.2.0 | Mount volume during build |
 
-### 16.5 `[Image]` — Quadlet-only (via `x-image`)
+### 17.5 `[Image]` — Quadlet-only (via `x-image`)
 
 | Directive | Podman equivalent | Since | Notes |
 |---|---|---|---|
@@ -546,7 +615,7 @@ They are available via the **x-extension mechanism** (see `x-container`, `x-imag
 | `ImageTag=` | `--tag=` | 5.3.0 | Additional tag for pulled image |
 | `TLSVerify=` | `--tls-verify=` | 4.8.0 | Require TLS verification for registries |
 
-### 16.6 `.pod` Quadlet (No Compose Equivalent)
+### 17.6 `.pod` Quadlet (No Compose Equivalent)
 
 Pod quadlets have no Compose equivalent at all. The entire `.pod` unit type is Quadlet-specific.
 
@@ -578,7 +647,7 @@ Pod quadlets have no Compose equivalent at all. The entire `.pod` unit type is Q
 | `UserNS=` | `--userns=` | 5.0.0 | User namespace mode for pod |
 | `Volume=` | `--volume=` | 5.0.0 | Volume mount for pod infra container |
 
-### 16.7 `.kube` Quadlet (No Compose Equivalent)
+### 17.7 `.kube` Quadlet (No Compose Equivalent)
 
 Kube quadlets deploy from Kubernetes YAML. Entirely Quadlet-specific.
 
@@ -599,7 +668,7 @@ Kube quadlets deploy from Kubernetes YAML. Entirely Quadlet-specific.
 | `UserNS=` | `--userns=` | 4.5.0 | User namespace mode |
 | `Yaml=` | *(positional arg)* | 4.4.0 | Path to Kubernetes YAML |
 
-### 16.8 `.artifact` Quadlet (No Compose Equivalent)
+### 17.8 `.artifact` Quadlet (No Compose Equivalent)
 
 Artifact quadlets manage OCI artifacts. Entirely Quadlet-specific (since 5.7.0).
 
@@ -619,7 +688,7 @@ Artifact quadlets manage OCI artifacts. Entirely Quadlet-specific (since 5.7.0).
 | `ServiceName=` | *(systemd unit name)* | 5.7.0 | Systemd service name |
 | `TLSVerify=` | `--tls-verify=` | 5.7.0 | Require TLS verification |
 
-### 16.9 `[Quadlet]` Section
+### 17.9 `[Quadlet]` Section
 
 | Directive | Since | Notes |
 |---|---|---|
@@ -627,7 +696,7 @@ Artifact quadlets manage OCI artifacts. Entirely Quadlet-specific (since 5.7.0).
 
 ---
 
-## 17. Mapping Counts
+## 18. Mapping Counts
 
 | Priority | Count | Min podman/systemd |
 |---|---|---|
@@ -635,9 +704,9 @@ Artifact quadlets manage OCI artifacts. Entirely Quadlet-specific (since 5.7.0).
 | **2** Systemd `[Service]`/`[Unit]` | ~30 fields | sd 208 baseline, ~5 later additions |
 | **3** PodmanArgs passthrough | ~15 fields | 4.6.0 (PodmanArgs added) |
 | **4** Unsupported | ~52 fields | — |
-| **—** Structural | ~10 fields | 4.4.0 baseline |
+| **—** Structural | ~15 fields | 4.4.0 baseline + jobs/timers |
 
-**Total: ~184 compose fields tracked.**
+**Total: ~189 compose fields tracked.**
 
 ### Quadlet-only directives (no Compose equivalent)
 

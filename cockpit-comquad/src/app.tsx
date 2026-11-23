@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Page, PageSection, Title, Button, EmptyState, EmptyStateBody, Spinner } from '@patternfly/react-core';
+import { Page, PageSection, Title, Button, Spinner } from '@patternfly/react-core';
 import { CubesIcon, SyncIcon } from '@patternfly/react-icons';
 import { ProjectsList } from './ProjectsList';
 import { ProjectDetail } from './ProjectDetail';
@@ -17,7 +17,6 @@ export const App: React.FC = () => {
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [deploying, setDeploying] = useState(false);
 
     const loadProjects = useCallback(async () => {
         setLoading(true);
@@ -136,7 +135,6 @@ export const App: React.FC = () => {
                     <ProjectsList
                         projects={projects}
                         onSelect={handleProjectSelect}
-                        onRefresh={loadProjects}
                   />
                 )}
           </PageSection>

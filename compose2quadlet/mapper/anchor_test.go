@@ -21,9 +21,9 @@ func TestSelectAnchor_NoDependencies(t *testing.T) {
 
 func TestSelectAnchor_WithDependencies(t *testing.T) {
 	services := map[string]types.ServiceConfig{
-		"web": {Name: "web", DependsOn: types.DependsOnConfig{
+		"web": {Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 			"db": {Condition: "service_started"},
-		}},
+		}}},
 		"db":    {Name: "db"},
 		"cache": {Name: "cache"},
 	}
@@ -36,12 +36,12 @@ func TestSelectAnchor_WithDependencies(t *testing.T) {
 
 func TestSelectAnchor_SingleRoot(t *testing.T) {
 	services := map[string]types.ServiceConfig{
-		"web": {Name: "web", DependsOn: types.DependsOnConfig{
+		"web": {Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 			"db": {Condition: "service_started"},
-		}},
-		"db": {Name: "db", DependsOn: types.DependsOnConfig{
+		}}},
+		"db": {Name: "db", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 			"init": {Condition: "service_completed_successfully"},
-		}},
+		}}},
 		"init": {Name: "init"},
 	}
 
@@ -53,9 +53,9 @@ func TestSelectAnchor_SingleRoot(t *testing.T) {
 
 func TestSelectAnchor_MultipleRoots(t *testing.T) {
 	services := map[string]types.ServiceConfig{
-		"web": {Name: "web", DependsOn: types.DependsOnConfig{
+		"web": {Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 			"db": {Condition: "service_started"},
-		}},
+		}}},
 		"db":    {Name: "db"},
 		"redis": {Name: "redis"},
 	}

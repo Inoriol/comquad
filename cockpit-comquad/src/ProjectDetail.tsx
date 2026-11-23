@@ -27,43 +27,17 @@ import {
     Tooltip
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { ArrowLeftIcon, SyncIcon, ExternalLinkAltIcon, LockIcon, UnlockIcon } from '@patternfly/react-icons';
+import { ArrowLeftIcon, SyncIcon, ExternalLinkAltIcon, LockIcon, UnlockIcon, PlayIcon } from '@patternfly/react-icons';
 import * as client from './client';
 import { _ } from './i18n';
-import type { Project, ViewData, Container, DryRunData } from './types';
+import { getStatusColor, getFileStatusColor, toggleSetItem } from './utils';
+import type { Project, ViewData, Container, DryRunData, Job } from './types';
 
 interface ProjectDetailProps {
     project: Project;
     onBack: () => void;
     onRefresh: () => void;
 }
-
-const getStatusColor = (status: string): 'green' | 'grey' | 'orange' | 'red' | 'blue' => {
-    switch (status) {
-        case 'healthy':
-        case 'running':
-            return 'green';
-        case 'up':
-            return 'blue';
-        case 'stopped':
-            return 'grey';
-        case 'degraded':
-            return 'orange';
-        case 'failed':
-            return 'red';
-        default:
-            return 'grey';
-    }
-};
-
-const getFileStatusColor = (status: string): 'green' | 'blue' | 'red' | 'orange' => {
-    switch (status) {
-        case 'created': return 'green';
-        case 'changed': return 'blue';
-        case 'removed': return 'red';
-        default: return 'orange';
-    }
-};
 
 export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onRefresh }) => {
     const [activeTab, setActiveTab] = useState(0);
@@ -169,17 +143,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
         setDeleteVolumes(false);
     };
 
-    const toggleFile = (name: string) => {
-        setExpandedFiles(prev => {
-            const next = new Set(prev);
-            if (next.has(name)) {
-                next.delete(name);
-            } else {
-                next.add(name);
-            }
-            return next;
-        });
-    };
+    const toggleFile = (name: string) => toggleSetItem(expandedFiles, setExpandedFiles, name);
 
     const handleResourceClick = async (resourceName: string) => {
         setResourceModal({ open: true, name: resourceName, content: '', loading: true });
@@ -363,7 +327,72 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                                 )}
                       </div>
                   </Tab>
-                    <Tab eventKey={1} title={<TabTitleText>{_('Containers')}</TabTitleText>}>
+                    <Tab eventKey={1} title={<TabTitleText>{_('Jobs')}</TabTitleText>}>
+                        <div style={{ marginTop: '1rem' }}>
+                            {viewData && viewData.jobs && viewData.jobs.length > 0
+                                ? (
+                                    <Table aria-label={_('Jobs table')} variant='compact'>
+                                        <Thead>
+                                            <Tr>
+                                                <Th>{_('Name')}</Th>
+                                                <Th>{_('Status')}</Th>
+                                                <Th>{_('Image')}</Th>
+                                                <Th>{_('Schedule')}</Th>
+                                                <Th>{_('Manual')}</Th>
+                                                <Th>{_('Actions')}</Th>
+                                          </Tr>
+                                      </Thead>
+                                        <Tbody>
+                                            {viewData.jobs.map((job: Job) => (
+                                                <Tr key={job.name}>
+                                                    <Td dataLabel={_('Name')}>{job.name}</Td>
+                                                    <Td dataLabel={_('Status')}>
+                                                        <Label color={getStatusColor(job.status)}>
+                                                            {job.status}
+                                                      </Label>
+                                                  </Td>
+                                                    <Td dataLabel={_('Image')}>
+                                                        <code>{job.image}</code>
+                                                  </Td>
+                                                    <Td dataLabel={_('Schedule')}>
+                                                        {job.schedule || '—'}
+                                                  </Td>
+                                                    <Td dataLabel={_('Manual')}>
+                                                        {job.manual ? _('Yes') : _('No')}
+                                                  </Td>
+                                                    <Td dataLabel={_('Actions')}>
+                                                        {job.manual && (
+                                                            <Button
+                                                                variant='link'
+                                                                isInline
+                                                                icon={<PlayIcon />}
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        await client.runJob(project.source_path, job.name);
+                                                                        await loadData();
+                                                                    } catch (err) {
+                                                                        setActionError(err instanceof Error ? err.message : _('Failed to run job'));
+                                                                    }
+                                                                }}
+                                                                isDisabled={actionLoading}
+                                                          >
+                                                                {_('Run')}
+                                                          </Button>
+                                                        )}
+                                                  </Td>
+                                              </Tr>
+                                            ))}
+                                      </Tbody>
+                                  </Table>
+                                )
+                                : (
+                                    <EmptyState>
+                                        <EmptyStateBody>{_('No jobs found')}</EmptyStateBody>
+                                  </EmptyState>
+                                )}
+                      </div>
+                  </Tab>
+                    <Tab eventKey={2} title={<TabTitleText>{_('Containers')}</TabTitleText>}>
                         <div style={{ marginTop: '1rem' }}>
                             {containers && containers.length > 0
                                 ? (
@@ -437,7 +466,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                                 )}
                       </div>
                   </Tab>
-                    <Tab eventKey={2} title={<TabTitleText>{_('Resources')}</TabTitleText>}>
+                    <Tab eventKey={3} title={<TabTitleText>{_('Resources')}</TabTitleText>}>
                         <div style={{ marginTop: '1rem' }}>
                             {viewData && viewData.resources && viewData.resources.length > 0
                                 ? (
@@ -600,7 +629,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, o
                     <Button
                         key='confirm'
                         variant={confirmModal.action === 'remove' ? 'danger' : confirmModal.action === 'stop' ? 'warning' : 'primary'}
-                        onClick={() => handleAction(confirmModal.action as any)}
+                        onClick={() => handleAction(confirmModal.action as 'update' | 'stop' | 'remove')}
                         isLoading={actionLoading}
                   >
                         {confirmModal.action === 'remove' ? _('Remove') : confirmModal.action === 'stop' ? _('Stop') : _('Update')}

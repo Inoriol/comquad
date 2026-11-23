@@ -7,24 +7,71 @@ For long-term goals, refer to the [roadmap](./ROADMAP.md).
 - **Value-level merge** — Multi-value directives (`Environment=`, `Volume=`, `PublishPort=`) are merged at key granularity; independent additions to the same key currently conflict instead of being merged per line.
 - **Diff rendering** — The unified diff implementation is homegrown; it could be replaced with `go-udiff` if richer output is ever needed.
 
+### Jobs Support (compose-spec v2.17.0+)
+
+Jobs are one-shot containers that run to completion, defined in the `jobs` top-level element of compose files.
+
+**Completed:**
+- ✅ Upgrade compose-go to v2.17.0 with jobs support
+- ✅ Add `UnitTimer` type and `SectionTimer` constant
+- ✅ Create `mapper/jobs.go` for job container unit generation
+- ✅ Create `mapper/timer.go` for schedule → .timer unit conversion
+- ✅ Create `mapper/cron.go` for cron-to-systemd calendar conversion
+- ✅ Update `transpile.go` to process jobs
+- ✅ Add `RunOptions` struct and `Run()` method to orchestrator
+- ✅ Add `comquad run` command for manual job execution
+- ✅ Update `up` to enable/start timers and skip job containers
+- ✅ Update `down` to disable/stop timers during teardown
+- ✅ Add `EnableUnit`/`DisableUnit` to SystemdClient interface
+- ✅ Add `Timers` field to ResourceInfo for state tracking
+- ✅ Fix test files for compose-go v2.17.0 API changes (ContainerSpec/WorkloadSpec embedding)
+  - `compose2quadlet/mapper/container_test.go`
+  - `compose2quadlet/mapper/image_test.go`
+  - `compose2quadlet/mapper/unit_test.go`
+  - `compose2quadlet/mapper/service_test.go`
+  - `compose2quadlet/mapper/healthcheck_test.go`
+  - `compose2quadlet/mapper/network_test.go`
+  - `compose2quadlet/mapper/volume_test.go`
+  - `compose2quadlet/mapper/secrets_test.go`
+  - `compose2quadlet/mapper/ports_test.go`
+  - `compose2quadlet/mapper/extensions_test.go`
+  - `compose2quadlet/transpile_test.go`
+  - `compose2quadlet/version_test.go`
+- ✅ Add unit tests for `mapper/jobs.go`
+- ✅ Add unit tests for `mapper/timer.go`
+- ✅ Add unit tests for `mapper/cron.go` (cron-to-systemd calendar conversion)
+
+**Leftover tasks:**
+- [x] Add integration tests for jobs lifecycle (up, run, down)
+- [x] Update `ps` command to show job status
+- [x] Update `start`/`stop`/`restart` commands to handle jobs
+- [x] Update `view` command to display jobs
+- [x] Add JSON output support for `run` command
+- [x] Update `list` command to show job count
+- [x] Update cockpit-comquad to display jobs
+- [x] Add `compose run` subcommand for docker-compose compatibility
+
 ### Packaging & Distribution
 
-- **Homebrew tap (Linux-only)** — Create separate `homebrew-comquad` repo with two formulas:
-  - `comquad` formula: CLI-only, downloads Linux binaries from main repo releases, `depends_on :linux` to restrict to Linux. Architectures: amd64, arm64 (no risc-v — homebrew doesn't properly support it).
-  - `cockpit-comquad` formula: Cockpit plugin that uses Homebrew's `post_install_steps` with `sudo: true` to create a symlink from `(share/"cockpit-comquad")` to `/usr/share/cockpit/comquad`. Depends on `comquad` formula (auto-installs CLI first). Uses modern Homebrew feature designed for system-path installations.
-  - Automate formula updates via GitHub Actions on main repo release.
+- **Man pages** — Add man pages to the `comquad` package. Generate from CLI help or write manually. Include in nFPM `contents` section.
 
-- **deb packages** — Use goreleaser `nfpms` to build two packages:
-  - `comquad` package: Go binary + man pages, architectures: amd64, arm64, riscv64
+- **Homebrew tap (Linux-only)** ✅ — Create `Inoriol/homebrew-tap` repo with Homebrew cask:
+   - `comquad` cask: CLI-only, downloads Linux binaries from main repo releases, `depends_on :linux` to restrict to Linux. Architectures: amd64, arm64 (no risc-v — homebrew doesn't properly support it).
+   - `cockpit-comquad` excluded from Homebrew (immutable distros like Bazzite have read-only `/usr/share/cockpit/`, so cockpit plugin should only be distributed via RPM/DEB).
+   - Automate cask updates via GitHub Actions on main repo release using GoReleaser's `homebrew_casks` feature.
+   - Uses `homebrew_casks` (not deprecated `brews`/formulas) per Homebrew's current model for pre-built binaries.
+
+- **deb packages** ✅ — Use goreleaser `nfpms` to build two packages:
+  - `comquad` package: Go binary + shell completions (bash, zsh, fish), architectures: amd64, arm64, riscv64
   - `cockpit-comquad` package: cockpit plugin web assets installed to `/usr/share/cockpit/comquad/`, `Depends: comquad`, `Recommends: cockpit` (soft dep — accommodates containerized cockpit)
   - Architectures: amd64, arm64, riscv64
 
-- **rpm packages** — Use goreleaser `nfpms` to build two packages:
-  - `comquad` package: Go binary + man pages, architectures: x86_64, aarch64, riscv64
+- **rpm packages** ✅ — Use goreleaser `nfpms` to build two packages:
+  - `comquad` package: Go binary + shell completions, architectures: x86_64, aarch64, riscv64
   - `cockpit-comquad` package: cockpit plugin web assets, `Requires: comquad`, `Suggests: cockpit` (soft dep)
   - Architectures: x86_64, aarch64, riscv64
 
-- **RISC-V architecture** — Add riscv64 to goreleaser build targets for binaries and deb/rpm packages only (skip for brew)
+- **RISC-V architecture** ✅ — Add riscv64 to goreleaser build targets for binaries and deb/rpm packages only (skip for brew)
 
 ### Quadlet Directives in Compose Files
 

@@ -24,3 +24,9 @@ type PullOptions struct {
 	DryRun       bool
 	Services     []string
 }
+
+type RunOptions struct {
+	JobName string
+	Follow  bool
+	DryRun  bool
+}
