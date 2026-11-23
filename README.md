@@ -42,6 +42,24 @@ Use `comquad up --no-diff` to apply changes without displaying the diff or askin
 
 ## Installation
 
+### From Package Repositories
+
+RPM and DEB packages are available on the [releases page](https://github.com/Inoriol/comquad/releases).
+
+**Debian/Ubuntu:**
+```bash
+sudo apt install ./comquad_*.deb
+sudo apt install ./cockpit-comquad_*.deb  # Optional: Cockpit web UI plugin
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install ./comquad-*.rpm
+sudo dnf install ./cockpit-comquad-*.rpm  # Optional: Cockpit web UI plugin
+```
+
+### From Source
+
 Build from source:
 
 ```bash
@@ -277,12 +295,12 @@ Enable with `COMQUAD_AUTONS=1`. See [ARCHITECTURE.md](./ARCHITECTURE.md) for set
 
 Generated Quadlet files are stored in:
 
-- Rootless mode: `~/.config/containers/systemd`
+- Rootless mode: `$XDG_CONFIG_HOME/containers/systemd` (default: `~/.config/containers/systemd`)
 - Root mode: `/etc/containers/systemd`
 
 Timer files (for scheduled jobs) are stored in the systemd user directory:
 
-- Rootless mode: `~/.config/systemd/user`
+- Rootless mode: `$XDG_CONFIG_HOME/systemd/user` (default: `~/.config/systemd/user`)
 - Root mode: `/etc/systemd/system`
 
 `comquad` stores project state below `$XDG_STATE_HOME/comquad/` (default: `~/.local/state/comquad/`). Successful deployments also keep a baseline used to show diffs and preserve manual changes made with `comquad edit`.

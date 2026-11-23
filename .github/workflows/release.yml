@@ -63,6 +63,11 @@ jobs:
           name: cockpit-comquad-tarball
           path: extra-dist
 
+      - name: Extract cockpit plugin for nFPM packaging
+        run: |
+          mkdir -p cockpit-dist
+          tar -xzf extra-dist/cockpit-comquad-*.tar.gz --strip-components=1 -C cockpit-dist cockpit-comquad-*/dist
+
       - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RPM and DEB packaging** — GoReleaser now generates RPM and DEB packages for distribution via nFPM:
+  - `comquad` package: CLI binary + shell completions (bash, zsh, fish) for amd64, arm64, riscv64
+  - `cockpit-comquad` package: Cockpit web UI plugin assets, depends on `comquad`, recommends/suggests `cockpit`
+  - Packages follow FHS conventions: `/usr/bin/comquad`, `/usr/share/bash-completion/completions/comquad`, etc.
+  - Release workflow updated to build cockpit-comquad assets and pass them to GoReleaser for packaging
+  - Added `scripts/completions.sh` to generate shell completions during release
+  - Added riscv64 architecture to build targets
+  - Packages tested on Debian 13 (trixi) and Fedora (distrobox)
 - **Cockpit plugin shared utilities** — New `cockpit-comquad/src/utils.ts` with shared helper functions:
   - `getStatusColor()` — Centralized status color mapping for project/service/container states
   - `getFileStatusColor()` — File status color mapping for dry-run previews
@@ -63,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **XDG_CONFIG_HOME compliance for quadlet and timer paths** — `GetSystemdPath()` and `GetSystemdUnitPath()` now respect `$XDG_CONFIG_HOME` instead of hardcoding `~/.config`. This ensures quadlet files and timer files are written to the correct location when users have a custom XDG config directory.
 - **Cockpit plugin security vulnerabilities** — Fixed 14 npm vulnerabilities (2 critical, 2 high, 10 moderate):
   - Updated `vitest` from 2.x to 5.x (fixes critical Prototype Pollution RCE in `tinypool`)
   - Updated `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` to 8.73.0

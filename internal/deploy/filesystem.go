@@ -19,25 +19,28 @@ func NewTargetDirResolver() *TargetDirResolver {
 	return &TargetDirResolver{}
 }
 
-// GetSystemdPath returns either /etc/containers/systemd or ~/.config/containers/systemd
+// GetSystemdPath returns either /etc/containers/systemd or $XDG_CONFIG_HOME/containers/systemd
+// (default: ~/.config/containers/systemd)
 func (r *TargetDirResolver) GetSystemdPath() (string, error) {
 	currentUser, err := user.Current()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current user: %w", err)
 	}
 
-	// Check if UID is 0 (root)
 	if currentUser.Uid == "0" {
 		return "/etc/containers/systemd", nil
 	}
 
-	// For non-root users, use ~/.config/containers/systemd
-	return filepath.Join(currentUser.HomeDir, ".config", "containers", "systemd"), nil
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir == "" {
+		configDir = filepath.Join(currentUser.HomeDir, ".config")
+	}
+	return filepath.Join(configDir, "containers", "systemd"), nil
 }
 
-// GetSystemdUnitPath returns the systemd unit directory where .service files should be placed.
+// GetSystemdUnitPath returns the systemd unit directory where .timer files should be placed.
 // For root: /etc/systemd/system
-// For non-root: ~/.config/systemd/user
+// For non-root: $XDG_CONFIG_HOME/systemd/user (default: ~/.config/systemd/user)
 func (r *TargetDirResolver) GetSystemdUnitPath() (string, error) {
 	currentUser, err := user.Current()
 	if err != nil {
@@ -48,7 +51,11 @@ func (r *TargetDirResolver) GetSystemdUnitPath() (string, error) {
 		return "/etc/systemd/system", nil
 	}
 
-	return filepath.Join(currentUser.HomeDir, ".config", "systemd", "user"), nil
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir == "" {
+		configDir = filepath.Join(currentUser.HomeDir, ".config")
+	}
+	return filepath.Join(configDir, "systemd", "user"), nil
 }
 
 // ValidatePodmanVersion checks that podman meets the minimum required version (4.8.0).

@@ -53,22 +53,24 @@ Jobs are one-shot containers that run to completion, defined in the `jobs` top-l
 
 ### Packaging & Distribution
 
+- **Man pages** — Add man pages to the `comquad` package. Generate from CLI help or write manually. Include in nFPM `contents` section.
+
 - **Homebrew tap (Linux-only)** — Create separate `homebrew-comquad` repo with two formulas:
   - `comquad` formula: CLI-only, downloads Linux binaries from main repo releases, `depends_on :linux` to restrict to Linux. Architectures: amd64, arm64 (no risc-v — homebrew doesn't properly support it).
   - `cockpit-comquad` formula: Cockpit plugin that uses Homebrew's `post_install_steps` with `sudo: true` to create a symlink from `(share/"cockpit-comquad")` to `/usr/share/cockpit/comquad`. Depends on `comquad` formula (auto-installs CLI first). Uses modern Homebrew feature designed for system-path installations.
   - Automate formula updates via GitHub Actions on main repo release.
 
-- **deb packages** — Use goreleaser `nfpms` to build two packages:
-  - `comquad` package: Go binary + man pages, architectures: amd64, arm64, riscv64
+- **deb packages** ✅ — Use goreleaser `nfpms` to build two packages:
+  - `comquad` package: Go binary + shell completions (bash, zsh, fish), architectures: amd64, arm64, riscv64
   - `cockpit-comquad` package: cockpit plugin web assets installed to `/usr/share/cockpit/comquad/`, `Depends: comquad`, `Recommends: cockpit` (soft dep — accommodates containerized cockpit)
   - Architectures: amd64, arm64, riscv64
 
-- **rpm packages** — Use goreleaser `nfpms` to build two packages:
-  - `comquad` package: Go binary + man pages, architectures: x86_64, aarch64, riscv64
+- **rpm packages** ✅ — Use goreleaser `nfpms` to build two packages:
+  - `comquad` package: Go binary + shell completions, architectures: x86_64, aarch64, riscv64
   - `cockpit-comquad` package: cockpit plugin web assets, `Requires: comquad`, `Suggests: cockpit` (soft dep)
   - Architectures: x86_64, aarch64, riscv64
 
-- **RISC-V architecture** — Add riscv64 to goreleaser build targets for binaries and deb/rpm packages only (skip for brew)
+- **RISC-V architecture** ✅ — Add riscv64 to goreleaser build targets for binaries and deb/rpm packages only (skip for brew)
 
 ### Quadlet Directives in Compose Files
 

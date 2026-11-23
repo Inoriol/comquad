@@ -395,6 +395,45 @@ When adding JSON support to a new command:
 
 In JSON mode, operational messages (logger output) are suppressed to keep stdout clean for JSON parsing. Only the final JSON result is emitted.
 
+## Packaging
+
+comquad uses GoReleaser with nFPM to generate RPM and DEB packages for distribution. The release workflow builds two packages:
+
+### Package Structure
+
+**comquad package:**
+- `/usr/bin/comquad` — CLI binary
+- `/usr/share/bash-completion/completions/comquad` — Bash completion
+- `/usr/share/zsh/vendor-completions/_comquad` — Zsh completion
+- `/usr/share/fish/vendor_completions.d/comquad.fish` — Fish completion
+- `/usr/share/doc/comquad/copyright` — License file
+
+**cockpit-comquad package:**
+- `/usr/share/cockpit/comquad/` — Cockpit web UI plugin assets
+- Depends on `comquad` package
+- Recommends `cockpit` (DEB) / Suggests `cockpit` (RPM)
+
+### Build Process
+
+The release workflow (`.github/workflows/release.yml`):
+1. Builds cockpit-comquad web assets and creates a tarball
+2. Runs GoReleaser which:
+   - Builds binaries for Linux (amd64, arm64, riscv64)
+   - Generates shell completions via `scripts/completions.sh`
+   - Creates RPM and DEB packages via nFPM
+   - Signs checksums with cosign (optional)
+   - Attaches packages to GitHub release
+
+### Configuration
+
+Package configuration is in `.goreleaser.yml`:
+- `nfpms` section defines package metadata and file mappings
+- `builds` section configures Go build settings
+- `archives` section defines tarball contents
+- `changelog` section groups commits by type (feat, fix, docs, etc.)
+
+The `cockpit-comquad` package uses `meta: true` to exclude the binary (it's provided by the `comquad` dependency).
+
 ## Cockpit Plugin
 
 The `cockpit-comquad/` directory contains a Cockpit web UI plugin for managing comquad projects. The plugin communicates with comquad via `cockpit.spawn()` calls to the CLI with `--json` flag. It does not require a separate backend daemon.

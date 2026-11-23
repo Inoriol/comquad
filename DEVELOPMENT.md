@@ -135,6 +135,67 @@ For running units, `logs` uses the unit's current invocation ID to avoid mixing 
 
 Quiet mode takes precedence over verbose mode. Errors are not suppressed.
 
+## Packaging and Release
+
+### Local Testing
+
+Test package builds locally without publishing:
+
+```bash
+# Generate completions
+./scripts/completions.sh
+
+# Build cockpit-comquad web assets
+cd cockpit-comquad && npm run build && cd ..
+mkdir -p cockpit-dist && cp -r cockpit-comquad/dist/* cockpit-dist/
+
+# Run GoReleaser snapshot
+goreleaser release --snapshot --clean --skip=publish
+
+# Inspect packages
+rpm -qlp dist/comquad_*.rpm
+dpkg-deb -c dist/comquad_*.deb
+```
+
+### Release Workflow
+
+The release is triggered by pushing a tag matching `v*`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The GitHub Actions workflow (`.github/workflows/release.yml`):
+1. Builds cockpit-comquad and creates a tarball
+2. Runs GoReleaser to build binaries and packages
+3. Creates a draft release with all artifacts
+
+### Package Configuration
+
+Package metadata is defined in `.goreleaser.yml`:
+- `nfpms` — RPM/DEB package configuration
+- `builds` — Go build settings (trimpath, ldflags, architectures)
+- `archives` — Tarball contents and naming
+- `changelog` — Commit grouping and filtering
+
+### Adding New Files to Packages
+
+To include additional files in the packages:
+
+1. Add to `nfpms.contents` in `.goreleaser.yml`:
+   ```yaml
+   contents:
+     - src: ./path/to/file
+       dst: /usr/share/comquad/file
+       file_info:
+         mode: 0644
+   ```
+
+2. For generated files (completions, man pages), add generation to `scripts/completions.sh` or a similar script.
+
+3. Test locally with `goreleaser release --snapshot --clean --skip=publish`.
+
 ## Testing Architecture
 
 The orchestrator uses injectable dependencies instead of constructing external clients inside every operation. Its factories include:
